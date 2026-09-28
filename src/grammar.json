@@ -1014,7 +1014,7 @@
                     "type": "ALIAS",
                     "content": {
                       "type": "SYMBOL",
-                      "name": "_for_lexical_declaration"
+                      "name": "for_lexical_declaration"
                     },
                     "named": true,
                     "value": "lexical_declaration"
@@ -1023,7 +1023,7 @@
                     "type": "ALIAS",
                     "content": {
                       "type": "SYMBOL",
-                      "name": "_for_variable_declaration"
+                      "name": "for_variable_declaration"
                     },
                     "named": true,
                     "value": "variable_declaration"
@@ -1114,7 +1114,7 @@
         }
       ]
     },
-    "_for_lexical_declaration": {
+    "for_lexical_declaration": {
       "type": "SEQ",
       "members": [
         {
@@ -1165,7 +1165,7 @@
         }
       ]
     },
-    "_for_variable_declaration": {
+    "for_variable_declaration": {
       "type": "SEQ",
       "members": [
         {
@@ -7134,7 +7134,7 @@
     [
       {
         "type": "SYMBOL",
-        "name": "_for_lexical_declaration"
+        "name": "for_lexical_declaration"
       },
       {
         "type": "SYMBOL",

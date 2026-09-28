@@ -119,7 +119,7 @@ module.exports = grammar({
     [$.import_statement, $.import],
     [$.export_statement, $.primary_expression],
     [$.lexical_declaration, $.primary_expression],
-    [$._for_lexical_declaration, $.primary_expression],
+    [$.for_lexical_declaration, $.primary_expression],
   ],
 
   conflicts: ($) => [
@@ -299,8 +299,8 @@ module.exports = grammar({
           field(
             'initializer',
             choice(
-              alias($._for_lexical_declaration, $.lexical_declaration),
-              alias($._for_variable_declaration, $.variable_declaration)
+              alias($.for_lexical_declaration, $.lexical_declaration),
+              alias($.for_variable_declaration, $.variable_declaration)
             )
           ),
           seq(field('initializer', $._expressions), ';'),
@@ -314,10 +314,11 @@ module.exports = grammar({
 
     // ECMAScript inserts no semicolon inside a for header, so these declarations end only with `;`. Accepting an
     // automatic semicolon there made `for (let x\n of y)` ambiguous until `of`, and an incremental reparse could
-    // reuse a declaration built when that ambiguity was resolved differently.
-    _for_lexical_declaration: ($) => seq(field('kind', choice('let', 'const')), commaSep1($.variable_declarator), ';'),
+    // reuse a declaration built when that ambiguity was resolved differently. The rules are visible and only used
+    // through aliases: a hidden rule would make `for_statement` inherit their `kind` field.
+    for_lexical_declaration: ($) => seq(field('kind', choice('let', 'const')), commaSep1($.variable_declarator), ';'),
 
-    _for_variable_declaration: ($) => seq('var', commaSep1($.variable_declarator), ';'),
+    for_variable_declaration: ($) => seq('var', commaSep1($.variable_declarator), ';'),
 
     for_in_statement: ($) => seq('for', optional('await'), $._for_header, field('body', $.statement)),
 
