@@ -119,6 +119,7 @@ module.exports = grammar({
     [$.import_statement, $.import],
     [$.export_statement, $.primary_expression],
     [$.lexical_declaration, $.primary_expression],
+    [$._for_lexical_declaration, $.primary_expression],
   ],
 
   conflicts: ($) => [
@@ -131,7 +132,6 @@ module.exports = grammar({
     [$.primary_expression, $.rest_pattern],
     [$.primary_expression, $.pattern],
     [$.primary_expression, $._for_header],
-    [$.variable_declarator, $._for_header],
     [$.array, $.array_pattern],
     [$.object, $.object_pattern],
     [$.assignment_expression, $.pattern],
@@ -296,7 +296,13 @@ module.exports = grammar({
         'for',
         '(',
         choice(
-          field('initializer', choice($.lexical_declaration, $.variable_declaration)),
+          field(
+            'initializer',
+            choice(
+              alias($._for_lexical_declaration, $.lexical_declaration),
+              alias($._for_variable_declaration, $.variable_declaration)
+            )
+          ),
           seq(field('initializer', $._expressions), ';'),
           field('initializer', $.empty_statement)
         ),
@@ -305,6 +311,13 @@ module.exports = grammar({
         ')',
         field('body', $.statement)
       ),
+
+    // ECMAScript inserts no semicolon inside a for header, so these declarations end only with `;`. Accepting an
+    // automatic semicolon there made `for (let x\n of y)` ambiguous until `of`, and an incremental reparse could
+    // reuse a declaration built when that ambiguity was resolved differently.
+    _for_lexical_declaration: ($) => seq(field('kind', choice('let', 'const')), commaSep1($.variable_declarator), ';'),
+
+    _for_variable_declaration: ($) => seq('var', commaSep1($.variable_declarator), ';'),
 
     for_in_statement: ($) => seq('for', optional('await'), $._for_header, field('body', $.statement)),
 
@@ -320,13 +333,11 @@ module.exports = grammar({
           ),
           seq(
             field('kind', choice('let', 'const')),
-            field('left', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern)),
-            optional($._automatic_semicolon)
+            field('left', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern))
           ),
           seq(
             field('kind', choice('using', seq('await', 'using'))),
-            field('left', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern)),
-            optional($._automatic_semicolon)
+            field('left', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern))
           )
         ),
         field('operator', choice('in', 'of')),

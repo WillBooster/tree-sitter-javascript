@@ -7,22 +7,14 @@ import { testCommand } from './run.js';
 // exits zero even when a case fails or no corpus is found, so its output decides: it must list the cases
 // it fuzzed and print no failure summary. TREE_SITTER_SEED, TREE_SITTER_ITERATIONS,
 // and TREE_SITTER_EDITS explore further locally.
-// "For statements" is excluded until its known inconsistency is fixed: after an edit to `of` in
-// `for (let j\n  of k);` and its undo, the reparse reuses the `let j` declaration ended by an automatic semicolon
-// and yields an ERROR instead of the for-in statement a fresh parse yields.
-testCommand(
-  'reparses the corpus consistently after random edits',
-  ['bun', 'run', 'tree-sitter', 'fuzz', '--exclude', 'For statements'],
-  900_000,
-  {
-    env: {
-      TREE_SITTER_SEED: process.env.TREE_SITTER_SEED ?? '1',
-      TREE_SITTER_ITERATIONS: process.env.TREE_SITTER_ITERATIONS ?? '1000',
-      TREE_SITTER_EDITS: process.env.TREE_SITTER_EDITS ?? '10',
-    },
-    check: (output) => {
-      expect(output).toMatch(/^ +\d+\. .+ - corpus - /m);
-      expect(output).not.toContain('failed fuzzing');
-    },
-  }
-);
+testCommand('reparses the corpus consistently after random edits', ['bun', 'run', 'tree-sitter', 'fuzz'], 900_000, {
+  env: {
+    TREE_SITTER_SEED: process.env.TREE_SITTER_SEED ?? '1',
+    TREE_SITTER_ITERATIONS: process.env.TREE_SITTER_ITERATIONS ?? '1000',
+    TREE_SITTER_EDITS: process.env.TREE_SITTER_EDITS ?? '10',
+  },
+  check: (output) => {
+    expect(output).toMatch(/^ +\d+\. .+ - corpus - /m);
+    expect(output).not.toContain('failed fuzzing');
+  },
+});
