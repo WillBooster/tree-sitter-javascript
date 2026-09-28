@@ -1,63 +1,70 @@
 {
   "name": "@willbooster/tree-sitter-javascript",
-  "version": "0.25.0",
+  "version": "0.0.0-semantically-released",
   "description": "JavaScript grammar for tree-sitter",
-  "repository": "https://github.com/WillBooster/tree-sitter-javascript",
-  "license": "MIT",
-  "author": "WillBooster Inc.",
-  "contributors": [
-    {
-      "name": "Max Brunsfeld",
-      "email": "maxbrunsfeld@gmail.com"
-    }
-  ],
-  "maintainers": [
-    {
-      "name": "Amaan Qureshi",
-      "email": "amaanq12@gmail.com"
-    }
-  ],
-  "main": "bindings/node",
-  "types": "bindings/node",
   "keywords": [
     "incremental",
     "parsing",
     "tree-sitter",
     "javascript"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WillBooster/tree-sitter-javascript.git"
+  },
+  "license": "MIT",
+  "author": "WillBooster Inc.",
   "files": [
     "grammar.js",
     "tree-sitter.json",
-    "binding.gyp",
-    "prebuilds/**",
-    "bindings/node/*",
-    "queries/*",
-    "src/**",
+    "src/node-types.json",
     "*.wasm"
   ],
-  "dependencies": {
-    "node-addon-api": "^8.3.1",
-    "node-gyp-build": "^4.8.4"
+  "scripts": {
+    "build-wasm": "tree-sitter build --wasm",
+    "build/ci": "tree-sitter generate && tree-sitter build --wasm",
+    "cleanup": "bun wb lint --fix --format",
+    "format": "bun wb lint --format",
+    "lint": "bun wb lint",
+    "lint-fix": "bun wb lint --fix",
+    "prepare": "(bun lefthook install || true) && (test ! -f .lefthook/normalize-bun-lockfile.sh || bash .lefthook/normalize-bun-lockfile.sh)",
+    "release": "wb release",
+    "prestart": "bun run build-wasm",
+    "start": "tree-sitter playground",
+    "test": "bun wb test",
+    "test/ci": "bun wb test-on-ci",
+    "typecheck": "bun wb typecheck",
+    "verify": "bun wb verify",
+    "verify-full": "bun wb verify --full"
   },
   "devDependencies": {
-    "eslint": "^9.14.0",
-    "eslint-config-treesitter": "^1.0.2",
-    "prebuildify": "^6.0.1",
-    "tree-sitter-cli": "^0.25.8"
+    "@semantic-release/exec": "7.1.0",
+    "@tsconfig/bun": "1.0.11",
+    "@types/bun": "1.4.2",
+    "@willbooster/oxfmt-config": "1.2.2",
+    "@willbooster/oxlint-config": "1.4.8",
+    "@willbooster/wb": "22.8.0",
+    "conventional-changelog-conventionalcommits": "10.4.0",
+    "lefthook": "2.1.14",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
+    "oxlint-tsgolint": "7.0.2002",
+    "semantic-release": "25.0.9",
+    "sort-package-json": "4.0.0",
+    "tree-sitter-cli": "0.27.0",
+    "typescript": "7.0.2",
+    "web-tree-sitter": "0.27.0"
   },
   "peerDependencies": {
-    "tree-sitter": "^0.25.0"
+    "web-tree-sitter": "^0.27.0"
   },
   "peerDependenciesMeta": {
-    "tree-sitter": {
+    "web-tree-sitter": {
       "optional": true
     }
   },
-  "scripts": {
-    "install": "node-gyp-build",
-    "lint": "eslint grammar.js",
-    "prestart": "tree-sitter build --wasm",
-    "start": "tree-sitter playground",
-    "test": "node --test bindings/node/*_test.js"
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }
