@@ -126,13 +126,14 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
 }
 
 // Called after an arrow function's block body and a line break: such a function cannot be continued by a member
-// access, call, or operator, so the statement ends unless a `,` continues the list or a `;` ends it explicitly.
+// access, call, or operator, so the statement ends unless a `,` continues the list, a `;` ends it explicitly, or a `?`
+// continues an enclosing conditional expression (`a ? b : () => {}` then `? c : d`, which V8 accepts).
 static bool ends_statement_after_block_arrow(TSLexer *lexer, bool *scanned_comment) {
     // REJECT means a `/` that starts no comment, i.e. a regex.
     if (scan_whitespace_and_comments(lexer, scanned_comment, true) == REJECT) {
         return true;
     }
-    return lexer->lookahead != ',' && lexer->lookahead != ';';
+    return lexer->lookahead != ',' && lexer->lookahead != ';' && lexer->lookahead != '?';
 }
 
 /**
