@@ -1,9 +1,11 @@
 # @willbooster/tree-sitter-javascript
 
+[![npm version](https://img.shields.io/npm/v/@willbooster/tree-sitter-javascript.svg)](https://www.npmjs.com/package/@willbooster/tree-sitter-javascript)
+[![license](https://img.shields.io/npm/l/@willbooster/tree-sitter-javascript.svg)](https://www.npmjs.com/package/@willbooster/tree-sitter-javascript)
 [![Test](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test.yml/badge.svg)](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test.yml)
 [![Test rust](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test-rust.yml/badge.svg)](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test-rust.yml)
 [![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
-[![wbfy](https://img.shields.io/badge/wbfy-20.24.0-1e90ff.svg)](https://github.com/WillBooster/shared/tree/main/packages/wbfy)
+[![wbfy](https://img.shields.io/badge/wbfy-20.26.0-1e90ff.svg)](https://github.com/WillBooster/shared/tree/main/packages/wbfy)
 [![crates.io](https://img.shields.io/crates/v/willbooster-tree-sitter-javascript.svg)](https://crates.io/crates/willbooster-tree-sitter-javascript)
 
 JavaScript and JSX grammar for [tree-sitter](https://github.com/tree-sitter/tree-sitter), forked from
@@ -14,11 +16,13 @@ This fork fixes parsing bugs and raises conformance with [ECMAScript (ECMA-262)]
 
 ## Usage
 
-The npm package ships `tree-sitter-javascript.wasm` for [web-tree-sitter](https://www.npmjs.com/package/web-tree-sitter):
+The npm package ships `tree-sitter-javascript.wasm` for
+[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter), which runs in Node.js, Bun,
+browsers, and Cloudflare Workers. In Node.js and Bun, load it from the package:
 
 ```js
 import { fileURLToPath } from 'node:url';
-import { Language, Parser } from 'web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 
 await Parser.init();
 const parser = new Parser();
@@ -27,7 +31,33 @@ parser.setLanguage(await Language.load(wasmPath));
 const tree = parser.parse('const App = () => <p>Hello</p>;\n');
 ```
 
-The package also ships the node types in `src/node-types.json`.
+In browsers, let your bundler serve both `.wasm` files and pass their URLs:
+
+```js
+import { Language, Parser } from '@willbooster/web-tree-sitter';
+import runtimeUrl from '@willbooster/web-tree-sitter/web-tree-sitter.wasm?url'; // Vite
+import javascriptUrl from '@willbooster/tree-sitter-javascript/tree-sitter-javascript.wasm?url';
+
+await Parser.init({ locateFile: () => runtimeUrl });
+const parser = new Parser();
+parser.setLanguage(await Language.load(javascriptUrl));
+```
+
+In Cloudflare Workers, which do not allow compiling Wasm at run time, import both `.wasm` files as modules, with or
+without Node.js compatibility:
+
+```js
+import { Language, Parser } from '@willbooster/web-tree-sitter';
+import runtime from '@willbooster/web-tree-sitter/web-tree-sitter.wasm';
+import javascript from '@willbooster/tree-sitter-javascript/tree-sitter-javascript.wasm';
+
+await Parser.init({ wasmModule: runtime });
+const parser = new Parser();
+parser.setLanguage(await Language.load(javascript));
+```
+
+The package also ships the node types in `src/node-types.json`, and `grammar.js` and the queries in `queries/` for
+grammars that extend this one (e.g. `require('@willbooster/tree-sitter-javascript/grammar')`).
 
 In Rust, depend on the [crate](https://crates.io/crates/willbooster-tree-sitter-javascript):
 
@@ -65,7 +95,10 @@ cargo test
   it; review its diff before committing;
 - a performance check (`test/unit/performance.test.ts`) that recovering from an error on each of 10,000 lines takes
   linear time, since consumers parse files while they are being edited. It loads the Wasm build through
-  web-tree-sitter, which `bun run build/ci` rebuilds after regenerating the parser.
+  @willbooster/web-tree-sitter, which `bun run build/ci` rebuilds after regenerating the parser;
+- checks that the Wasm build parses in Chromium (`test/unit/browser/`) and in Cloudflare Workers with and without
+  Node.js compatibility (`test/unit/workers.test.ts`). Run `bun run test/ci-setup` once before the first
+  run to install Chromium and, on Linux, the system libraries it needs.
 
 CI also runs these tests on Linux arm64 and macOS, where the Rust binding compiles the parser natively, and fuzzes the parser with libFuzzer and sanitizers
 (`.github/workflows/robustness.yml`).

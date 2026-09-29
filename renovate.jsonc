@@ -13,8 +13,8 @@
   ],
   "packageRules": [
     {
-      // The Wasm build that tree-sitter-cli emits must load in the web-tree-sitter release of the same version.
-      "matchPackageNames": ["tree-sitter-cli", "web-tree-sitter"],
+      // The Wasm build that tree-sitter-cli emits must load in @willbooster/web-tree-sitter.
+      "matchPackageNames": ["tree-sitter-cli", "@willbooster/web-tree-sitter"],
       "groupName": "tree-sitter",
     },
   ],
