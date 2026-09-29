@@ -1,24 +1,12 @@
 {
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
   "grammars": [
     {
       "name": "javascript",
       "camelcase": "JavaScript",
       "scope": "source.js",
       "path": ".",
-      "file-types": [
-        "js",
-        "mjs",
-        "cjs",
-        "jsx"
-      ],
-      "highlights": [
-        "queries/highlights.scm",
-        "queries/highlights-jsx.scm",
-        "queries/highlights-params.scm"
-      ],
-      "tags": [
-        "queries/tags.scm"
-      ],
+      "file-types": ["js", "mjs", "cjs", "jsx"],
       "injection-regex": "^(js|javascript)$"
     }
   ],
@@ -28,12 +16,7 @@
     "description": "JavaScript grammar for tree-sitter",
     "authors": [
       {
-        "name": "Max Brunsfeld",
-        "email": "maxbrunsfeld@gmail.com"
-      },
-      {
-        "name": "Amaan Qureshi",
-        "email": "amaanq12@gmail.com"
+        "name": "WillBooster Inc."
       }
     ],
     "links": {
@@ -41,11 +24,13 @@
     }
   },
   "bindings": {
-    "c": true,
-    "go": true,
-    "node": true,
-    "python": true,
+    "c": false,
+    "go": false,
+    "java": false,
+    "node": false,
+    "python": false,
     "rust": true,
-    "swift": true
+    "swift": false,
+    "zig": false
   }
 }
