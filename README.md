@@ -97,8 +97,8 @@ cargo test
   linear time, since consumers parse files while they are being edited. It loads the Wasm build through
   @willbooster/web-tree-sitter, which `bun run build/ci` rebuilds after regenerating the parser;
 - checks that the Wasm build parses in Chromium (`test/unit/browser/`) and in Cloudflare Workers with and without
-  Node.js compatibility (`test/unit/workers.test.ts`). Run `bunx playwright install chromium` once before the first
-  run.
+  Node.js compatibility (`test/unit/workers.test.ts`). Run `bun run test/ci-setup` once before the first
+  run to install Chromium and, on Linux, the system libraries it needs.
 
 CI also runs these tests on Linux arm64 and macOS, where the Rust binding compiles the parser natively, and fuzzes the parser with libFuzzer and sanitizers
 (`.github/workflows/robustness.yml`).
