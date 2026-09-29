@@ -127,7 +127,8 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
 
 /**
  * @param after_block_arrow Whether an arrow function's block body has just ended. Such a function cannot be continued
- * by a member access, call, or operator, so a line break always ends the statement unless a `,` continues the list.
+ * by a member access, call, or operator, so a line break ends the statement unless a `,` continues the list or a `;`
+ * ends it explicitly.
  */
 static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, bool after_block_arrow,
                                      bool *scanned_comment) {
@@ -177,7 +178,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
     }
 
     if (after_block_arrow) {
-        return lexer->lookahead != ',';
+        return lexer->lookahead != ',' && lexer->lookahead != ';';
     }
 
     switch (lexer->lookahead) {

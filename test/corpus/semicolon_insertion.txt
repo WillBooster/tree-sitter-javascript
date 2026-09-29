@@ -330,6 +330,8 @@ n({ o: () => {}
 p = c ? () => {}
   : () => {}
 [q]
+r = () => {}
+;[s]
 
 ---
 
@@ -376,4 +378,7 @@ p = c ? () => {}
         (identifier)
         (arrow_function (formal_parameters) (statement_block))
         (arrow_function (formal_parameters) (statement_block)))))
+  (expression_statement (array (identifier)))
+  (expression_statement
+    (assignment_expression (identifier) (arrow_function (formal_parameters) (statement_block))))
   (expression_statement (array (identifier))))
