@@ -573,12 +573,24 @@ module.exports = grammar({
       choice(
         seq(
           '"',
-          repeat(choice(alias($.unescaped_double_jsx_string_fragment, $.string_fragment), $.html_character_reference)),
+          repeat(
+            choice(
+              alias($.unescaped_double_jsx_string_fragment, $.string_fragment),
+              $.html_character_reference,
+              alias($._jsx_string_ampersand, $.string_fragment)
+            )
+          ),
           '"'
         ),
         seq(
           "'",
-          repeat(choice(alias($.unescaped_single_jsx_string_fragment, $.string_fragment), $.html_character_reference)),
+          repeat(
+            choice(
+              alias($.unescaped_single_jsx_string_fragment, $.string_fragment),
+              $.html_character_reference,
+              alias($._jsx_string_ampersand, $.string_fragment)
+            )
+          ),
           "'"
         )
       ),
@@ -587,10 +599,14 @@ module.exports = grammar({
     // We give names to the token() constructs containing a regexp
     // so as to obtain a node in the CST.
     //
-    unescaped_double_jsx_string_fragment: () => token.immediate(prec(1, /([^"&]|&[^#A-Za-z])+/)),
+    unescaped_double_jsx_string_fragment: () => token.immediate(prec(1, /([^"&]|&[^#A-Za-z"&])+/)),
 
     // same here
-    unescaped_single_jsx_string_fragment: () => token.immediate(prec(1, /([^'&]|&[^#A-Za-z])+/)),
+    unescaped_single_jsx_string_fragment: () => token.immediate(prec(1, /([^'&]|&[^#A-Za-z'&])+/)),
+
+    // An `&` that does not start a complete html_character_reference is a literal character, as in HTML. The lexer
+    // prefers the longer html_character_reference when one follows.
+    _jsx_string_ampersand: () => token.immediate(/&/),
 
     _jsx_attribute_value: ($) => choice(alias($._jsx_string, $.string), $.jsx_expression, $._jsx_element),
 

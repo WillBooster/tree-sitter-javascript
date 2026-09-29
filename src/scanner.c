@@ -289,6 +289,37 @@ static bool scan_html_comment(TSLexer *lexer) {
     return true;
 }
 
+static inline bool is_ascii_letter(int32_t c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+
+static inline bool is_ascii_digit(int32_t c) { return c >= '0' && c <= '9'; }
+
+static inline bool is_hex_digit(int32_t c) { return is_ascii_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'); }
+
+// Consumes the `&` at the lookahead and the characters after it that could continue an html_character_reference, and
+// returns whether they form a complete one, i.e. whether the grammar's html_character_reference matches here.
+static bool scan_character_reference(TSLexer *lexer) {
+    advance(lexer);
+    unsigned length = 0;
+    if (lexer->lookahead == '#') {
+        advance(lexer);
+        bool hex = lexer->lookahead == 'x' || lexer->lookahead == 'X';
+        if (hex) {
+            advance(lexer);
+        }
+        unsigned max_length = hex ? 6 : 5;
+        while (length < max_length && (hex ? is_hex_digit(lexer->lookahead) : is_ascii_digit(lexer->lookahead))) {
+            advance(lexer);
+            length++;
+        }
+    } else {
+        while (length < 30 && is_ascii_letter(lexer->lookahead)) {
+            advance(lexer);
+            length++;
+        }
+    }
+    return length > 0 && lexer->lookahead == ';';
+}
+
 static bool scan_jsx_text(TSLexer *lexer) {
     // saw_text will be true if we see any non-whitespace content, or any whitespace content that is not a newline and
     // does not immediately follow a newline.
@@ -297,8 +328,28 @@ static bool scan_jsx_text(TSLexer *lexer) {
     // immediately follows a newline.
     bool at_newline = false;
 
-    while (lexer->lookahead != 0 && lexer->lookahead != '<' && lexer->lookahead != '>' && lexer->lookahead != '{' &&
-           lexer->lookahead != '}' && lexer->lookahead != '&') {
+    lexer->result_symbol = JSX_TEXT;
+    for (;;) {
+        lexer->mark_end(lexer);
+        switch (lexer->lookahead) {
+            case 0:
+            case '<':
+            case '>':
+            case '{':
+            case '}':
+                return saw_text;
+            case '&':
+                // A complete character reference ends the text; any other `&` is a literal character, as in HTML.
+                if (scan_character_reference(lexer)) {
+                    return saw_text;
+                }
+                saw_text = true;
+                at_newline = false;
+                continue;
+            default:
+                break;
+        }
+
         bool is_wspace = iswspace(lexer->lookahead);
         if (lexer->lookahead == '\n') {
             at_newline = true;
@@ -325,9 +376,6 @@ static bool scan_jsx_text(TSLexer *lexer) {
 
         advance(lexer);
     }
-
-    lexer->result_symbol = JSX_TEXT;
-    return saw_text;
 }
 
 bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer, const bool *valid_symbols) {
