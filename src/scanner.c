@@ -1,3 +1,4 @@
+#include "tree_sitter/alloc.h"
 #include "tree_sitter/parser.h"
 
 #include <stdio.h>
@@ -12,15 +13,32 @@ enum TokenType {
     ESCAPE_SEQUENCE,
     REGEX_PATTERN,
     JSX_TEXT,
+    ARROW_FUNCTION_BLOCK_END,
+    ARROW_FUNCTION_BLOCK_CONTINUATION,
 };
 
-void *tree_sitter_javascript_external_scanner_create() { return NULL; }
+typedef struct {
+    // Set by ARROW_FUNCTION_BLOCK_END, and cleared by the AUTOMATIC_SEMICOLON or ARROW_FUNCTION_BLOCK_CONTINUATION that
+    // follows it. The flag lives in the scanner state, which tree-sitter stores in each external token, because
+    // incremental parsing can reuse the arrow function and lex the next token after the parser has left the states in
+    // which these tokens are valid.
+    bool automatic_semicolon_pending;
+} Scanner;
 
-void tree_sitter_javascript_external_scanner_destroy(void *p) {}
+void *tree_sitter_javascript_external_scanner_create() { return ts_calloc(1, sizeof(Scanner)); }
 
-unsigned tree_sitter_javascript_external_scanner_serialize(void *payload, char *buffer) { return 0; }
+void tree_sitter_javascript_external_scanner_destroy(void *payload) { ts_free(payload); }
 
-void tree_sitter_javascript_external_scanner_deserialize(void *p, const char *b, unsigned n) {}
+unsigned tree_sitter_javascript_external_scanner_serialize(void *payload, char *buffer) {
+    Scanner *scanner = (Scanner *)payload;
+    buffer[0] = (char)scanner->automatic_semicolon_pending;
+    return 1;
+}
+
+void tree_sitter_javascript_external_scanner_deserialize(void *payload, const char *buffer, unsigned length) {
+    Scanner *scanner = (Scanner *)payload;
+    scanner->automatic_semicolon_pending = length > 0 && buffer[0];
+}
 
 static inline void advance(TSLexer *lexer) { lexer->advance(lexer, false); }
 
@@ -107,7 +125,12 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
     }
 }
 
-static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, bool *scanned_comment) {
+/**
+ * @param after_block_arrow Whether an arrow function's block body has just ended. Such a function cannot be continued
+ * by a member access, call, or operator, so a line break always ends the statement unless a `,` continues the list.
+ */
+static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, bool after_block_arrow,
+                                     bool *scanned_comment) {
     lexer->result_symbol = AUTOMATIC_SEMICOLON;
     lexer->mark_end(lexer);
 
@@ -148,8 +171,13 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
 
     skip(lexer);
 
+    // REJECT means a `/` that starts no comment, i.e. a division or a regex.
     if (scan_whitespace_and_comments(lexer, scanned_comment, true) == REJECT) {
-        return false;
+        return after_block_arrow;
+    }
+
+    if (after_block_arrow) {
+        return lexer->lookahead != ',';
     }
 
     switch (lexer->lookahead) {
@@ -379,6 +407,8 @@ static bool scan_jsx_text(TSLexer *lexer) {
 }
 
 bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer, const bool *valid_symbols) {
+    Scanner *scanner = (Scanner *)payload;
+
     if (valid_symbols[TEMPLATE_CHARS]) {
         if (valid_symbols[AUTOMATIC_SEMICOLON]) {
             return false;
@@ -386,13 +416,27 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         return scan_template_chars(lexer);
     }
 
+    if (scanner->automatic_semicolon_pending &&
+        (valid_symbols[AUTOMATIC_SEMICOLON] || valid_symbols[ARROW_FUNCTION_BLOCK_CONTINUATION])) {
+        scanner->automatic_semicolon_pending = false;
+        lexer->result_symbol =
+            valid_symbols[AUTOMATIC_SEMICOLON] ? AUTOMATIC_SEMICOLON : ARROW_FUNCTION_BLOCK_CONTINUATION;
+        lexer->mark_end(lexer);
+        return true;
+    }
+
     if (valid_symbols[JSX_TEXT] && scan_jsx_text(lexer)) {
         return true;
     }
 
-    if (valid_symbols[AUTOMATIC_SEMICOLON]) {
+    if (valid_symbols[AUTOMATIC_SEMICOLON] || valid_symbols[ARROW_FUNCTION_BLOCK_END]) {
+        bool after_block_arrow = valid_symbols[ARROW_FUNCTION_BLOCK_END];
         bool scanned_comment = false;
-        bool ret = scan_automatic_semicolon(lexer, !valid_symbols[LOGICAL_OR], &scanned_comment);
+        bool ret = scan_automatic_semicolon(lexer, !valid_symbols[LOGICAL_OR], after_block_arrow, &scanned_comment);
+        if (ret && after_block_arrow) {
+            lexer->result_symbol = ARROW_FUNCTION_BLOCK_END;
+            scanner->automatic_semicolon_pending = true;
+        }
         if (!ret && !scanned_comment && valid_symbols[TERNARY_QMARK] && lexer->lookahead == '?') {
             return scan_ternary_qmark(lexer);
         }

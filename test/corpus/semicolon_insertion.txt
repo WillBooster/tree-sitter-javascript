@@ -307,3 +307,73 @@ b
     (statement_block))))
   (expression_statement
     (member_expression (identifier) (comment) (property_identifier))))
+
+============================================
+Line breaks after arrow functions with block bodies
+============================================
+
+const f = () => {
+}
+[a].forEach(g)
+g = async (x) => {}
+(b)
+h = () => {}
+`t`
+i = () => {}
+/re/.test(s)
+j = () => {}, k = x => {}
+, l
+m = x => x
+[0]
+n({ o: () => {}
+})
+p = c ? () => {}
+  : () => {}
+[q]
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator (identifier) (arrow_function (formal_parameters) (statement_block))))
+  (expression_statement
+    (call_expression
+      (member_expression (array (identifier)) (property_identifier))
+      (arguments (identifier))))
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (arrow_function (formal_parameters (identifier)) (statement_block))))
+  (expression_statement (parenthesized_expression (identifier)))
+  (expression_statement
+    (assignment_expression (identifier) (arrow_function (formal_parameters) (statement_block))))
+  (expression_statement (template_string (string_fragment)))
+  (expression_statement
+    (assignment_expression (identifier) (arrow_function (formal_parameters) (statement_block))))
+  (expression_statement
+    (call_expression
+      (member_expression (regex (regex_pattern)) (property_identifier))
+      (arguments (identifier))))
+  (expression_statement
+    (sequence_expression
+      (assignment_expression (identifier) (arrow_function (formal_parameters) (statement_block)))
+      (assignment_expression (identifier) (arrow_function (identifier) (statement_block)))
+      (identifier)))
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (arrow_function (identifier) (subscript_expression (identifier) (number)))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (object
+          (pair (property_identifier) (arrow_function (formal_parameters) (statement_block)))))))
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (ternary_expression
+        (identifier)
+        (arrow_function (formal_parameters) (statement_block))
+        (arrow_function (formal_parameters) (statement_block)))))
+  (expression_statement (array (identifier))))
