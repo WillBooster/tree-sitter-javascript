@@ -150,6 +150,43 @@ Template strings
       (string_fragment))))
 
 ============================================
+Template strings with escapes invalid outside tagged templates
+============================================
+
+String.raw`C:\update\xfiles`;
+tag`\u{zz} \x4 \u004 \u0041 \x41 \u{41}`;
+
+----
+
+(program
+  (expression_statement
+    (call_expression
+      (member_expression
+        (identifier)
+        (property_identifier))
+      (template_string
+        (string_fragment)
+        (escape_sequence)
+        (string_fragment)
+        (escape_sequence)
+        (string_fragment))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (template_string
+        (escape_sequence)
+        (string_fragment)
+        (escape_sequence)
+        (string_fragment)
+        (escape_sequence)
+        (string_fragment)
+        (escape_sequence)
+        (string_fragment)
+        (escape_sequence)
+        (string_fragment)
+        (escape_sequence)))))
+
+============================================
 Complex function calls with template strings
 ============================================
 new f()`hello`;
