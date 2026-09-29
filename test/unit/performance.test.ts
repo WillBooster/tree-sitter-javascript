@@ -11,10 +11,13 @@ await Parser.init();
 const parser = new Parser();
 parser.setLanguage(await Language.load(WasmPath));
 
+function mtime(file: string): number {
+  return fs.statSync(path.resolve(Root, file)).mtimeMs;
+}
+
 // The tests load the Wasm build as it is, so a check against a stale one would pass after a source edit that
 // brings the slowdown back.
 test('uses a Wasm build built from the current parser', () => {
-  const mtime = (file: string): number => fs.statSync(path.resolve(Root, file)).mtimeMs;
   // `bun run build-wasm` compiles src/ without regenerating it, so src/parser.c must also be newer than grammar.js.
   expect(
     mtime('grammar.js') > mtime('src/parser.c'),
