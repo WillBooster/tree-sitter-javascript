@@ -125,10 +125,18 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
     }
 }
 
+// Called after an arrow function's block body and a line break: such a function cannot be continued by a member
+// access, call, or operator, so the statement ends unless a `,` continues the list or a `;` ends it explicitly.
+static bool ends_statement_after_block_arrow(TSLexer *lexer, bool *scanned_comment) {
+    // REJECT means a `/` that starts no comment, i.e. a regex.
+    if (scan_whitespace_and_comments(lexer, scanned_comment, true) == REJECT) {
+        return true;
+    }
+    return lexer->lookahead != ',' && lexer->lookahead != ';';
+}
+
 /**
- * @param after_block_arrow Whether an arrow function's block body has just ended. Such a function cannot be continued
- * by a member access, call, or operator, so a line break ends the statement unless a `,` continues the list or a `;`
- * ends it explicitly.
+ * @param after_block_arrow Whether an arrow function's block body has just ended.
  */
 static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, bool after_block_arrow,
                                      bool *scanned_comment) {
@@ -144,6 +152,11 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
             WhitespaceResult result = scan_whitespace_and_comments(lexer, scanned_comment, false);
             if (result == REJECT) {
                 return false;
+            }
+
+            // ACCEPT means that the comments contain a line break.
+            if (result == ACCEPT && after_block_arrow) {
+                return ends_statement_after_block_arrow(lexer, scanned_comment);
             }
 
             if (result == ACCEPT && comment_condition && lexer->lookahead != ',' && lexer->lookahead != '=') {
@@ -172,13 +185,12 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
 
     skip(lexer);
 
-    // REJECT means a `/` that starts no comment, i.e. a division or a regex.
-    if (scan_whitespace_and_comments(lexer, scanned_comment, true) == REJECT) {
-        return after_block_arrow;
+    if (after_block_arrow) {
+        return ends_statement_after_block_arrow(lexer, scanned_comment);
     }
 
-    if (after_block_arrow) {
-        return lexer->lookahead != ',' && lexer->lookahead != ';';
+    if (scan_whitespace_and_comments(lexer, scanned_comment, true) == REJECT) {
+        return false;
     }
 
     switch (lexer->lookahead) {

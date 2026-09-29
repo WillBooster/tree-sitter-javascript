@@ -332,6 +332,10 @@ p = c ? () => {}
 [q]
 r = () => {}
 ;[s]
+t = () => {} /*
+*/ [u]
+v = () => {} // c
+(w)
 
 ---
 
@@ -381,4 +385,12 @@ r = () => {}
   (expression_statement (array (identifier)))
   (expression_statement
     (assignment_expression (identifier) (arrow_function (formal_parameters) (statement_block))))
-  (expression_statement (array (identifier))))
+  (expression_statement (array (identifier)))
+  (expression_statement
+    (assignment_expression (identifier) (arrow_function (formal_parameters) (statement_block))))
+  (comment)
+  (expression_statement (array (identifier)))
+  (expression_statement
+    (assignment_expression (identifier) (arrow_function (formal_parameters) (statement_block))))
+  (comment)
+  (expression_statement (parenthesized_expression (identifier))))
