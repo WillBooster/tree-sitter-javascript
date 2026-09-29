@@ -76,6 +76,8 @@ jobs:
             "Cflags: -I$PWD/include" "Libs: -L$PWD -Wl,-rpath,$PWD -ltree-sitter" > tree-sitter.pc
       - name: Fuzz
         working-directory: .tmp/fuzz-action
+        # An explicit bash adds pipefail, so that a failure of make, not only of tee, fails the step.
+        shell: bash
         run: make LANG_NAME="$(jq -r .name "$GITHUB_WORKSPACE/src/grammar.json")" |& tee >(perl annotate.pl)
         env:
           PKG_CONFIG_PATH: ${{ github.workspace }}/.tmp/tree-sitter/lib
