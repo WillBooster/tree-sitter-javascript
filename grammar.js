@@ -912,9 +912,21 @@ module.exports = grammar({
     template_string: ($) =>
       seq(
         '`',
-        repeat(choice(alias($._template_chars, $.string_fragment), $.escape_sequence, $.template_substitution)),
+        repeat(
+          choice(
+            alias($._template_chars, $.string_fragment),
+            $.escape_sequence,
+            alias($._invalid_template_escape, $.escape_sequence),
+            $.template_substitution
+          )
+        ),
         '`'
       ),
+
+    // Tagged templates allow `\x` and `\u` without the hex digits an escape_sequence needs (the cooked string is
+    // undefined). The lexer prefers the longer escape_sequence when the digits follow. Untagged templates reject these
+    // escapes, but the lexer cannot tell the two apart.
+    _invalid_template_escape: () => token.immediate(seq('\\', /[xu]/)),
 
     template_substitution: ($) => seq('${', $._expressions, '}'),
 
