@@ -188,7 +188,7 @@ module.exports = grammar({
     export_specifier: ($) =>
       seq(field('name', $._module_export_name), optional(seq('as', field('alias', $._module_export_name)))),
 
-    _module_export_name: ($) => choice($.identifier, $.string, 'default'),
+    _module_export_name: ($) => choice(reserved('properties', $.identifier), $.string),
 
     declaration: ($) =>
       choice(
@@ -547,15 +547,18 @@ module.exports = grammar({
 
     jsx_identifier: () => /[a-zA-Z_$][a-zA-Z\d_$]*-[a-zA-Z\d_$-]*/,
 
-    _jsx_identifier: ($) => choice(alias($.jsx_identifier, $.identifier), $.identifier),
+    _jsx_identifier: ($) => choice(alias($.jsx_identifier, $.identifier), reserved('properties', $.identifier)),
 
     nested_identifier: ($) =>
       prec(
         'member',
         seq(
-          field('object', choice($.identifier, alias($.nested_identifier, $.member_expression))),
+          field(
+            'object',
+            choice(reserved('properties', $.identifier), alias($.nested_identifier, $.member_expression))
+          ),
           '.',
-          field('property', alias($.identifier, $.property_identifier))
+          field('property', alias(reserved('properties', $.identifier), $.property_identifier))
         )
       ),
 

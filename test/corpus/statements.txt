@@ -304,7 +304,8 @@ export { "string import" as "string export" } from 'foo';
   (export_statement
     (export_clause
       (export_specifier
-        name: (identifier))))
+        name: (identifier)
+        alias: (identifier))))
   (export_statement
     source: (string
       (string_fragment)))
@@ -358,6 +359,67 @@ export { "string import" as "string export" } from 'foo';
           (string_fragment))))
     source: (string
       (string_fragment))))
+
+============================================
+Reserved words as module export names
+============================================
+
+export { default as export } from './x';
+export { a as if, b as default };
+export { if, default } from './x';
+export * as default from 'm';
+export * as for from 'm';
+import { default as d, if as i } from 'm';
+
+---
+
+(program
+  (export_statement
+    (export_clause
+      (export_specifier
+        name: (identifier)
+        alias: (identifier)))
+    source: (string (string_fragment)))
+  (export_statement
+    (export_clause
+      (export_specifier
+        name: (identifier)
+        alias: (identifier))
+      (export_specifier
+        name: (identifier)
+        alias: (identifier))))
+  (export_statement
+    (export_clause
+      (export_specifier
+        name: (identifier))
+      (export_specifier
+        name: (identifier)))
+    source: (string (string_fragment)))
+  (export_statement
+    (namespace_export (identifier))
+    source: (string (string_fragment)))
+  (export_statement
+    (namespace_export (identifier))
+    source: (string (string_fragment)))
+  (import_statement
+    (import_clause
+      (named_imports
+        (import_specifier
+          name: (identifier)
+          alias: (identifier))
+        (import_specifier
+          name: (identifier)
+          alias: (identifier))))
+    source: (string (string_fragment))))
+
+============================================
+Reserved words as imported bindings
+:error
+============================================
+
+import { a as if } from 'm';
+
+---
 
 ============================================
 Decorators before exports
