@@ -44,6 +44,34 @@ static inline void advance(TSLexer *lexer) { lexer->advance(lexer, false); }
 
 static inline void skip(TSLexer *lexer) { lexer->advance(lexer, true); }
 
+static inline bool is_line_terminator(int32_t c) { return c == '\n' || c == '\r' || c == 0x2028 || c == 0x2029; }
+
+// The characters of the whitespace class in the grammar's extras (which includes the line terminators). iswspace
+// depends on the C library and locale and differs from that class.
+static inline bool is_whitespace(int32_t c) {
+    switch (c) {
+        case '\t':
+        case '\n':
+        case '\v':
+        case '\f':
+        case '\r':
+        case ' ':
+        case 0xA0:
+        case 0x1680:
+        case 0x200B:
+        case 0x2028:
+        case 0x2029:
+        case 0x202F:
+        case 0x205F:
+        case 0x2060:
+        case 0x3000:
+        case 0xFEFF:
+            return true;
+        default:
+            return c >= 0x2000 && c <= 0x200A;
+    }
+}
+
 static bool scan_template_chars(TSLexer *lexer) {
     lexer->result_symbol = TEMPLATE_CHARS;
     for (bool has_content = false;; has_content = true) {
@@ -80,7 +108,7 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
     bool saw_block_newline = false;
 
     for (;;) {
-        while (iswspace(lexer->lookahead)) {
+        while (is_whitespace(lexer->lookahead)) {
             skip(lexer);
         }
 
@@ -89,8 +117,7 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
 
             if (lexer->lookahead == '/') {
                 skip(lexer);
-                while (lexer->lookahead != 0 && lexer->lookahead != '\n' && lexer->lookahead != 0x2028 &&
-                       lexer->lookahead != 0x2029) {
+                while (lexer->lookahead != 0 && !is_line_terminator(lexer->lookahead)) {
                     skip(lexer);
                 }
                 *scanned_comment = true;
@@ -109,7 +136,7 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
 
                             break;
                         }
-                    } else if (lexer->lookahead == '\n' || lexer->lookahead == 0x2028 || lexer->lookahead == 0x2029) {
+                    } else if (is_line_terminator(lexer->lookahead)) {
                         saw_block_newline = true;
                         skip(lexer);
                     } else {
@@ -173,11 +200,11 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
             return true;
         }
 
-        if (lexer->lookahead == '\n' || lexer->lookahead == 0x2028 || lexer->lookahead == 0x2029) {
+        if (is_line_terminator(lexer->lookahead)) {
             break;
         }
 
-        if (!iswspace(lexer->lookahead)) {
+        if (!is_whitespace(lexer->lookahead)) {
             return false;
         }
 
@@ -266,7 +293,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
 
 static bool scan_ternary_qmark(TSLexer *lexer) {
     for (;;) {
-        if (!iswspace(lexer->lookahead)) {
+        if (!is_whitespace(lexer->lookahead)) {
             break;
         }
         skip(lexer);
@@ -295,7 +322,7 @@ static bool scan_ternary_qmark(TSLexer *lexer) {
 }
 
 static bool scan_html_comment(TSLexer *lexer) {
-    while (iswspace(lexer->lookahead) || lexer->lookahead == 0x2028 || lexer->lookahead == 0x2029) {
+    while (is_whitespace(lexer->lookahead)) {
         skip(lexer);
     }
 
@@ -320,8 +347,7 @@ static bool scan_html_comment(TSLexer *lexer) {
         return false;
     }
 
-    while (lexer->lookahead != 0 && lexer->lookahead != '\n' && lexer->lookahead != 0x2028 &&
-           lexer->lookahead != 0x2029) {
+    while (lexer->lookahead != 0 && !is_line_terminator(lexer->lookahead)) {
         advance(lexer);
     }
 
@@ -393,7 +419,8 @@ static bool scan_jsx_text(TSLexer *lexer) {
         }
 
         bool is_wspace = iswspace(lexer->lookahead);
-        if (lexer->lookahead == '\n') {
+        // Babel splits JSX text into lines at CR and LF only, and keeps U+2028 and U+2029 as text.
+        if (lexer->lookahead == '\n' || lexer->lookahead == '\r') {
             at_newline = true;
         } else {
             // If at_newline is already true, and we see some whitespace, then it must stay true.

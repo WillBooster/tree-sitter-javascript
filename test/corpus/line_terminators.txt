@@ -1,0 +1,131 @@
+============================================================
+Automatic semicolon insertion at standalone carriage returns
+============================================================
+
+abx++ylet c // commentdconst f = () => {}[a].forEach(g)
+
+---
+
+(program
+  (expression_statement (identifier))
+  (expression_statement (identifier))
+  (expression_statement (identifier))
+  (expression_statement (update_expression (identifier)))
+  (lexical_declaration (variable_declarator (identifier)))
+  (comment)
+  (expression_statement (identifier))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (arrow_function (formal_parameters) (statement_block))))
+  (expression_statement
+    (call_expression
+      (member_expression (array (identifier)) (property_identifier))
+      (arguments (identifier)))))
+
+===================================================
+Line continuations with carriage returns in strings
+===================================================
+
+'a\b';'c\
+d';
+
+---
+
+(program
+  (expression_statement
+    (string (string_fragment) (escape_sequence) (string_fragment)))
+  (expression_statement
+    (string (string_fragment) (escape_sequence) (string_fragment))))
+
+==============================================
+Whitespace-only JSX text with carriage returns
+==============================================
+
+<div>
+  <a />
+</div>;<div>  <b /></div>;
+
+---
+
+(program
+  (expression_statement
+    (jsx_element
+      (jsx_opening_element (identifier))
+      (jsx_self_closing_element (identifier))
+      (jsx_closing_element (identifier))))
+  (expression_statement
+    (jsx_element
+      (jsx_opening_element (identifier))
+      (jsx_self_closing_element (identifier))
+      (jsx_closing_element (identifier)))))
+
+==========================================
+Hash-bang lines ending at carriage returns
+==========================================
+
+#!/usr/bin/env nodeconsole.log(1)
+
+---
+
+(program
+  (hash_bang_line)
+  (expression_statement
+    (call_expression
+      (member_expression (identifier) (property_identifier))
+      (arguments (number)))))
+
+========================================
+Static getters split by carriage returns
+========================================
+
+class A {  static get  a() {}  static  get  b() {}}
+
+---
+
+(program
+  (class_declaration
+    (identifier)
+    (class_body
+      (method_definition (property_identifier) (formal_parameters) (statement_block))
+      (method_definition (property_identifier) (formal_parameters) (statement_block)))))
+
+=================================
+Whitespace after carriage returns
+=================================
+
+a﻿[b]c (d)
+
+---
+
+(program
+  (expression_statement (subscript_expression (identifier) (identifier)))
+  (expression_statement (call_expression (identifier) (arguments (identifier)))))
+
+=====================================================
+Line breaks after an escaped question mark in strings
+:error
+=====================================================
+
+"a\?
+b";
+
+---
+
+=======================================
+Carriage returns in regular expressions
+:error
+=======================================
+
+x = /ab/;
+
+---
+
+======================================
+Line separators in regular expressions
+:error
+======================================
+
+x = /a b/;
+
+---
