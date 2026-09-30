@@ -39,7 +39,10 @@ if (!dryRun && env.GITHUB_REF_NAME?.startsWith(pendingBranchPrefix)) {
   // After the dispatch, since the reusable workflow skips re-runs on a deleted branch.
   await github('DELETE', `git/refs/heads/${env.GITHUB_REF_NAME}`);
 } else if (!(await deferToPendingRelease()) || dryRun) {
-  execFileSync('wb', ['release', ...args], { cwd: rootDir, stdio: 'inherit' });
+  // semantic-release also takes other spellings of `--no-ci` (e.g. `--ci=false`), so whenever this wrapper runs dry,
+  // semantic-release is told to as well; otherwise it could release past a pending release this run did not complete.
+  const releaseArgs = dryRun ? [...args, ...(args.includes('--') ? [] : ['--']), '--dry-run'] : args;
+  execFileSync('wb', ['release', ...releaseArgs], { cwd: rootDir, stdio: 'inherit' });
 }
 
 async function completePendingRelease(tag) {
