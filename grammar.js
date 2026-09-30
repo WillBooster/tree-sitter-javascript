@@ -23,6 +23,12 @@ module.exports = grammar({
     $.escape_sequence,
     $.regex_pattern,
     $.jsx_text,
+    // Zero-width tokens after an arrow function's block body that a line break (or `}` or the end of input) follows:
+    // such a function cannot be called, indexed, or used as an operand, so the statement ends there if it can. The
+    // scanner inserts the automatic semicolon right after _arrow_function_block_end, or else emits
+    // _arrow_function_block_continuation, since the arrow function may be, e.g., an argument.
+    $._arrow_function_block_end,
+    $._arrow_function_block_continuation,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -697,7 +703,13 @@ module.exports = grammar({
           $._call_signature
         ),
         '=>',
-        field('body', choice($.expression, $.statement_block))
+        choice(
+          field('body', $.expression),
+          seq(
+            field('body', $.statement_block),
+            optional(seq($._arrow_function_block_end, optional($._arrow_function_block_continuation)))
+          )
+        )
       ),
 
     // Override

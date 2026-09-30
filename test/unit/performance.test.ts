@@ -29,17 +29,24 @@ test('uses a Wasm build built from the current parser', () => {
   ).toBe(false);
 });
 
-// Consumers parse files being edited, so recovering from many errors must stay linear. Linear recovery
-// takes about 0.2 s here. The check measures this process's CPU time, since the other test files running in
-// parallel (e.g. Chromium and workerd) stretch the wall-clock time on small CI runners.
+// Consumers parse files being edited, so recovering from many errors must stay linear: 10 times as many lines must
+// take about 10 times as long, where quadratic recovery takes about 100 times. The check compares CPU times instead of
+// using a fixed limit, since CI runners differ several-fold in speed and run other test files in parallel, and it
+// parses once before measuring, since compiling the Wasm module counts as CPU time.
 test('recovers from an error on each of 10,000 lines in linear time', () => {
+  cpuTimeToParseErrorLines(10_000);
+  const small = Math.min(...[1, 2, 3].map(() => cpuTimeToParseErrorLines(1000)));
+  const large = Math.min(...[1, 2, 3].map(() => cpuTimeToParseErrorLines(10_000)));
+  expect(large, `1,000 lines took ${small} ms and 10,000 lines ${large} ms`).toBeLessThan(small * 30);
+});
+
+function cpuTimeToParseErrorLines(lines: number): number {
   const start = process.cpuUsage();
-  const tree = parser.parse('$ a\n'.repeat(10_000));
+  const tree = parser.parse('$ a\n'.repeat(lines));
   const { user, system } = process.cpuUsage(start);
-  const elapsed = (user + system) / 1000;
   if (!tree) throw new Error('The parser returned no tree');
   const { hasError } = tree.rootNode;
   tree.delete();
   expect(hasError).toBe(true);
-  expect(elapsed).toBeLessThan(3000);
-});
+  return (user + system) / 1000;
+}
