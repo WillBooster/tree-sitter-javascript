@@ -28,16 +28,24 @@ const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: rootDir, encoding
 // The registries trust this workflow file for publishing.
 const dispatch = (ref) => github('POST', 'actions/workflows/release.yml/dispatches', { ref });
 const pendingBranchPrefix = 'release-pending/';
-// The dry-run options of `wb release` and of semantic-release (forwarded after `--`).
-const dryRun = process.argv.slice(2).some((arg) => ['--dry-run', '--dry', '-d'].includes(arg));
+const args = process.argv.slice(2);
+// `wb release` forwards only the options after `--` to semantic-release and rejects the ones it does not know.
+const releaseOptions = args.includes('--') ? args.slice(args.indexOf('--') + 1) : [];
+// The dry-run options of `wb release` and of semantic-release, and semantic-release's own dry run outside CI unless
+// `--no-ci` is given.
+const dryRun =
+  args.some((arg) => ['--dry-run', '--dry', '-d'].includes(arg)) || (!env.CI && !releaseOptions.includes('--no-ci'));
 
-if (!dryRun && env.GITHUB_REF_NAME.startsWith(pendingBranchPrefix)) {
+if (!dryRun && env.GITHUB_REF_NAME?.startsWith(pendingBranchPrefix)) {
   await completePendingRelease(env.GITHUB_REF_NAME.slice(pendingBranchPrefix.length));
   await dispatch(releaseConfig.branches[0]);
   // After the dispatch, since the reusable workflow skips re-runs on a deleted branch.
   await github('DELETE', `git/refs/heads/${env.GITHUB_REF_NAME}`);
 } else if (!(await deferToPendingRelease()) || dryRun) {
-  execFileSync('wb', ['release', ...process.argv.slice(2)], { cwd: rootDir, stdio: 'inherit' });
+  // semantic-release also takes other spellings of `--no-ci` (e.g. `--ci=false`), so whenever this wrapper runs dry,
+  // semantic-release is told to as well; otherwise it could release past a pending release this run did not complete.
+  const releaseArgs = dryRun ? [...args, ...(args.includes('--') ? [] : ['--']), '--dry-run'] : args;
+  execFileSync('wb', ['release', ...releaseArgs], { cwd: rootDir, stdio: 'inherit' });
 }
 
 async function completePendingRelease(tag) {
@@ -57,9 +65,14 @@ async function completePendingRelease(tag) {
 
 /**
  * Returns whether a pending release of an older commit must be completed before releasing this commit. A dry run only
- * reports what a real run would do.
+ * reports what a real run would do, and skips the check without GitHub credentials, which semantic-release's dry run on
+ * a branch it does not release from does not need.
  */
 async function deferToPendingRelease() {
+  if (dryRun && !(env.GITHUB_REPOSITORY && env.GITHUB_TOKEN)) {
+    console.info('Skipped the check for pending releases, which needs GITHUB_REPOSITORY and GITHUB_TOKEN.');
+    return false;
+  }
   // Oldest first, since versions are released in order.
   const drafts = await listPendingReleases(github);
   for (const draft of drafts.toReversed()) {

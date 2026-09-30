@@ -32,8 +32,9 @@ test('uses a Wasm build built from the current parser', () => {
 // Consumers parse files being edited, so recovering from many errors must stay linear: 10 times as many lines must
 // take about 10 times as long, where quadratic recovery takes about 100 times. The check compares CPU times instead of
 // using a fixed limit, since CI runners differ several-fold in speed and run other test files in parallel, and it
-// parses once before measuring, since compiling the Wasm module counts as CPU time.
-test('recovers from an error on each of 10,000 lines in linear time', () => {
+// parses once before measuring, since compiling the Wasm module counts as CPU time. Its seven parses can exceed
+// Vitest's default 5 s timeout on slow runners (7.3 s on macos-15-intel).
+test('recovers from an error on each of 10,000 lines in linear time', { timeout: 60_000 }, () => {
   cpuTimeToParseErrorLines(10_000);
   const small = Math.min(...[1, 2, 3].map(() => cpuTimeToParseErrorLines(1000)));
   const large = Math.min(...[1, 2, 3].map(() => cpuTimeToParseErrorLines(10_000)));
