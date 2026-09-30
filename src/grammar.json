@@ -1067,8 +1067,13 @@
           "type": "SEQ",
           "members": [
             {
-              "type": "SYMBOL",
-              "name": "variable_declarator"
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_using_declarator"
+              },
+              "named": true,
+              "value": "variable_declarator"
             },
             {
               "type": "REPEAT",
@@ -1080,8 +1085,13 @@
                     "value": ","
                   },
                   {
-                    "type": "SYMBOL",
-                    "name": "variable_declarator"
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "_using_declarator"
+                    },
+                    "named": true,
+                    "value": "variable_declarator"
                   }
                 ]
               }
@@ -1091,6 +1101,31 @@
         {
           "type": "SYMBOL",
           "name": "_semicolon"
+        }
+      ]
+    },
+    "_using_declarator": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_initializer"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
     },
@@ -1268,87 +1303,12 @@
           "value": "("
         },
         {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "FIELD",
-              "name": "initializer",
-              "content": {
-                "type": "CHOICE",
-                "members": [
-                  {
-                    "type": "ALIAS",
-                    "content": {
-                      "type": "SYMBOL",
-                      "name": "for_lexical_declaration"
-                    },
-                    "named": true,
-                    "value": "lexical_declaration"
-                  },
-                  {
-                    "type": "ALIAS",
-                    "content": {
-                      "type": "SYMBOL",
-                      "name": "for_variable_declaration"
-                    },
-                    "named": true,
-                    "value": "variable_declaration"
-                  }
-                ]
-              }
-            },
-            {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "FIELD",
-                  "name": "initializer",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "_expressions"
-                  }
-                },
-                {
-                  "type": "STRING",
-                  "value": ";"
-                }
-              ]
-            },
-            {
-              "type": "FIELD",
-              "name": "initializer",
-              "content": {
-                "type": "SYMBOL",
-                "name": "empty_statement"
-              }
-            }
-          ]
+          "type": "SYMBOL",
+          "name": "_for_initializer"
         },
         {
-          "type": "FIELD",
-          "name": "condition",
-          "content": {
-            "type": "CHOICE",
-            "members": [
-              {
-                "type": "SEQ",
-                "members": [
-                  {
-                    "type": "SYMBOL",
-                    "name": "_expressions"
-                  },
-                  {
-                    "type": "STRING",
-                    "value": ";"
-                  }
-                ]
-              },
-              {
-                "type": "SYMBOL",
-                "name": "empty_statement"
-              }
-            ]
-          }
+          "type": "SYMBOL",
+          "name": "_for_condition"
         },
         {
           "type": "FIELD",
@@ -1379,6 +1339,98 @@
           }
         }
       ]
+    },
+    "_for_initializer": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "initializer",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "for_lexical_declaration"
+                },
+                "named": true,
+                "value": "lexical_declaration"
+              },
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "for_variable_declaration"
+                },
+                "named": true,
+                "value": "variable_declaration"
+              },
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_for_using_declaration"
+                },
+                "named": true,
+                "value": "using_declaration"
+              }
+            ]
+          }
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "initializer",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_expressions"
+              }
+            },
+            {
+              "type": "STRING",
+              "value": ";"
+            }
+          ]
+        },
+        {
+          "type": "FIELD",
+          "name": "initializer",
+          "content": {
+            "type": "SYMBOL",
+            "name": "empty_statement"
+          }
+        }
+      ]
+    },
+    "_for_condition": {
+      "type": "FIELD",
+      "name": "condition",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "_expressions"
+              },
+              {
+                "type": "STRING",
+                "value": ";"
+              }
+            ]
+          },
+          {
+            "type": "SYMBOL",
+            "name": "empty_statement"
+          }
+        ]
+      }
     },
     "for_lexical_declaration": {
       "type": "SEQ",
@@ -1457,6 +1509,76 @@
                   {
                     "type": "SYMBOL",
                     "name": "variable_declarator"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": ";"
+        }
+      ]
+    },
+    "_for_using_declaration": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "kind",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "using"
+              },
+              {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": "await"
+                  },
+                  {
+                    "type": "STRING",
+                    "value": "using"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_using_declarator"
+              },
+              "named": true,
+              "value": "variable_declarator"
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": ","
+                  },
+                  {
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "_using_declarator"
+                    },
+                    "named": true,
+                    "value": "variable_declarator"
                   }
                 ]
               }
@@ -1675,10 +1797,6 @@
                         },
                         "named": true,
                         "value": "identifier"
-                      },
-                      {
-                        "type": "SYMBOL",
-                        "name": "_destructuring_pattern"
                       }
                     ]
                   }
@@ -7214,6 +7332,10 @@
         {
           "type": "STRING",
           "value": "let"
+        },
+        {
+          "type": "STRING",
+          "value": "using"
         }
       ]
     },
