@@ -393,7 +393,8 @@ static bool scan_jsx_text(TSLexer *lexer) {
         }
 
         bool is_wspace = iswspace(lexer->lookahead);
-        if (is_line_terminator(lexer->lookahead)) {
+        // Babel splits JSX text into lines at CR and LF only, and keeps U+2028 and U+2029 as text.
+        if (lexer->lookahead == '\n' || lexer->lookahead == '\r') {
             at_newline = true;
         } else {
             // If at_newline is already true, and we see some whitespace, then it must stay true.

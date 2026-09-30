@@ -59,3 +59,31 @@ Whitespace-only JSX text with carriage returns
       (jsx_opening_element (identifier))
       (jsx_self_closing_element (identifier))
       (jsx_closing_element (identifier)))))
+
+=====================================================
+Line breaks after an escaped question mark in strings
+:error
+=====================================================
+
+"a\?
+b";
+
+---
+
+=======================================
+Carriage returns in regular expressions
+:error
+=======================================
+
+x = /ab/;
+
+---
+
+======================================
+Line separators in regular expressions
+:error
+======================================
+
+x = /a b/;
+
+---
