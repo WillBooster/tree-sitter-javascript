@@ -46,8 +46,8 @@ static inline void skip(TSLexer *lexer) { lexer->advance(lexer, true); }
 
 static inline bool is_line_terminator(int32_t c) { return c == '\n' || c == '\r' || c == 0x2028 || c == 0x2029; }
 
-// The whitespace in the grammar's extras: Unicode White_Space (which includes the line terminators), U+FEFF, U+2060,
-// and U+200B. iswspace depends on the C library and locale and misses some of them.
+// The characters of the whitespace class in the grammar's extras (which includes the line terminators). iswspace
+// depends on the C library and locale and differs from that class.
 static inline bool is_whitespace(int32_t c) {
     switch (c) {
         case '\t':
@@ -56,7 +56,6 @@ static inline bool is_whitespace(int32_t c) {
         case '\f':
         case '\r':
         case ' ':
-        case 0x85:
         case 0xA0:
         case 0x1680:
         case 0x200B:
