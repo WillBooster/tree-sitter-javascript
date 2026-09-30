@@ -59,11 +59,14 @@ parser.setLanguage(await Language.load(javascript));
 The package also ships the node types in `src/node-types.json`, and `grammar.js` and the queries in `queries/` for
 grammars that extend this one (e.g. `require('@willbooster/tree-sitter-javascript/grammar')`).
 
-In Rust, depend on the [crate](https://crates.io/crates/willbooster-tree-sitter-javascript):
+In Rust, depend on the [crate](https://crates.io/crates/willbooster-tree-sitter-javascript) and on
+[willbooster-tree-sitter](https://crates.io/crates/willbooster-tree-sitter), the runtime this package is tested and
+fuzzed with (the grammar also loads in the upstream `tree-sitter` crate 0.27, whose error recovery never ends on some
+malformed input):
 
 ```toml
 [dependencies]
-tree-sitter = "0.27"
+tree-sitter = { package = "willbooster-tree-sitter", version = "1" }
 tree-sitter-javascript = { package = "willbooster-tree-sitter-javascript", version = "1" }
 ```
 
