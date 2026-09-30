@@ -353,8 +353,7 @@ module.exports = grammar({
 
     // ECMAScript inserts no semicolon inside a for header, so these declarations end only with `;`. Accepting an
     // automatic semicolon there made `for (let x\n of y)` ambiguous until `of`, and an incremental reparse could
-    // reuse a declaration built when that ambiguity was resolved differently. The rules are visible and only used
-    // through aliases: a hidden rule would make `for_statement` inherit their `kind` field.
+    // reuse a declaration built when that ambiguity was resolved differently.
     for_lexical_declaration: ($) => seq(field('kind', choice('let', 'const')), commaSep1($.variable_declarator), ';'),
 
     for_variable_declaration: ($) => seq('var', commaSep1($.variable_declarator), ';'),
