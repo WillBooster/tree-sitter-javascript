@@ -153,7 +153,7 @@ module.exports = grammar({
   rules: {
     program: ($) => seq(optional($.hash_bang_line), repeat($.statement)),
 
-    hash_bang_line: () => /#!.*/,
+    hash_bang_line: () => /#![^\n\r\u2028\u2029]*/,
 
     //
     // Export declarations

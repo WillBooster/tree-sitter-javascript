@@ -5523,7 +5523,10 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
     case 127:
       ACCEPT_TOKEN(sym_hash_bang_line);
       if (lookahead != 0 &&
-          lookahead != '\n') ADVANCE(127);
+          lookahead != '\n' &&
+          lookahead != '\r' &&
+          lookahead != 0x2028 &&
+          lookahead != 0x2029) ADVANCE(127);
       END_STATE();
     case 128:
       ACCEPT_TOKEN(anon_sym_STAR);

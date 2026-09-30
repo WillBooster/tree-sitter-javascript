@@ -60,6 +60,21 @@ Whitespace-only JSX text with carriage returns
       (jsx_self_closing_element (identifier))
       (jsx_closing_element (identifier)))))
 
+==========================================
+Hash-bang lines ending at carriage returns
+==========================================
+
+#!/usr/bin/env nodeconsole.log(1)
+
+---
+
+(program
+  (hash_bang_line)
+  (expression_statement
+    (call_expression
+      (member_expression (identifier) (property_identifier))
+      (arguments (number)))))
+
 =====================================================
 Line breaks after an escaped question mark in strings
 :error

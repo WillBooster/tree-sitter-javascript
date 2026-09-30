@@ -29,7 +29,7 @@
     },
     "hash_bang_line": {
       "type": "PATTERN",
-      "value": "#!.*"
+      "value": "#![^\\n\\r\\u2028\\u2029]*"
     },
     "export_statement": {
       "type": "CHOICE",
