@@ -1,16 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>WillBooster/willbooster-configs:renovate.jsonc"],
-  "customManagers": [
-    {
-      // The fuzz job builds the parser with this tree-sitter version, which must match the CLI that generated it.
-      "customType": "regex",
-      "managerFilePatterns": ["/^\\.github/workflows/robustness\\.yml$/"],
-      "matchStrings": ["tree-sitter-version: v(?<currentValue>\\S+)"],
-      "depNameTemplate": "tree-sitter-cli",
-      "datasourceTemplate": "npm",
-    },
-  ],
   "packageRules": [
     {
       // The Wasm build that tree-sitter-cli emits must load in @willbooster/web-tree-sitter.
