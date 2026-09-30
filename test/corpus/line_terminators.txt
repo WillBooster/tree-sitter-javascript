@@ -75,6 +75,21 @@ Hash-bang lines ending at carriage returns
       (member_expression (identifier) (property_identifier))
       (arguments (number)))))
 
+========================================
+Static getters split by carriage returns
+========================================
+
+class A {  static get  a() {}  static  get  b() {}}
+
+---
+
+(program
+  (class_declaration
+    (identifier)
+    (class_body
+      (method_definition (property_identifier) (formal_parameters) (statement_block))
+      (method_definition (property_identifier) (formal_parameters) (statement_block)))))
+
 =====================================================
 Line breaks after an escaped question mark in strings
 :error
