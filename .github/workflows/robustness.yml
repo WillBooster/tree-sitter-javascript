@@ -34,11 +34,9 @@ jobs:
       - run: git diff --exit-code -- src
       - run: bun run test/ci
   # Runs the parser under libFuzzer with AddressSanitizer and UndefinedBehaviorSanitizer, seeded with the
-  # input of each corpus case. A grammar change alters which tokens the scanner is asked for, so it runs
-  # on every change, not only on scanner changes. The parser is linked with the WillBooster/tree-sitter runtime
-  # at the version of @willbooster/web-tree-sitter in package.json, the runtime this package is used with, since
-  # the upstream runtime can recover from some errors forever. tree-sitter/fuzz-action provides the harness,
-  # the dictionary, and the Makefile, but installs the upstream runtime itself.
+  # input of each corpus case. Every grammar change regenerates the parser, so it runs on every change. The parser
+  # runs on WillBooster/tree-sitter at the willbooster-tree-sitter version in Cargo.lock, the runtime the Rust tests
+  # use: the error recovery of upstream's runtime never ends on some inputs.
   fuzz:
     runs-on: ubuntu-latest
     steps:
@@ -46,13 +44,17 @@ jobs:
         with:
           persist-credentials: false
       - id: runtime
-        run: echo "version=$(jq -r '.devDependencies["@willbooster/web-tree-sitter"]' package.json)" >> "$GITHUB_OUTPUT"
+        run: |
+          version=$(awk '/^name = "willbooster-tree-sitter"$/ { getline; gsub(/version = |"/, ""); print }' Cargo.lock)
+          echo "ref=v${version:?Cargo.lock locks no willbooster-tree-sitter}" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7.0.1
         with:
           repository: WillBooster/tree-sitter
-          ref: v${{ steps.runtime.outputs.version }}
+          ref: ${{ steps.runtime.outputs.ref }}
           path: .tmp/tree-sitter
           persist-credentials: false
+      # tree-sitter/fuzz-action can only build upstream's runtime, so only its harness and sanitizer ignore list are
+      # used, and its build is reproduced below.
       - uses: actions/checkout@v7.0.1
         with:
           repository: tree-sitter/fuzz-action
@@ -66,29 +68,25 @@ jobs:
             state == 2 && /^---+$/ { state = 0; close(file); next }
             state == 2 { print > file }
           ' $(find test/corpus -name '*.txt' | LC_ALL=C sort)
-      # The Makefile links the runtime through pkg-config.
-      - name: Build the runtime
-        working-directory: .tmp/tree-sitter/lib
+      - name: Build the fuzzer
         run: |
-          clang -std=c11 -O2 -g -fPIC -shared -D_POSIX_C_SOURCE=200112L -D_DEFAULT_SOURCE -Iinclude -Isrc src/lib.c \
-            -o libtree-sitter.so
-          printf '%s\n' 'Name: tree-sitter' 'Description: WillBooster/tree-sitter' 'Version: ${{ steps.runtime.outputs.version }}' \
-            "Cflags: -I$PWD/include" "Libs: -L$PWD -Wl,-rpath,$PWD -ltree-sitter" > tree-sitter.pc
+          jq '.. | select((.type? == "STRING" or (.type? == "ALIAS" and .named? == false)) and .value? != "") | .value' \
+            src/grammar.json | grep -v '\\' | iconv -c -f UTF-8 -t ASCII//TRANSLIT > .tmp/fuzz-dict
+          # Like tree-sitter/fuzz-action, only the grammar is instrumented, not the runtime.
+          clang -std=c11 -Og -g -c -D_POSIX_C_SOURCE=200112L -D_DEFAULT_SOURCE -I.tmp/tree-sitter/lib/include \
+            -I.tmp/tree-sitter/lib/src .tmp/tree-sitter/lib/src/lib.c -o .tmp/tree-sitter.o
+          clang -std=c11 -Og -g -fsanitize=fuzzer,address,undefined \
+            -fsanitize-ignorelist=.tmp/fuzz-action/ignorelist.ini -I.tmp/tree-sitter/lib/include -Isrc \
+            -DTS_LANG="tree_sitter_$(jq -r .name src/grammar.json)" .tmp/fuzz-action/fuzzer.c src/parser.c \
+            $(ls src/scanner.c 2> /dev/null) .tmp/tree-sitter.o -o .tmp/fuzzer
       - name: Fuzz
-        working-directory: .tmp/fuzz-action
-        # An explicit bash adds pipefail, so that a failure of make, not only of tee, fails the step.
-        shell: bash
-        run: make LANG_NAME="$(jq -r .name "$GITHUB_WORKSPACE/src/grammar.json")" |& tee >(perl annotate.pl)
-        env:
-          PKG_CONFIG_PATH: ${{ github.workspace }}/.tmp/tree-sitter/lib
-          LANG_DIR: ${{ github.workspace }}
-          CORPUS_DIR: ${{ github.workspace }}/.tmp/fuzz-seeds
-          MAX_TIME: '300'
-      - if: failure()
-        uses: actions/upload-artifact@v7.0.1
+        run: |
+          mkdir -p .tmp/fuzz-out .tmp/fuzz-artifacts
+          .tmp/fuzzer .tmp/fuzz-out .tmp/fuzz-seeds -dict=.tmp/fuzz-dict -artifact_prefix=.tmp/fuzz-artifacts/ \
+            -timeout=10 -max_total_time=300 -max_len=4096
+      - uses: actions/upload-artifact@v7.0.1
+        if: failure()
         with:
           name: fuzzer-artifacts
-          path: .tmp/fuzz-action/artifacts/
-          # The path is inside the hidden .tmp directory.
-          include-hidden-files: true
+          path: .tmp/fuzz-artifacts/
           retention-days: 7
