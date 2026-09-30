@@ -89,4 +89,6 @@ jobs:
         with:
           name: fuzzer-artifacts
           path: .tmp/fuzz-action/artifacts/
+          # The path is inside the hidden .tmp directory.
+          include-hidden-files: true
           retention-days: 7
