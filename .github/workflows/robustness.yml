@@ -35,12 +35,29 @@ jobs:
       - run: bun run test/ci
   # Runs the parser under libFuzzer with AddressSanitizer and UndefinedBehaviorSanitizer, seeded with the
   # input of each corpus case. A grammar change alters which tokens the scanner is asked for, so it runs
-  # on every change, not only on scanner changes.
+  # on every change, not only on scanner changes. The parser is linked with the WillBooster/tree-sitter runtime
+  # at the version of @willbooster/web-tree-sitter in package.json, the runtime this package is used with, since
+  # the upstream runtime can recover from some errors forever. tree-sitter/fuzz-action provides the harness,
+  # the dictionary, and the Makefile, but installs the upstream runtime itself.
   fuzz:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
         with:
+          persist-credentials: false
+      - id: runtime
+        run: echo "version=$(jq -r '.devDependencies["@willbooster/web-tree-sitter"]' package.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: WillBooster/tree-sitter
+          ref: v${{ steps.runtime.outputs.version }}
+          path: .tmp/tree-sitter
+          persist-credentials: false
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: tree-sitter/fuzz-action
+          ref: v4
+          path: .tmp/fuzz-action
           persist-credentials: false
       - run: |
           mkdir -p .tmp/fuzz-seeds
@@ -49,9 +66,29 @@ jobs:
             state == 2 && /^---+$/ { state = 0; close(file); next }
             state == 2 { print > file }
           ' $(find test/corpus -name '*.txt' | LC_ALL=C sort)
-      - uses: tree-sitter/fuzz-action@v4
+      # The Makefile links the runtime through pkg-config.
+      - name: Build the runtime
+        working-directory: .tmp/tree-sitter/lib
+        run: |
+          clang -std=c11 -O2 -g -fPIC -shared -D_POSIX_C_SOURCE=200112L -D_DEFAULT_SOURCE -Iinclude -Isrc src/lib.c \
+            -o libtree-sitter.so
+          printf '%s\n' 'Name: tree-sitter' 'Description: WillBooster/tree-sitter' 'Version: ${{ steps.runtime.outputs.version }}' \
+            "Cflags: -I$PWD/include" "Libs: -L$PWD -Wl,-rpath,$PWD -ltree-sitter" > tree-sitter.pc
+      - name: Fuzz
+        working-directory: .tmp/fuzz-action
+        # An explicit bash adds pipefail, so that a failure of make, not only of tee, fails the step.
+        shell: bash
+        run: make LANG_NAME="$(jq -r .name "$GITHUB_WORKSPACE/src/grammar.json")" |& tee >(perl annotate.pl)
+        env:
+          PKG_CONFIG_PATH: ${{ github.workspace }}/.tmp/tree-sitter/lib
+          LANG_DIR: ${{ github.workspace }}
+          CORPUS_DIR: ${{ github.workspace }}/.tmp/fuzz-seeds
+          MAX_TIME: '300'
+      - if: failure()
+        uses: actions/upload-artifact@v7.0.1
         with:
-          corpus: .tmp/fuzz-seeds
-          max-time: '300'
-          # Renovate updates it together with tree-sitter-cli in package.json (renovate.jsonc).
-          tree-sitter-version: v0.27.0
+          name: fuzzer-artifacts
+          path: .tmp/fuzz-action/artifacts/
+          # The path is inside the hidden .tmp directory.
+          include-hidden-files: true
+          retention-days: 7
