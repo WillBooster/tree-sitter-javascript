@@ -905,17 +905,7 @@ module.exports = grammar({
 
     escape_sequence: () =>
       token.immediate(
-        seq(
-          '\\',
-          choice(
-            /[^xu0-7]/,
-            /[0-7]{1,3}/,
-            /x[0-9a-fA-F]{2}/,
-            /u[0-9a-fA-F]{4}/,
-            /u\{[0-9a-fA-F]+\}/,
-            /[\r?][\n\u2028\u2029]/
-          )
-        )
+        seq('\\', choice(/[^xu0-7]/, /[0-7]{1,3}/, /x[0-9a-fA-F]{2}/, /u[0-9a-fA-F]{4}/, /u\{[0-9a-fA-F]+\}/, /\r\n/))
       ),
 
     // http://stackoverflow.com/questions/13014947/regex-to-match-a-c-style-multiline-comment/36328890#36328890
@@ -960,15 +950,15 @@ module.exports = grammar({
                 '[',
                 repeat(
                   choice(
-                    seq('\\', /./), // escaped character
-                    /[^\]\n\\]/ // any character besides ']' or '\n'
+                    seq('\\', /[^\n\r\u2028\u2029]/), // escaped character
+                    /[^\]\\\n\r\u2028\u2029]/ // any character besides ']', '\', or a line terminator
                   )
                 ),
                 ']'
               ), // square-bracket-delimited character class
-              seq('\\', /./), // escaped character
+              seq('\\', /[^\n\r\u2028\u2029]/), // escaped character
               // oxlint-disable-next-line no-useless-escape -- tree-sitter's regex parser rejects an unescaped `[` in a character class.
-              /[^/\\\[\n]/ // any character besides '[', '\', '/', '\n'
+              /[^/\\\[\n\r\u2028\u2029]/ // any character besides '[', '\', '/', or a line terminator
             )
           )
         )
