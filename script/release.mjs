@@ -59,9 +59,14 @@ async function completePendingRelease(tag) {
 
 /**
  * Returns whether a pending release of an older commit must be completed before releasing this commit. A dry run only
- * reports what a real run would do.
+ * reports what a real run would do, and skips the check without GitHub credentials, which semantic-release's dry run on
+ * a branch it does not release from does not need.
  */
 async function deferToPendingRelease() {
+  if (dryRun && !(env.GITHUB_REPOSITORY && env.GITHUB_TOKEN)) {
+    console.info('Skipped the check for pending releases, which needs GITHUB_REPOSITORY and GITHUB_TOKEN.');
+    return false;
+  }
   // Oldest first, since versions are released in order.
   const drafts = await listPendingReleases(github);
   for (const draft of drafts.toReversed()) {
