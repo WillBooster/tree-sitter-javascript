@@ -29,9 +29,12 @@ const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: rootDir, encoding
 const dispatch = (ref) => github('POST', 'actions/workflows/release.yml/dispatches', { ref });
 const pendingBranchPrefix = 'release-pending/';
 const args = process.argv.slice(2);
-// The dry-run options of `wb release` and of semantic-release (forwarded after `--`), and semantic-release's own dry run
-// outside CI unless `--no-ci` is given.
-const dryRun = args.some((arg) => ['--dry-run', '--dry', '-d'].includes(arg)) || (!env.CI && !args.includes('--no-ci'));
+// `wb release` forwards only the options after `--` to semantic-release and rejects the ones it does not know.
+const releaseOptions = args.includes('--') ? args.slice(args.indexOf('--') + 1) : [];
+// The dry-run options of `wb release` and of semantic-release, and semantic-release's own dry run outside CI unless
+// `--no-ci` is given.
+const dryRun =
+  args.some((arg) => ['--dry-run', '--dry', '-d'].includes(arg)) || (!env.CI && !releaseOptions.includes('--no-ci'));
 
 if (!dryRun && env.GITHUB_REF_NAME?.startsWith(pendingBranchPrefix)) {
   await completePendingRelease(env.GITHUB_REF_NAME.slice(pendingBranchPrefix.length));
