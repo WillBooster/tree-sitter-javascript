@@ -202,3 +202,17 @@
   "with"
   "yield"
 ] @keyword
+
+; `default` as a module export name is an identifier node.
+(export_specifier
+  name: (identifier) @keyword
+  (#eq? @keyword "default"))
+(export_specifier
+  alias: (identifier) @keyword
+  (#eq? @keyword "default"))
+(import_specifier
+  name: (identifier) @keyword
+  (#eq? @keyword "default"))
+(namespace_export
+  (identifier) @keyword
+  (#eq? @keyword "default"))
