@@ -90,6 +90,18 @@ class A {  static get  a() {}  static  get  b() {}}
       (method_definition (property_identifier) (formal_parameters) (statement_block))
       (method_definition (property_identifier) (formal_parameters) (statement_block)))))
 
+=================================
+Whitespace after carriage returns
+=================================
+
+a﻿[b]c (d)
+
+---
+
+(program
+  (expression_statement (subscript_expression (identifier) (identifier)))
+  (expression_statement (call_expression (identifier) (arguments (identifier)))))
+
 =====================================================
 Line breaks after an escaped question mark in strings
 :error

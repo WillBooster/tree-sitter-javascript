@@ -46,6 +46,33 @@ static inline void skip(TSLexer *lexer) { lexer->advance(lexer, true); }
 
 static inline bool is_line_terminator(int32_t c) { return c == '\n' || c == '\r' || c == 0x2028 || c == 0x2029; }
 
+// The whitespace in the grammar's extras: Unicode White_Space (which includes the line terminators), U+FEFF, U+2060,
+// and U+200B. iswspace depends on the C library and locale and misses some of them.
+static inline bool is_whitespace(int32_t c) {
+    switch (c) {
+        case '\t':
+        case '\n':
+        case '\v':
+        case '\f':
+        case '\r':
+        case ' ':
+        case 0x85:
+        case 0xA0:
+        case 0x1680:
+        case 0x200B:
+        case 0x2028:
+        case 0x2029:
+        case 0x202F:
+        case 0x205F:
+        case 0x2060:
+        case 0x3000:
+        case 0xFEFF:
+            return true;
+        default:
+            return c >= 0x2000 && c <= 0x200A;
+    }
+}
+
 static bool scan_template_chars(TSLexer *lexer) {
     lexer->result_symbol = TEMPLATE_CHARS;
     for (bool has_content = false;; has_content = true) {
@@ -82,7 +109,7 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
     bool saw_block_newline = false;
 
     for (;;) {
-        while (iswspace(lexer->lookahead)) {
+        while (is_whitespace(lexer->lookahead)) {
             skip(lexer);
         }
 
@@ -178,7 +205,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
             break;
         }
 
-        if (!iswspace(lexer->lookahead)) {
+        if (!is_whitespace(lexer->lookahead)) {
             return false;
         }
 
@@ -267,7 +294,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
 
 static bool scan_ternary_qmark(TSLexer *lexer) {
     for (;;) {
-        if (!iswspace(lexer->lookahead)) {
+        if (!is_whitespace(lexer->lookahead)) {
             break;
         }
         skip(lexer);
@@ -296,7 +323,7 @@ static bool scan_ternary_qmark(TSLexer *lexer) {
 }
 
 static bool scan_html_comment(TSLexer *lexer) {
-    while (iswspace(lexer->lookahead) || is_line_terminator(lexer->lookahead)) {
+    while (is_whitespace(lexer->lookahead)) {
         skip(lexer);
     }
 
