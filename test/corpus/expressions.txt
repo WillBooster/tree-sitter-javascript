@@ -2227,7 +2227,8 @@ function await(await) { await: await (await + await (0)); }
 (program
   (function_declaration
     (identifier)
-    (formal_parameters (identifier))
+    (formal_parameters
+      (identifier))
     (statement_block
       (labeled_statement
         (statement_identifier)
@@ -2381,3 +2382,41 @@ i = <Foo:Bar bar={}>{...children}</Foo:Bar>
           name: (jsx_namespace_name
             (identifier)
             (identifier)))))))
+
+============================================
+Reserved words as JSX names
+============================================
+
+a = <label class="x" for="y" />;
+b = <var>c</var>;
+d = <svg:switch if="1" />;
+e = <f.default />;
+
+---
+
+(program
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (jsx_self_closing_element
+        (identifier)
+        (jsx_attribute (property_identifier) (string (string_fragment)))
+        (jsx_attribute (property_identifier) (string (string_fragment))))))
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (jsx_element
+        (jsx_opening_element (identifier))
+        (jsx_text)
+        (jsx_closing_element (identifier)))))
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (jsx_self_closing_element
+        (jsx_namespace_name (identifier) (identifier))
+        (jsx_attribute (property_identifier) (string (string_fragment))))))
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (jsx_self_closing_element
+        (member_expression (identifier) (property_identifier))))))

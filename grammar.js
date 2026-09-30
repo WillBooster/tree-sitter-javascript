@@ -8,6 +8,46 @@
 /// <reference types="tree-sitter-cli/dsl" />
 // @ts-check
 
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Lexical_grammar#reserved_words
+const RESERVED_WORDS = [
+  'break',
+  'case',
+  'catch',
+  'class',
+  'const',
+  'continue',
+  'debugger',
+  'default',
+  'delete',
+  'do',
+  'else',
+  'export',
+  'extends',
+  'false',
+  'finally',
+  'for',
+  'function',
+  'if',
+  'import',
+  'in',
+  'instanceof',
+  'new',
+  'null',
+  'return',
+  'super',
+  'switch',
+  'this',
+  'throw',
+  'true',
+  'try',
+  'typeof',
+  'var',
+  'void',
+  'while',
+  'with',
+];
+const NAMED_RESERVED_WORDS = new Set(['this', 'super', 'true', 'false', 'null']);
+
 // oxlint-disable-next-line unicorn/prefer-module -- This package is CommonJS, so tree-sitter loads grammar.js as CommonJS.
 module.exports = grammar({
   name: 'javascript',
@@ -34,44 +74,7 @@ module.exports = grammar({
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
 
   reserved: {
-    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Lexical_grammar#reserved_words
-    global: () => [
-      'break',
-      'case',
-      'catch',
-      'class',
-      'const',
-      'continue',
-      'debugger',
-      'default',
-      'delete',
-      'do',
-      'else',
-      'export',
-      'extends',
-      'false',
-      'finally',
-      'for',
-      'function',
-      'if',
-      'import',
-      'in',
-      'instanceof',
-      'new',
-      'null',
-      'return',
-      'super',
-      'switch',
-      'this',
-      'throw',
-      'true',
-      'try',
-      'typeof',
-      'var',
-      'void',
-      'while',
-      'with',
-    ],
+    global: () => RESERVED_WORDS,
     properties: () => [],
   },
 
@@ -129,6 +132,7 @@ module.exports = grammar({
   ],
 
   conflicts: ($) => [
+    [$._local_export_specifier, $._module_export_name],
     [$.primary_expression, $._property_name],
     [$.primary_expression, $.await_expression],
     [$.primary_expression, $.await_expression, $._property_name],
@@ -167,7 +171,7 @@ module.exports = grammar({
             seq('*', $._from_clause),
             seq($.namespace_export, $._from_clause),
             seq($.export_clause, $._from_clause),
-            $.export_clause
+            alias($._local_export_clause, $.export_clause)
           ),
           $._semicolon
         ),
@@ -188,7 +192,22 @@ module.exports = grammar({
     export_specifier: ($) =>
       seq(field('name', $._module_export_name), optional(seq('as', field('alias', $._module_export_name)))),
 
-    _module_export_name: ($) => choice($.identifier, $.string, 'default'),
+    // Without a `from` clause, each name refers to a local binding, which cannot be a reserved word.
+    _local_export_clause: ($) =>
+      seq('{', commaSep(alias($._local_export_specifier, $.export_specifier)), optional(','), '}'),
+
+    _local_export_specifier: ($) =>
+      seq(field('name', choice($.identifier, $.string)), optional(seq('as', field('alias', $._module_export_name)))),
+
+    // Reserved words are listed as keywords rather than allowed through the property word set, because the word set
+    // would also apply to the local bindings that share these positions until `as` or `from` (e.g. `import { if }`).
+    _module_export_name: ($) =>
+      choice(
+        $.identifier,
+        $.string,
+        // `this`, `super`, `true`, `false`, and `null` are named rules, and a bare string would make them non-terminals.
+        alias(choice(...RESERVED_WORDS.map((word) => (NAMED_RESERVED_WORDS.has(word) ? $[word] : word))), $.identifier)
+      ),
 
     declaration: ($) =>
       choice(
@@ -547,15 +566,18 @@ module.exports = grammar({
 
     jsx_identifier: () => /[a-zA-Z_$][a-zA-Z\d_$]*-[a-zA-Z\d_$-]*/,
 
-    _jsx_identifier: ($) => choice(alias($.jsx_identifier, $.identifier), $.identifier),
+    _jsx_identifier: ($) => choice(alias($.jsx_identifier, $.identifier), reserved('properties', $.identifier)),
 
     nested_identifier: ($) =>
       prec(
         'member',
         seq(
-          field('object', choice($.identifier, alias($.nested_identifier, $.member_expression))),
+          field(
+            'object',
+            choice(reserved('properties', $.identifier), alias($.nested_identifier, $.member_expression))
+          ),
           '.',
-          field('property', alias($.identifier, $.property_identifier))
+          field('property', alias(reserved('properties', $.identifier), $.property_identifier))
         )
       ),
 
