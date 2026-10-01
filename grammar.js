@@ -48,6 +48,11 @@ const RESERVED_WORDS = [
 ];
 const NAMED_RESERVED_WORDS = new Set(['this', 'super', 'true', 'false', 'null']);
 
+// Words that are keywords only in some positions and identifiers elsewhere. A line break never separates the member
+// modifiers from the class member they start, unlike the other words.
+const MEMBER_MODIFIERS = ['get', 'set', 'static'];
+const CONTEXTUAL_KEYWORDS = ['async', 'await', 'export', 'let', 'using'];
+
 // oxlint-disable-next-line unicorn/prefer-module -- This package is CommonJS, so tree-sitter loads grammar.js as CommonJS.
 module.exports = grammar({
   name: 'javascript',
@@ -69,6 +74,14 @@ module.exports = grammar({
     // _arrow_function_block_continuation, since the arrow function may be, e.g., an argument.
     $._arrow_function_block_end,
     $._arrow_function_block_continuation,
+    // Sentinels that the scanner never emits: the grammar allows each only where a line break has a fixed meaning, so
+    // the scanner can tell from the valid symbols how to treat one there (see LineBreakRule in src/scanner.c). Each is an
+    // alternative to what follows its position rather than an optional token before it, since an optional token would
+    // duplicate the parse states after it.
+    $._line_break_ends_statement,
+    $._line_break_after_binding,
+    $._line_break_after_field,
+    $._line_break_after_modifier,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -149,7 +162,6 @@ module.exports = grammar({
     [$.labeled_statement, $._property_name],
     [$.computed_property_name, $.array],
     [$.binary_expression, $._initializer],
-    [$.class_static_block, $._property_name],
   ],
 
   word: ($) => $.identifier,
@@ -304,7 +316,7 @@ module.exports = grammar({
     variable_declarator: ($) =>
       seq(
         field('name', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern)),
-        optional($._initializer)
+        optional(choice($._initializer, $._line_break_after_binding))
       ),
 
     statement_block: ($) => prec.right(seq('{', repeat($.statement), '}', optional($._automatic_semicolon))),
@@ -417,14 +429,23 @@ module.exports = grammar({
     with_statement: ($) => seq('with', field('object', $.parenthesized_expression), field('body', $.statement)),
 
     break_statement: ($) =>
-      seq('break', field('label', optional(alias($.identifier, $.statement_identifier))), $._semicolon),
+      seq(
+        'break',
+        field('label', optional(alias($.identifier, $.statement_identifier))),
+        choice($._semicolon, $._line_break_ends_statement)
+      ),
 
     continue_statement: ($) =>
-      seq('continue', field('label', optional(alias($.identifier, $.statement_identifier))), $._semicolon),
+      seq(
+        'continue',
+        field('label', optional(alias($.identifier, $.statement_identifier))),
+        choice($._semicolon, $._line_break_ends_statement)
+      ),
 
     debugger_statement: ($) => seq('debugger', $._semicolon),
 
-    return_statement: ($) => seq('return', optional($._expressions), $._semicolon),
+    return_statement: ($) =>
+      seq('return', choice(seq(optional($._expressions), $._semicolon), $._line_break_ends_statement)),
 
     throw_statement: ($) => seq('throw', $._expressions, $._semicolon),
 
@@ -507,7 +528,8 @@ module.exports = grammar({
         $.call_expression
       ),
 
-    yield_expression: ($) => prec.right(seq('yield', choice(seq('*', $.expression), optional($.expression)))),
+    yield_expression: ($) =>
+      prec.right(seq('yield', choice(seq('*', $.expression), optional($.expression), $._line_break_ends_statement))),
 
     object: ($) =>
       prec(
@@ -1129,13 +1151,19 @@ module.exports = grammar({
       seq(
         repeat(field('decorator', $.decorator)),
         optional('static'),
-        field('property', $._property_name),
-        optional($._initializer)
+        choice(
+          seq(field('property', $._field_name), optional(choice($._initializer, $._line_break_after_field))),
+          // A line break after these words continues a getter, setter, or static member.
+          seq(
+            field('property', alias(choice(...MEMBER_MODIFIERS), $.property_identifier)),
+            optional(choice($._initializer, $._line_break_after_modifier))
+          )
+        )
       ),
 
     formal_parameters: ($) => seq('(', optional(seq(commaSep1($._formal_parameter), optional(','))), ')'),
 
-    class_static_block: ($) => seq('static', optional($._automatic_semicolon), field('body', $.statement_block)),
+    class_static_block: ($) => seq('static', field('body', $.statement_block)),
 
     // This negative dynamic precedence ensures that during error recovery,
     // unfinished constructs are generally treated as literal expressions,
@@ -1147,18 +1175,35 @@ module.exports = grammar({
     method_definition: ($) =>
       seq(
         repeat(field('decorator', $.decorator)),
-        optional(choice('static', alias(token(seq('static', /\s+/, 'get', /\s*[\n\r\u2028\u2029]/)), 'static get'))),
+        optional('static'),
         optional('async'),
         optional(choice('get', 'set', '*')),
         field('name', $._property_name),
         field('parameters', $.formal_parameters),
-        field('body', $.statement_block)
+        field('body', alias($._method_body, $.statement_block))
       ),
+
+    // A rule of its own rather than statement_block: sharing it let tree-sitter merge the state after a method's `}` with
+    // the one after a function expression's `}`, where `in`, `instanceof`, and `extends` are keywords, so a method with
+    // one of those names could not follow another method.
+    _method_body: ($) => seq('{', repeat($.statement), '}'),
 
     pair: ($) => seq(field('key', $._property_name), ':', field('value', $.expression)),
 
     pair_pattern: ($) =>
       seq(field('key', $._property_name), ':', field('value', choice($.pattern, $.assignment_pattern))),
+
+    _field_name: ($) =>
+      reserved(
+        'properties',
+        choice(
+          alias(choice($.identifier, ...CONTEXTUAL_KEYWORDS), $.property_identifier),
+          $.private_property_identifier,
+          $.string,
+          $.number,
+          $.computed_property_name
+        )
+      ),
 
     _property_name: ($) =>
       reserved(
@@ -1174,7 +1219,7 @@ module.exports = grammar({
 
     computed_property_name: ($) => seq('[', $.expression, ']'),
 
-    _reserved_identifier: () => choice('get', 'set', 'async', 'await', 'static', 'export', 'let', 'using'),
+    _reserved_identifier: () => choice(...MEMBER_MODIFIERS, ...CONTEXTUAL_KEYWORDS),
 
     _semicolon: ($) => choice($._automatic_semicolon, ';'),
   },

@@ -427,3 +427,202 @@ in2
   (expression_statement (assignment_expression (identifier) (number)))
   (expression_statement (identifier))
   (expression_statement (identifier)))
+
+============================================
+Line breaks after return, yield, break, and continue
+============================================
+
+function* f() {
+  return
+  (a)
+  yield
+  [b]
+  yield // comment
+  -c
+  return /* comment */ (d)
+  g(yield
+    e)
+  for (;;) {
+    break
+    (h)
+    continue label
+    [i]
+  }
+}
+
+---
+
+(program
+  (generator_function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (return_statement)
+      (expression_statement (parenthesized_expression (identifier)))
+      (expression_statement (yield_expression))
+      (expression_statement (array (identifier)))
+      (expression_statement (yield_expression))
+      (comment)
+      (expression_statement (unary_expression (identifier)))
+      (return_statement (comment) (parenthesized_expression (identifier)))
+      (expression_statement (call_expression (identifier) (arguments (yield_expression (identifier)))))
+      (for_statement
+        (empty_statement)
+        (empty_statement)
+        (statement_block
+          (break_statement)
+          (expression_statement (parenthesized_expression (identifier)))
+          (continue_statement (statement_identifier))
+          (expression_statement (array (identifier))))))))
+
+============================================
+Line breaks after declarations without initializers
+============================================
+
+let a
+[b, c] = d
+var e // comment
+(f)
+let g
+= 1, h
+, i
+
+---
+
+(program
+  (lexical_declaration (variable_declarator (identifier)))
+  (expression_statement
+    (assignment_expression (array_pattern (identifier) (identifier)) (identifier)))
+  (variable_declaration (variable_declarator (identifier)))
+  (comment)
+  (expression_statement (parenthesized_expression (identifier)))
+  (lexical_declaration
+    (variable_declarator (identifier) (number))
+    (variable_declarator (identifier))
+    (variable_declarator (identifier))))
+
+============================================
+Line breaks after class field names
+============================================
+
+class A {
+  #a
+
+  [b] = null
+  c
+  *d() {}
+  e
+  () {}
+  async
+  f() {}
+  get
+  [g]() {}
+  static
+  h() {}
+  set
+  = 1
+  static
+  {}
+  get
+}
+
+---
+
+(program
+  (class_declaration
+    (identifier)
+    (class_body
+      (field_definition (private_property_identifier))
+      (field_definition (computed_property_name (identifier)) (null))
+      (field_definition (property_identifier))
+      (method_definition (property_identifier) (formal_parameters) (statement_block))
+      (method_definition (property_identifier) (formal_parameters) (statement_block))
+      (field_definition (property_identifier))
+      (method_definition (property_identifier) (formal_parameters) (statement_block))
+      (method_definition (computed_property_name (identifier)) (formal_parameters) (statement_block))
+      (method_definition (property_identifier) (formal_parameters) (statement_block))
+      (field_definition (property_identifier) (number))
+      (class_static_block (statement_block))
+      (field_definition (property_identifier)))))
+
+============================================
+Line breaks inside block comments
+============================================
+
+a /* comment
+*/ b
+c = 1 /* comment
+*/ d = 2
+e /* comment
+*/ + f
+
+---
+
+(program
+  (expression_statement (identifier))
+  (comment)
+  (expression_statement (identifier))
+  (expression_statement (assignment_expression (identifier) (number)))
+  (comment)
+  (expression_statement (assignment_expression (identifier) (number)))
+  (expression_statement
+    (binary_expression (identifier) (comment) (identifier))))
+
+============================================
+Line breaks after get, set, and static in class bodies
+============================================
+
+class A {
+  static get
+  = 1
+  get
+  b() {}
+  static
+  get
+  c() {}
+  set
+  [d](v) {}
+}
+
+---
+
+(program
+  (class_declaration
+    (identifier)
+    (class_body
+      (field_definition (property_identifier) (number))
+      (method_definition (property_identifier) (formal_parameters) (statement_block))
+      (method_definition (property_identifier) (formal_parameters) (statement_block))
+      (method_definition
+        (computed_property_name (identifier))
+        (formal_parameters (identifier))
+        (statement_block)))))
+
+============================================
+Semicolons at the start of the line after a declaration or return
+============================================
+
+var a
+;(function () {})()
+function f() {
+  return
+  ;[b].forEach(g)
+}
+
+---
+
+(program
+  (variable_declaration (variable_declarator (identifier)))
+  (expression_statement
+    (call_expression
+      (parenthesized_expression (function_expression (formal_parameters) (statement_block)))
+      (arguments)))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (return_statement)
+      (expression_statement
+        (call_expression
+          (member_expression (array (identifier)) (property_identifier))
+          (arguments (identifier)))))))

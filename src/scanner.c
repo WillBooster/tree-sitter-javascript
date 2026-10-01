@@ -14,6 +14,10 @@ enum TokenType {
     JSX_TEXT,
     ARROW_FUNCTION_BLOCK_END,
     ARROW_FUNCTION_BLOCK_CONTINUATION,
+    LINE_BREAK_ENDS_STATEMENT,
+    LINE_BREAK_AFTER_BINDING,
+    LINE_BREAK_AFTER_FIELD,
+    LINE_BREAK_AFTER_MODIFIER,
 };
 
 typedef struct {
@@ -111,6 +115,9 @@ typedef enum {
     REJECT,     // Semicolon is illegal, ie a syntax error occurred
     NO_NEWLINE, // Unclear if semicolon will be legal, continue
     ACCEPT,     // Semicolon is legal, assuming a comment was encountered
+    // Like ACCEPT, but the line break is inside the block comment that the lexer stopped after, so it will not be seen
+    // again once tree-sitter has consumed that comment.
+    ACCEPT_IN_BLOCK_COMMENT,
 } WhitespaceResult;
 
 /**
@@ -143,7 +150,7 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
                             *scanned_comment = true;
 
                             if (lexer->lookahead != '/' && !consume) {
-                                return saw_block_newline ? ACCEPT : NO_NEWLINE;
+                                return saw_block_newline ? ACCEPT_IN_BLOCK_COMMENT : NO_NEWLINE;
                             }
 
                             break;
@@ -175,13 +182,31 @@ static bool ends_statement_after_block_arrow(TSLexer *lexer, bool *scanned_comme
     return lexer->lookahead != ',' && lexer->lookahead != ';' && lexer->lookahead != '?';
 }
 
+// What a line break after the preceding token means, told by the sentinel external tokens that the grammar allows
+// only at these positions; the scanner never emits them.
+typedef enum {
+    // Decided by the characters that follow.
+    LINE_BREAK_BY_NEXT_TOKEN,
+    // After `return`, `yield`, `break`, or `continue`, which ECMAScript forbids a line break after.
+    LINE_BREAK_ENDS,
+    // After a declared name without an initializer: only `=` or `,` continues the declaration.
+    LINE_BREAK_AFTER_BINDING_NAME,
+    // After a class field name without an initializer: only `=` (an initializer) or `(` (a method) continues it.
+    LINE_BREAK_AFTER_FIELD_NAME,
+    // After `get`, `set`, or `static` in a class body, which a line break never separates from the member they start.
+    LINE_BREAK_AFTER_MODIFIER_WORD,
+} LineBreakRule;
+
+static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule, bool *scanned_comment);
+
 /**
  * @param after_block_arrow Whether an arrow function's block body has just ended.
  */
 static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, bool after_block_arrow,
-                                     bool *scanned_comment) {
+                                     LineBreakRule rule, bool *scanned_comment) {
     lexer->result_symbol = AUTOMATIC_SEMICOLON;
     lexer->mark_end(lexer);
+    bool line_break_in_block_comment = false;
 
     for (;;) {
         if (lexer->eof(lexer)) {
@@ -194,13 +219,14 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
                 return false;
             }
 
-            // ACCEPT means that the comments contain a line break.
-            if (result == ACCEPT && after_block_arrow) {
-                return ends_statement_after_block_arrow(lexer, scanned_comment);
-            }
-
-            if (result == ACCEPT && comment_condition && lexer->lookahead != ',' && lexer->lookahead != '=') {
-                return true;
+            if (result == ACCEPT || result == ACCEPT_IN_BLOCK_COMMENT) {
+                if (after_block_arrow || rule != LINE_BREAK_BY_NEXT_TOKEN) {
+                    return scan_after_line_break(lexer, after_block_arrow, rule, scanned_comment);
+                }
+                if (comment_condition && lexer->lookahead != ',' && lexer->lookahead != '=') {
+                    return true;
+                }
+                line_break_in_block_comment = result == ACCEPT_IN_BLOCK_COMMENT;
             }
         }
 
@@ -217,19 +243,42 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
         }
 
         if (!is_whitespace(lexer->lookahead)) {
-            return false;
+            // Otherwise tree-sitter consumes the comments and calls the scanner again after them.
+            return line_break_in_block_comment && scan_after_line_break(lexer, false, rule, scanned_comment);
         }
 
         skip(lexer);
     }
 
     skip(lexer);
+    return scan_after_line_break(lexer, after_block_arrow, rule, scanned_comment);
+}
 
+static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule,
+                                  bool *scanned_comment) {
     if (after_block_arrow) {
         return ends_statement_after_block_arrow(lexer, scanned_comment);
     }
 
-    if (scan_whitespace_and_comments(lexer, scanned_comment, true) == REJECT) {
+    // REJECT means a `/` that starts no comment.
+    bool before_slash = scan_whitespace_and_comments(lexer, scanned_comment, true) == REJECT;
+    // A `;` at the start of the next line ends the statement itself.
+    if (!before_slash && lexer->lookahead == ';') {
+        return false;
+    }
+    switch (rule) {
+        case LINE_BREAK_ENDS:
+            return true;
+        case LINE_BREAK_AFTER_BINDING_NAME:
+            return before_slash || (lexer->lookahead != '=' && lexer->lookahead != ',');
+        case LINE_BREAK_AFTER_FIELD_NAME:
+            return before_slash || (lexer->lookahead != '=' && lexer->lookahead != '(');
+        case LINE_BREAK_AFTER_MODIFIER_WORD:
+            return !before_slash && (lexer->lookahead == '}' || lexer->eof(lexer));
+        default:
+            break;
+    }
+    if (before_slash) {
         return false;
     }
 
@@ -484,7 +533,12 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
     if (valid_symbols[AUTOMATIC_SEMICOLON] || valid_symbols[ARROW_FUNCTION_BLOCK_END]) {
         bool after_block_arrow = valid_symbols[ARROW_FUNCTION_BLOCK_END];
         bool scanned_comment = false;
-        bool ret = scan_automatic_semicolon(lexer, !valid_symbols[LOGICAL_OR], after_block_arrow, &scanned_comment);
+        LineBreakRule rule = valid_symbols[LINE_BREAK_ENDS_STATEMENT]   ? LINE_BREAK_ENDS
+                             : valid_symbols[LINE_BREAK_AFTER_BINDING] ? LINE_BREAK_AFTER_BINDING_NAME
+                             : valid_symbols[LINE_BREAK_AFTER_FIELD]   ? LINE_BREAK_AFTER_FIELD_NAME
+                             : valid_symbols[LINE_BREAK_AFTER_MODIFIER] ? LINE_BREAK_AFTER_MODIFIER_WORD
+                                                                       : LINE_BREAK_BY_NEXT_TOKEN;
+        bool ret = scan_automatic_semicolon(lexer, !valid_symbols[LOGICAL_OR], after_block_arrow, rule, &scanned_comment);
         if (ret && after_block_arrow) {
             lexer->result_symbol = ARROW_FUNCTION_BLOCK_END;
             scanner->automatic_semicolon_pending = true;
