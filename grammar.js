@@ -789,7 +789,7 @@ module.exports = grammar({
         )
       ),
 
-    await_expression: ($) => prec('unary_void', seq('await', $.expression)),
+    await_expression: ($) => prec.dynamic(2, prec('unary_void', seq('await', $.expression))),
 
     member_expression: ($) =>
       prec(
