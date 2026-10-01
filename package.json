@@ -22,8 +22,8 @@
     "*.wasm"
   ],
   "scripts": {
-    "build-wasm": "tree-sitter build --wasm",
-    "build/ci": "tree-sitter generate && tree-sitter build --wasm",
+    "build-wasm": "script/tree-sitter build --wasm",
+    "build/ci": "script/tree-sitter generate && script/tree-sitter build --wasm",
     "cleanup": "bun wb lint --fix --format",
     "format": "bun wb lint --format",
     "lint": "bun wb lint",
@@ -31,7 +31,7 @@
     "prepare": "(bun lefthook install || true) && (test ! -f .lefthook/normalize-bun-lockfile.sh || bash .lefthook/normalize-bun-lockfile.sh)",
     "release": "wb release",
     "prestart": "bun run build-wasm",
-    "start": "tree-sitter playground",
+    "start": "script/tree-sitter playground",
     "test": "bun wb test",
     "test/ci": "bun wb test-on-ci",
     "test/ci-setup": "playwright install --with-deps chromium",
@@ -46,7 +46,7 @@
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
     "@willbooster/wb": "22.13.1",
-    "@willbooster/web-tree-sitter": "1.0.12",
+    "@willbooster/web-tree-sitter": "1.0.15",
     "conventional-changelog-conventionalcommits": "10.4.0",
     "lefthook": "2.1.14",
     "oxfmt": "0.70.0",
