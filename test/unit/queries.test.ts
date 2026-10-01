@@ -14,6 +14,16 @@ const queryPaths = (kind: (typeof QueryKinds)[number]): string[] =>
   treeSitterJson.grammars.flatMap((grammar) => grammar[kind]);
 await Parser.init();
 
+// Tools that read tree-sitter.json use only the queries it lists, so a query file it misses goes unused.
+test('lists every query file in tree-sitter.json', () => {
+  const listed = QueryKinds.flatMap((kind) => queryPaths(kind)).toSorted();
+  const files = fs
+    .readdirSync(path.join(Root, 'queries'))
+    .map((file) => `queries/${file}`)
+    .toSorted();
+  expect(listed).toEqual(files);
+});
+
 // Tools that read tree-sitter.json, such as the tree-sitter CLI, compile each kind of query from its files
 // concatenated, so a node type that a grammar change removes must fail here rather than in them. performance.test.ts
 // checks that the Wasm build is current.
