@@ -1170,11 +1170,15 @@
       }
     },
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": false,
       "types": [
         {
           "type": "export_clause",
+          "named": true
+        },
+        {
+          "type": "import_attribute",
           "named": true
         },
         {

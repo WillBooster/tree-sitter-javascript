@@ -179,9 +179,7 @@ module.exports = grammar({
         seq(
           'export',
           choice(
-            seq('*', $._from_clause),
-            seq($.namespace_export, $._from_clause),
-            seq($.export_clause, $._from_clause),
+            seq(choice('*', $.namespace_export, $.export_clause), $._from_clause, optional($.import_attribute)),
             alias($._local_export_clause, $.export_clause)
           ),
           $._semicolon
