@@ -707,3 +707,32 @@ class B {
 (program
   (class_declaration (identifier) (class_body (field_definition (property_identifier))))
   (class_declaration (identifier) (class_body (field_definition (property_identifier)))))
+
+============================================
+Fields named static, get, or set before a decorated member
+============================================
+
+class A {
+  static
+  @d m() {}
+  get
+  @d x = 1
+  set
+  @d static m() {}
+  static get
+  @d
+  n() {}
+}
+
+---
+
+(program
+  (class_declaration (identifier) (class_body
+    (field_definition (property_identifier))
+    (method_definition (decorator (identifier)) (property_identifier) (formal_parameters) (statement_block))
+    (field_definition (property_identifier))
+    (field_definition (decorator (identifier)) (property_identifier) (number))
+    (field_definition (property_identifier))
+    (method_definition (decorator (identifier)) (property_identifier) (formal_parameters) (statement_block))
+    (field_definition (property_identifier))
+    (method_definition (decorator (identifier)) (property_identifier) (formal_parameters) (statement_block)))))
