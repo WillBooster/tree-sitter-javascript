@@ -2474,3 +2474,33 @@ e = <f.default />;
       (identifier)
       (jsx_self_closing_element
         (member_expression (identifier) (property_identifier))))))
+
+============================================
+Unicode spaces in JSX text
+============================================
+
+a = <b>　<c /> </b>;
+d = <e>
+　<f />
+</e>;
+
+---
+
+(program
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (jsx_element
+        (jsx_opening_element (identifier))
+        (jsx_text)
+        (jsx_self_closing_element (identifier))
+        (jsx_text)
+        (jsx_closing_element (identifier)))))
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (jsx_element
+        (jsx_opening_element (identifier))
+        (jsx_text)
+        (jsx_self_closing_element (identifier))
+        (jsx_closing_element (identifier))))))

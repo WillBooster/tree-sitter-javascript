@@ -2,7 +2,6 @@
 #include "tree_sitter/parser.h"
 
 #include <stdio.h>
-#include <wctype.h>
 
 enum TokenType {
     AUTOMATIC_SEMICOLON,
@@ -72,15 +71,28 @@ static inline bool is_whitespace(int32_t c) {
     }
 }
 
+static inline bool is_ascii_letter(int32_t c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+
+static inline bool is_ascii_digit(int32_t c) { return c >= '0' && c <= '9'; }
+
+// Counts the characters the grammar's identifiers may continue with (a backslash starts a `\u` escape), with every
+// character from U+007F on other than whitespace, which suffices to tell `in` and `instanceof` from the identifiers they
+// start.
+static inline bool is_identifier_part(int32_t c) {
+    return is_ascii_letter(c) || is_ascii_digit(c) || c == '_' || c == '$' || c == '\\' ||
+           (c >= 0x7F && !is_whitespace(c));
+}
+
 static bool scan_template_chars(TSLexer *lexer) {
     lexer->result_symbol = TEMPLATE_CHARS;
     for (bool has_content = false;; has_content = true) {
         lexer->mark_end(lexer);
+        if (lexer->eof(lexer)) {
+            return false;
+        }
         switch (lexer->lookahead) {
             case '`':
                 return has_content;
-            case '\0':
-                return false;
             case '$':
                 advance(lexer);
                 if (lexer->lookahead == '{') {
@@ -117,13 +129,13 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
 
             if (lexer->lookahead == '/') {
                 skip(lexer);
-                while (lexer->lookahead != 0 && !is_line_terminator(lexer->lookahead)) {
+                while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) {
                     skip(lexer);
                 }
                 *scanned_comment = true;
             } else if (lexer->lookahead == '*') {
                 skip(lexer);
-                while (lexer->lookahead != 0) {
+                while (!lexer->eof(lexer)) {
                     if (lexer->lookahead == '*') {
                         skip(lexer);
                         if (lexer->lookahead == '/') {
@@ -172,7 +184,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
     lexer->mark_end(lexer);
 
     for (;;) {
-        if (lexer->lookahead == 0) {
+        if (lexer->eof(lexer)) {
             return true;
         }
 
@@ -243,7 +255,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
         // Insert a semicolon before decimals literals but not otherwise.
         case '.':
             skip(lexer);
-            return iswdigit(lexer->lookahead);
+            return is_ascii_digit(lexer->lookahead);
 
         // Insert a semicolon before `--` and `++`, but not before binary `+` or `-`.
         case '+':
@@ -268,7 +280,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
             }
             skip(lexer);
 
-            if (!iswalpha(lexer->lookahead)) {
+            if (!is_identifier_part(lexer->lookahead)) {
                 return false;
             }
 
@@ -279,7 +291,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
                 skip(lexer);
             }
 
-            if (!iswalpha(lexer->lookahead)) {
+            if (!is_identifier_part(lexer->lookahead)) {
                 return false;
             }
             break;
@@ -311,7 +323,7 @@ static bool scan_ternary_qmark(TSLexer *lexer) {
 
         if (lexer->lookahead == '.') {
             advance(lexer);
-            if (iswdigit(lexer->lookahead)) {
+            if (is_ascii_digit(lexer->lookahead)) {
                 return true;
             }
             return false;
@@ -347,7 +359,7 @@ static bool scan_html_comment(TSLexer *lexer) {
         return false;
     }
 
-    while (lexer->lookahead != 0 && !is_line_terminator(lexer->lookahead)) {
+    while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) {
         advance(lexer);
     }
 
@@ -356,10 +368,6 @@ static bool scan_html_comment(TSLexer *lexer) {
 
     return true;
 }
-
-static inline bool is_ascii_letter(int32_t c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
-
-static inline bool is_ascii_digit(int32_t c) { return c >= '0' && c <= '9'; }
 
 static inline bool is_hex_digit(int32_t c) { return is_ascii_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'); }
 
@@ -399,8 +407,10 @@ static bool scan_jsx_text(TSLexer *lexer) {
     lexer->result_symbol = JSX_TEXT;
     for (;;) {
         lexer->mark_end(lexer);
+        if (lexer->eof(lexer)) {
+            return saw_text;
+        }
         switch (lexer->lookahead) {
-            case 0:
             case '<':
             case '>':
             case '{':
@@ -418,7 +428,8 @@ static bool scan_jsx_text(TSLexer *lexer) {
                 break;
         }
 
-        bool is_wspace = iswspace(lexer->lookahead);
+        // Only ASCII whitespace counts, as in Babel's JSX whitespace trimming; other spaces, such as U+00A0, are text.
+        bool is_wspace = (lexer->lookahead >= '\t' && lexer->lookahead <= '\r') || lexer->lookahead == ' ';
         // Babel splits JSX text into lines at CR and LF only, and keeps U+2028 and U+2029 as text.
         if (lexer->lookahead == '\n' || lexer->lookahead == '\r') {
             at_newline = true;
