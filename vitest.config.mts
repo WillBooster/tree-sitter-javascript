@@ -11,6 +11,7 @@ export default defineConfig({
           name: 'node',
           include: ['test/unit/**/*.test.ts'],
           exclude: ['test/unit/browser/**'],
+          globalSetup: ['test/unit/forkCli.setup.ts'],
         },
       },
       {
