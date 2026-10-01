@@ -48,8 +48,7 @@ const RESERVED_WORDS = [
 ];
 const NAMED_RESERVED_WORDS = new Set(['this', 'super', 'true', 'false', 'null']);
 
-// Words that are keywords only in some positions and identifiers elsewhere. A line break never separates the member
-// modifiers from the class member they start, unlike the other words.
+// Words that are keywords only in some positions and identifiers elsewhere.
 const MEMBER_MODIFIERS = ['get', 'set', 'static'];
 const CONTEXTUAL_KEYWORDS = ['async', 'await', 'export', 'let', 'using'];
 
@@ -1155,10 +1154,11 @@ module.exports = grammar({
             optional('static'),
             choice(
               seq(field('property', $._field_name), optional(choice($._initializer, $._line_break_after_field))),
-              // A line break after `get` or `set` continues a getter or setter.
+              // A line break after `get` or `set` continues a getter or setter. Allowing both sentinels here tells
+              // the scanner that a `*` on the next line cannot continue the member, unlike after `static`.
               seq(
                 field('property', alias(choice('get', 'set'), $.property_identifier)),
-                optional(choice($._initializer, $._line_break_after_modifier))
+                optional(choice($._initializer, $._line_break_after_modifier, $._line_break_after_field))
               )
             )
           ),

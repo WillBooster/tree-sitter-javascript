@@ -7056,6 +7056,10 @@
                                 {
                                   "type": "SYMBOL",
                                   "name": "_line_break_after_modifier"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "_line_break_after_field"
                                 }
                               ]
                             },

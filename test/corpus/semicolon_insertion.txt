@@ -595,6 +595,10 @@ class A {
   [d](v) {}
   static static
   e() {}
+  get
+  *f() {}
+  static
+  *g() {}
 }
 
 ---
@@ -611,6 +615,9 @@ class A {
         (formal_parameters (identifier))
         (statement_block))
       (field_definition (property_identifier))
+      (method_definition (property_identifier) (formal_parameters) (statement_block))
+      (field_definition (property_identifier))
+      (method_definition (property_identifier) (formal_parameters) (statement_block))
       (method_definition (property_identifier) (formal_parameters) (statement_block)))))
 
 ============================================
