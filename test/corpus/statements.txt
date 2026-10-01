@@ -993,6 +993,7 @@ Using declarations in for statements
 
 for (using x = f(), y = g(); x.ok; ) {}
 for (await using z = h(); ; ) {}
+for (using of = i(); ; ) {}
 
 ---
 
@@ -1002,6 +1003,11 @@ for (await using z = h(); ; ) {}
       (variable_declarator (identifier) (call_expression (identifier) (arguments)))
       (variable_declarator (identifier) (call_expression (identifier) (arguments))))
     (member_expression (identifier) (property_identifier))
+    (statement_block))
+  (for_statement
+    (using_declaration
+      (variable_declarator (identifier) (call_expression (identifier) (arguments))))
+    (empty_statement)
     (statement_block))
   (for_statement
     (using_declaration
