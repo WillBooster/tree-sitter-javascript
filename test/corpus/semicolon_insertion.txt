@@ -442,6 +442,10 @@ function* f() {
   return /* comment */ (d)
   g(yield
     e)
+  const h = yield
+    , i = 1
+  j = k ? yield
+    : l
   for (;;) {
     break
     (h)
@@ -466,6 +470,13 @@ function* f() {
       (expression_statement (unary_expression (identifier)))
       (return_statement (comment) (parenthesized_expression (identifier)))
       (expression_statement (call_expression (identifier) (arguments (yield_expression (identifier)))))
+      (lexical_declaration
+        (variable_declarator (identifier) (yield_expression))
+        (variable_declarator (identifier) (number)))
+      (expression_statement
+        (assignment_expression
+          (identifier)
+          (ternary_expression (identifier) (yield_expression) (identifier))))
       (for_statement
         (empty_statement)
         (empty_statement)
