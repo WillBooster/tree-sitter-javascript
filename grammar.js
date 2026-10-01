@@ -1131,7 +1131,10 @@ module.exports = grammar({
       prec(
         'call',
         seq(
-          field('function', choice($.identifier, alias($.decorator_member_expression, $.member_expression))),
+          field(
+            'function',
+            choice($.identifier, alias($.decorator_member_expression, $.member_expression), $.parenthesized_expression)
+          ),
           field('arguments', $.arguments)
         )
       ),

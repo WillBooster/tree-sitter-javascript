@@ -883,6 +883,7 @@ class A {
   n() {}
   @e.#f o = 1
   @g.class(h) p() {}
+  @(i.j)(k) q() {}
 }
 
 ---
@@ -910,6 +911,14 @@ class A {
         (decorator
           (call_expression
             (member_expression (identifier) (property_identifier))
+            (arguments (identifier))))
+        (property_identifier)
+        (formal_parameters)
+        (statement_block))
+      (method_definition
+        (decorator
+          (call_expression
+            (parenthesized_expression (member_expression (identifier) (property_identifier)))
             (arguments (identifier))))
         (property_identifier)
         (formal_parameters)

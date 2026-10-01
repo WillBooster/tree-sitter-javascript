@@ -6885,6 +6885,10 @@
                   },
                   "named": true,
                   "value": "member_expression"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "parenthesized_expression"
                 }
               ]
             }
