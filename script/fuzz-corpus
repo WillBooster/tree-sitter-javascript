@@ -10,8 +10,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-version=$(awk '/^name = "willbooster-tree-sitter"$/ { getline; gsub(/version = |"/, ""); print }' Cargo.lock)
-cli=.tmp/tree-sitter-cli/${version:?Cargo.lock locks no willbooster-tree-sitter}
+version=$(script/runtime-version)
+cli=.tmp/tree-sitter-cli/$version
 if [[ ! -x $cli/bin/tree-sitter ]]; then
   case $(uname -s)-$(uname -m) in
     Linux-x86_64) platform=linux-x64 ;;

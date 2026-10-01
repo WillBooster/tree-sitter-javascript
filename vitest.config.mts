@@ -3,6 +3,9 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // wbfy declares the `vitest/globals` types in tsconfig.json for every package that depends on Vitest, so the
+    // runner provides the globals those types promise.
+    globals: true,
     projects: [
       {
         test: {

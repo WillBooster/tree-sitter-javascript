@@ -45,8 +45,7 @@ jobs:
           persist-credentials: false
       - id: runtime
         run: |
-          version=$(awk '/^name = "willbooster-tree-sitter"$/ { getline; gsub(/version = |"/, ""); print }' Cargo.lock)
-          echo "ref=v${version:?Cargo.lock locks no willbooster-tree-sitter}" >> "$GITHUB_OUTPUT"
+          echo "ref=v$(script/runtime-version)" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7.0.1
         with:
           repository: WillBooster/tree-sitter
