@@ -18,6 +18,7 @@ enum TokenType {
     LINE_BREAK_AFTER_BINDING,
     LINE_BREAK_AFTER_FIELD,
     LINE_BREAK_AFTER_MODIFIER,
+    LINE_BREAK_BEFORE_ATTRIBUTES,
 };
 
 typedef struct {
@@ -85,6 +86,17 @@ static inline bool is_ascii_digit(int32_t c) { return c >= '0' && c <= '9'; }
 static inline bool is_identifier_part(int32_t c) {
     return is_ascii_letter(c) || is_ascii_digit(c) || c == '_' || c == '$' || c == '\\' ||
            (c >= 0x7F && !is_whitespace(c));
+}
+
+// Consumes the lookahead while it matches `word`, and returns whether the whole word matched and ends there.
+static bool scan_word(TSLexer *lexer, const char *word) {
+    for (; *word; word++) {
+        if (lexer->lookahead != *word) {
+            return false;
+        }
+        skip(lexer);
+    }
+    return !is_identifier_part(lexer->lookahead);
 }
 
 static bool scan_template_chars(TSLexer *lexer) {
@@ -199,6 +211,8 @@ typedef enum {
     // After `get` or `set` at the start of a class member: as after `static`, except that a `*` also ends the field,
     // since an accessor cannot be a generator.
     LINE_BREAK_AFTER_ACCESSOR_WORD,
+    // After the source of an import or re-export: only the `with` of its attributes continues it.
+    LINE_BREAK_BEFORE_IMPORT_ATTRIBUTES,
 } LineBreakRule;
 
 static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule, bool *scanned_comment);
@@ -296,6 +310,8 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
             return before_slash || (lexer->lookahead != '=' && lexer->lookahead != '(');
         case LINE_BREAK_AFTER_MODIFIER_WORD:
             return !before_slash && (lexer->lookahead == '}' || lexer->eof(lexer));
+        case LINE_BREAK_BEFORE_IMPORT_ATTRIBUTES:
+            return before_slash || !scan_word(lexer, "with");
         case LINE_BREAK_AFTER_ACCESSOR_WORD:
             return !before_slash && (lexer->lookahead == '}' || lexer->lookahead == '*' || lexer->eof(lexer));
         default:
@@ -565,6 +581,8 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
             rule = valid_symbols[LINE_BREAK_AFTER_FIELD] ? LINE_BREAK_AFTER_ACCESSOR_WORD : LINE_BREAK_AFTER_MODIFIER_WORD;
         } else if (valid_symbols[LINE_BREAK_AFTER_FIELD]) {
             rule = LINE_BREAK_AFTER_FIELD_NAME;
+        } else if (valid_symbols[LINE_BREAK_BEFORE_ATTRIBUTES]) {
+            rule = LINE_BREAK_BEFORE_IMPORT_ATTRIBUTES;
         }
         bool ret = scan_automatic_semicolon(lexer, !valid_symbols[LOGICAL_OR], after_block_arrow, rule, &scanned_comment);
         if (ret && after_block_arrow) {

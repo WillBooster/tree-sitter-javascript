@@ -446,6 +446,10 @@ Import attributes on re-exports
 export { default } from './data.json' with { type: 'json' };
 export * from './a.json' with { type: 'json' };
 export * as b from './b.json' with { type: 'json' };
+export * from './c.json'
+  with { type: 'json' };
+import d from './d.json'
+  with { type: 'json' };
 
 ---
 
@@ -461,6 +465,15 @@ export * as b from './b.json' with { type: 'json' };
       (object (pair key: (property_identifier) value: (string (string_fragment))))))
   (export_statement
     (namespace_export (identifier))
+    source: (string (string_fragment))
+    (import_attribute
+      (object (pair key: (property_identifier) value: (string (string_fragment))))))
+  (export_statement
+    source: (string (string_fragment))
+    (import_attribute
+      (object (pair key: (property_identifier) value: (string (string_fragment))))))
+  (import_statement
+    (import_clause (identifier))
     source: (string (string_fragment))
     (import_attribute
       (object (pair key: (property_identifier) value: (string (string_fragment)))))))
