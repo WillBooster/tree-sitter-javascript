@@ -58,10 +58,6 @@
         "named": true
       },
       {
-        "type": "new_expression",
-        "named": true
-      },
-      {
         "type": "primary_expression",
         "named": true
       },

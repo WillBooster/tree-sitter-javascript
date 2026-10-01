@@ -500,8 +500,6 @@ module.exports = grammar({
         $.binary_expression,
         $.ternary_expression,
         $.update_expression,
-        // A `new` with arguments is a primary expression (see new_expression).
-        alias($._argumentless_new_expression, $.new_expression),
         $.yield_expression
       ),
 
@@ -529,7 +527,8 @@ module.exports = grammar({
         $.class,
         $.meta_property,
         $.call_expression,
-        $.new_expression
+        $.new_expression,
+        alias($._argumentless_new_expression, $.new_expression)
       ),
 
     yield_expression: ($) =>
@@ -802,17 +801,15 @@ module.exports = grammar({
         )
       ),
 
-    // As in ECMAScript, a `new` with arguments is a member-level (primary) expression and one without them is not, so a
-    // member access or index extends the nearest `new` with arguments, while an argument list fills the nearest `new`
-    // that still lacks one: `new new A().b` constructs `new A().b`, `new new A().b(2)` constructs `new A().b` with `2`,
-    // and `new new A()(2)` constructs `new A()`.
+    // As in ECMAScript, a member access or index extends the nearest `new` with arguments, while an argument list fills
+    // the nearest `new` that still lacks one: `new new A().b` constructs `new A().b`, `new new A().b(2)` constructs
+    // `new A().b` with `2`, and `new new A()(2)` constructs `new A()`. The 'member' and 'new' precedences make the parser
+    // shift a `.`, `[`, or argument list after a constructor rather than end a `new` without arguments, so that form
+    // never takes one. Both forms are primary expressions, so a nested `new` matches the constructor field's type.
     new_expression: ($) =>
-      prec('new', seq('new', field('constructor', $._new_constructor), field('arguments', $.arguments))),
+      prec('new', seq('new', field('constructor', $.primary_expression), field('arguments', $.arguments))),
 
-    _argumentless_new_expression: ($) => prec.right('new', seq('new', field('constructor', $._new_constructor))),
-
-    _new_constructor: ($) =>
-      prec('new', choice($.primary_expression, alias($._argumentless_new_expression, $.new_expression))),
+    _argumentless_new_expression: ($) => prec.right('new', seq('new', field('constructor', $.primary_expression))),
 
     await_expression: ($) => prec.dynamic(2, prec('unary_void', seq('await', $.expression))),
 

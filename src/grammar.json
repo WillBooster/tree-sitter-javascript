@@ -2458,15 +2458,6 @@
           "name": "update_expression"
         },
         {
-          "type": "ALIAS",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_argumentless_new_expression"
-          },
-          "named": true,
-          "value": "new_expression"
-        },
-        {
           "type": "SYMBOL",
           "name": "yield_expression"
         }
@@ -2571,6 +2562,15 @@
         {
           "type": "SYMBOL",
           "name": "new_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_argumentless_new_expression"
+          },
+          "named": true,
+          "value": "new_expression"
         }
       ]
     },
@@ -4257,7 +4257,7 @@
             "name": "constructor",
             "content": {
               "type": "SYMBOL",
-              "name": "_new_constructor"
+              "name": "primary_expression"
             }
           },
           {
@@ -4286,30 +4286,8 @@
             "name": "constructor",
             "content": {
               "type": "SYMBOL",
-              "name": "_new_constructor"
+              "name": "primary_expression"
             }
-          }
-        ]
-      }
-    },
-    "_new_constructor": {
-      "type": "PREC",
-      "value": "new",
-      "content": {
-        "type": "CHOICE",
-        "members": [
-          {
-            "type": "SYMBOL",
-            "name": "primary_expression"
-          },
-          {
-            "type": "ALIAS",
-            "content": {
-              "type": "SYMBOL",
-              "name": "_argumentless_new_expression"
-            },
-            "named": true,
-            "value": "new_expression"
           }
         ]
       }
