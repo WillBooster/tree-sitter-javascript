@@ -1110,7 +1110,7 @@ module.exports = grammar({
           $.identifier,
           alias($.decorator_member_expression, $.member_expression),
           alias($.decorator_call_expression, $.call_expression),
-          alias($.decorator_parenthesized_expression, $.parenthesized_expression)
+          $.parenthesized_expression
         )
       ),
 
@@ -1126,8 +1126,6 @@ module.exports = grammar({
           )
         )
       ),
-
-    decorator_parenthesized_expression: ($) => seq('(', $._expressions, ')'),
 
     decorator_call_expression: ($) =>
       prec(

@@ -6793,13 +6793,8 @@
               "value": "call_expression"
             },
             {
-              "type": "ALIAS",
-              "content": {
-                "type": "SYMBOL",
-                "name": "decorator_parenthesized_expression"
-              },
-              "named": true,
-              "value": "parenthesized_expression"
+              "type": "SYMBOL",
+              "name": "parenthesized_expression"
             }
           ]
         }
@@ -6865,23 +6860,6 @@
           }
         ]
       }
-    },
-    "decorator_parenthesized_expression": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "("
-        },
-        {
-          "type": "SYMBOL",
-          "name": "_expressions"
-        },
-        {
-          "type": "STRING",
-          "value": ")"
-        }
-      ]
     },
     "decorator_call_expression": {
       "type": "PREC",
