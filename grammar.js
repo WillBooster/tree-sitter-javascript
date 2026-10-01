@@ -334,8 +334,9 @@ module.exports = grammar({
         field('body', $.statement)
       ),
 
-    // Hidden rules, so that the alternatives share the parse states of the rest of the header instead of each
-    // repeating them.
+    // Extracted into rules because tree-sitter expands a `choice` written inline in the `seq` above into one production
+    // per alternative, each repeating the parse states of the rest of the header (about 30 KB of Wasm). They are hidden
+    // so that `initializer` and `condition` stay fields of `for_statement` and no node type is added.
     _for_initializer: ($) =>
       choice(
         field(
