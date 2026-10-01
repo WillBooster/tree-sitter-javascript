@@ -1378,6 +1378,8 @@ const m = await (await import('./x')).default;
 await (x)?.y;
 await [x][0];
 o.await(1);
+x = { await: 1 };
+const { await } = obj;
 
 ---
 
@@ -1409,7 +1411,15 @@ o.await(1);
   (expression_statement
     (call_expression
       (member_expression (identifier) (property_identifier))
-      (arguments (number)))))
+      (arguments (number))))
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (object (pair (property_identifier) (number)))))
+  (lexical_declaration
+    (variable_declarator
+      (object_pattern (shorthand_property_identifier_pattern))
+      (identifier))))
 
 ============================================
 Async Functions and Methods
