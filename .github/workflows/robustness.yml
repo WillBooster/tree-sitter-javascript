@@ -45,7 +45,8 @@ jobs:
           persist-credentials: false
       - id: runtime
         run: |
-          echo "ref=v$(script/runtime-version)" >> "$GITHUB_OUTPUT"
+          version=$(script/runtime-version)
+          echo "ref=v$version" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7.0.1
         with:
           repository: WillBooster/tree-sitter

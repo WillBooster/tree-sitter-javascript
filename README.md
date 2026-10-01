@@ -107,8 +107,9 @@ cargo test
 - a check that `package.json` and `Cargo.lock` lock the same WillBooster/tree-sitter runtime version
   (`test/unit/runtimeVersion.test.ts`).
 
-The tests and `script/parse-examples` compile the parser into `.tmp/tree-sitter-lib` instead of the CLI's cache
-shared by every checkout.
+The tests and `script/parse-examples` compile the parser into `.tmp/` instead of the CLI's cache shared by every
+checkout: into `.tmp/tree-sitter-lib`, except that `script/fuzz-corpus` builds a per-run parser in `.tmp/fuzz` and
+deletes it afterwards.
 
 CI also runs these tests on Linux arm64 and macOS, where the Rust binding compiles the parser natively, and fuzzes the
 parser with libFuzzer and sanitizers (`.github/workflows/robustness.yml`).
