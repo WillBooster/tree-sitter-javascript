@@ -58,10 +58,6 @@
         "named": true
       },
       {
-        "type": "new_expression",
-        "named": true
-      },
-      {
         "type": "primary_expression",
         "named": true
       },
@@ -163,6 +159,10 @@
       },
       {
         "type": "meta_property",
+        "named": true
+      },
+      {
+        "type": "new_expression",
         "named": true
       },
       {
@@ -2236,10 +2236,6 @@
         "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "new_expression",
-            "named": true
-          },
           {
             "type": "primary_expression",
             "named": true
