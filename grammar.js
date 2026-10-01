@@ -803,8 +803,9 @@ module.exports = grammar({
       ),
 
     // As in ECMAScript, a `new` with arguments is a member-level (primary) expression and one without them is not, so a
-    // member access, a call, or a further argument list binds to the nearest `new` with arguments: `new new A().b`
-    // constructs `new A().b`, and `new new A()(2)` constructs `new A()`.
+    // member access or index extends the nearest `new` with arguments, while an argument list fills the nearest `new`
+    // that still lacks one: `new new A().b` constructs `new A().b`, `new new A().b(2)` constructs `new A().b` with `2`,
+    // and `new new A()(2)` constructs `new A()`.
     new_expression: ($) =>
       prec('new', seq('new', field('constructor', $._new_constructor), field('arguments', $.arguments))),
 
