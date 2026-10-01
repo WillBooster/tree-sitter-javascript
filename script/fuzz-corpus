@@ -9,6 +9,10 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+# Even with --lib-path, `tree-sitter fuzz` compiles the grammar in the current directory into the CLI's parser cache
+# and loads it. That cache is shared by every checkout and reused when newer than the sources, so this checkout uses a
+# cache of its own.
+export TREE_SITTER_LIBDIR=$PWD/.tmp/tree-sitter-lib
 
 version=$(script/runtime-version)
 cli=.tmp/tree-sitter-cli/$version
