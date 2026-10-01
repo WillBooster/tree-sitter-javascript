@@ -97,11 +97,13 @@ class A {  static get  a() {}  static  get  b() {}  static get  = 1  get
 Whitespace after carriage returns
 =================================
 
-a﻿[b]c (d)
+a﻿[b]c
+​[d]e (f)
 
 ---
 
 (program
+  (expression_statement (subscript_expression (identifier) (identifier)))
   (expression_statement (subscript_expression (identifier) (identifier)))
   (expression_statement (call_expression (identifier) (arguments (identifier)))))
 

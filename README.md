@@ -5,7 +5,7 @@
 [![Test](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test.yml/badge.svg)](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test.yml)
 [![Test rust](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test-rust.yml/badge.svg)](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test-rust.yml)
 [![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
-[![wbfy](https://img.shields.io/badge/wbfy-20.26.0-1e90ff.svg)](https://github.com/WillBooster/shared/tree/main/packages/wbfy)
+[![wbfy](https://img.shields.io/badge/wbfy-20.28.5-1e90ff.svg)](https://github.com/WillBooster/shared/tree/main/packages/wbfy)
 [![crates.io](https://img.shields.io/crates/v/willbooster-tree-sitter-javascript.svg)](https://crates.io/crates/willbooster-tree-sitter-javascript)
 
 JavaScript and JSX grammar for [tree-sitter](https://github.com/tree-sitter/tree-sitter), forked from
@@ -89,22 +89,30 @@ cargo test
 `bun run test` runs:
 
 - the corpus in `test/corpus`, with the native build and with the Wasm build (the first run downloads the WASI SDK);
-- an incremental-parsing check (`test/unit/incremental.test.ts`): `tree-sitter fuzz` edits each corpus case at random,
-  reparses it, undoes the edits, and reparses again. `TREE_SITTER_SEED`, `TREE_SITTER_ITERATIONS`, and
-  `TREE_SITTER_EDITS` run other or more edits;
+- an incremental-parsing check (`test/unit/incremental.test.ts`): `script/fuzz-corpus` runs `tree-sitter fuzz`, which
+  edits each corpus case at random, reparses it, undoes the edits, and reparses again, on the WillBooster/tree-sitter
+  runtime version locked in `Cargo.lock` (the first run downloads that CLI from its GitHub Release, or builds it with
+  `cargo` when the download fails or the release has no binary that runs here). `TREE_SITTER_SEED`,
+  `TREE_SITTER_ITERATIONS`, and `TREE_SITTER_EDITS` run other or more edits;
 - a check that the real-world JavaScript files in `examples/`, the checked-in ones and those of the cloned repository,
-  fail to parse exactly as listed in `script/known-failures.txt`. The first run clones the repository. The example repository is pinned to a commit in
-  `script/parse-examples`. After a grammar change or a moved pin alters that list, `script/parse-examples` rewrites
-  it; review its diff before committing;
+  fail to parse exactly as listed in `script/known-failures.txt`. The first run clones the repository. The example
+  repository is pinned to a commit in `script/parse-examples`. After a grammar change or a moved pin alters that list,
+  `script/parse-examples` rewrites it; review its diff before committing;
 - a performance check (`test/unit/performance.test.ts`) that recovering from an error on each of 10,000 lines takes
   linear time, since consumers parse files while they are being edited. It loads the Wasm build through
   @willbooster/web-tree-sitter, which `bun run build/ci` rebuilds after regenerating the parser;
 - checks that the Wasm build parses in Chromium (`test/unit/browser/`) and in Cloudflare Workers with and without
   Node.js compatibility (`test/unit/workers.test.ts`). Run `bun run test/ci-setup` once before the first
-  run to install Chromium and, on Linux, the system libraries it needs.
+  run to install Chromium and, on Linux, the system libraries it needs;
+- a check that `package.json` and `Cargo.lock` lock the same WillBooster/tree-sitter runtime version
+  (`test/unit/runtimeVersion.test.ts`).
 
-CI also runs these tests on Linux arm64 and macOS, where the Rust binding compiles the parser natively, and fuzzes the parser with libFuzzer and sanitizers
-(`.github/workflows/robustness.yml`).
+The tests, `script/parse-examples`, and `script/fuzz-corpus` compile the parser into `.tmp/tree-sitter-lib` instead
+of the CLI's cache shared by every checkout; `script/fuzz-corpus` also builds a per-run parser in `.tmp/fuzz` and
+deletes it afterwards.
+
+CI also runs these tests on Linux arm64 and macOS, where the Rust binding compiles the parser natively, and fuzzes the
+parser with libFuzzer and sanitizers (`.github/workflows/robustness.yml`).
 
 ### References
 
