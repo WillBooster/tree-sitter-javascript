@@ -1,18 +1,14 @@
 #!/usr/bin/env bash
 
-# Runs `tree-sitter fuzz`: it edits each corpus case at random, reparses it incrementally, undoes the edits, and reparses
-# again. The CLI comes from WillBooster/tree-sitter at the willbooster-tree-sitter version in Cargo.lock, since the
-# runtime embedded in the upstream CLI lacks fixes this grammar's tests depend on. The first run downloads that CLI into
-# .tmp/ from the GitHub Release of the version, or builds it when the download fails or the release has no binary that
-# runs here, which takes over 10 minutes on GitHub's Intel macOS runner.
+# Runs `tree-sitter fuzz`: it edits each corpus case at random, reparses it incrementally, undoes the edits, and
+# reparses again. The CLI comes from WillBooster/tree-sitter at the willbooster-tree-sitter version in Cargo.lock, since
+# the runtime embedded in the upstream CLI lacks fixes this grammar's tests depend on. The first run downloads that CLI
+# into .tmp/ from the GitHub Release of the version, or builds it when the download fails or the release has no binary
+# that runs here, which takes over 10 minutes on GitHub's Intel macOS runner.
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-# Even with --lib-path, `tree-sitter fuzz` compiles the grammar in the current directory into the CLI's parser cache
-# and loads it. That cache is shared by every checkout and reused when newer than the sources, so this checkout uses a
-# cache of its own.
-export TREE_SITTER_LIBDIR=$PWD/.tmp/tree-sitter-lib
 
 version=$(script/runtime-version)
 cli=.tmp/tree-sitter-cli/$version

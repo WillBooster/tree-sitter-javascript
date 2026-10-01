@@ -29,26 +29,37 @@ test('uses a Wasm build built from the current parser', () => {
   ).toBe(false);
 });
 
-// Consumers parse files being edited, so recovering from many errors must stay linear: 10 times as many lines must
-// take about 10 times as long, where quadratic recovery takes about 100 times. The check compares CPU times of this test
-// file's process (see `pool` in vitest.config.mts) instead of using a fixed limit, since CI runners differ several-fold
-// in speed and run other test files in parallel, and it parses once before measuring, since compiling the Wasm module
-// counts as CPU time. Its seven parses can exceed
-// Vitest's default 5 s timeout on slow runners (7.3 s on macos-15-intel).
-test('recovers from an error on each of 10,000 lines in linear time', { timeout: 60_000 }, () => {
-  cpuTimeToParseErrorLines(10_000);
-  const small = Math.min(...[1, 2, 3].map(() => cpuTimeToParseErrorLines(1000)));
-  const large = Math.min(...[1, 2, 3].map(() => cpuTimeToParseErrorLines(10_000)));
-  expect(large, `1,000 lines took ${small} ms and 10,000 lines ${large} ms`).toBeLessThan(small * 30);
+// Consumers parse files being edited, so recovering from many errors must stay linear: ten times the lines take about
+// ten times as long, against a hundred times for quadratic recovery. The check compares the two sizes instead of using
+// a fixed limit, since CI runners differ several-fold in speed. The parses are timed in the CPU time of the thread that
+// runs them: wall-clock time is inflated unevenly by the test files running alongside, and the process's CPU time also
+// counts the engine's background threads, which compile the Wasm build and collect garbage during the parses. Warm-up
+// parses, alternating the sizes, and keeping the fastest of five runs each filter out the remaining noise; 18 leaves a
+// margin over the ratios of 10.0 to 10.9 measured locally and fails for growth faster than about n^1.25.
+test('recovers from an error on each line in linear time', { timeout: 60_000 }, () => {
+  const small = '$ a\n'.repeat(2000);
+  const large = '$ a\n'.repeat(20_000);
+  parseCpuTime(large);
+  parseCpuTime(large);
+  let smallFastest = Infinity;
+  let largeFastest = Infinity;
+  for (let run = 0; run < 5; run++) {
+    smallFastest = Math.min(smallFastest, parseCpuTime(small));
+    largeFastest = Math.min(largeFastest, parseCpuTime(large));
+  }
+  expect(
+    largeFastest / smallFastest,
+    `2,000 lines took ${smallFastest} µs and 20,000 lines ${largeFastest} µs`
+  ).toBeLessThan(18);
 });
 
-function cpuTimeToParseErrorLines(lines: number): number {
-  const start = process.cpuUsage();
-  const tree = parser.parse('$ a\n'.repeat(lines));
-  const { user, system } = process.cpuUsage(start);
+function parseCpuTime(source: string): number {
+  const start = process.threadCpuUsage();
+  const tree = parser.parse(source);
+  const { system, user } = process.threadCpuUsage(start);
   if (!tree) throw new Error('The parser returned no tree');
   const { hasError } = tree.rootNode;
   tree.delete();
   expect(hasError).toBe(true);
-  return (user + system) / 1000;
+  return system + user;
 }
