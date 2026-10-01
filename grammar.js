@@ -1192,9 +1192,9 @@ module.exports = grammar({
     // This negative dynamic precedence ensures that during error recovery,
     // unfinished constructs are generally treated as literal expressions,
     // not patterns.
-    pattern: ($) => prec.dynamic(-1, choice($._lhs_expression, $.rest_pattern)),
+    pattern: ($) => prec.dynamic(-1, choice($._lhs_expression, $.parenthesized_expression, $.rest_pattern)),
 
-    rest_pattern: ($) => prec.right(seq('...', $._lhs_expression)),
+    rest_pattern: ($) => prec.right(seq('...', choice($._lhs_expression, $.parenthesized_expression))),
 
     method_definition: ($) =>
       seq(
