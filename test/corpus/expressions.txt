@@ -873,6 +873,49 @@ class Foo {
           (string_fragment))))))
 
 ============================================
+Decorators with reserved, private, and parenthesized names
+============================================
+
+@a.default
+class A {
+  @b.if m() {}
+  @(c.d)
+  n() {}
+  @e.#f o = 1
+  @g.class(h) p() {}
+}
+
+---
+
+(program
+  (class_declaration
+    (decorator (member_expression (identifier) (property_identifier)))
+    (identifier)
+    (class_body
+      (method_definition
+        (decorator (member_expression (identifier) (property_identifier)))
+        (property_identifier)
+        (formal_parameters)
+        (statement_block))
+      (method_definition
+        (decorator (parenthesized_expression (member_expression (identifier) (property_identifier))))
+        (property_identifier)
+        (formal_parameters)
+        (statement_block))
+      (field_definition
+        (decorator (member_expression (identifier) (private_property_identifier)))
+        (property_identifier)
+        (number))
+      (method_definition
+        (decorator
+          (call_expression
+            (member_expression (identifier) (property_identifier))
+            (arguments (identifier))))
+        (property_identifier)
+        (formal_parameters)
+        (statement_block)))))
+
+============================================
 Arrays
 ============================================
 

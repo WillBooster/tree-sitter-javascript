@@ -1109,7 +1109,8 @@ module.exports = grammar({
         choice(
           $.identifier,
           alias($.decorator_member_expression, $.member_expression),
-          alias($.decorator_call_expression, $.call_expression)
+          alias($.decorator_call_expression, $.call_expression),
+          alias($.decorator_parenthesized_expression, $.parenthesized_expression)
         )
       ),
 
@@ -1119,9 +1120,14 @@ module.exports = grammar({
         seq(
           field('object', choice($.identifier, alias($.decorator_member_expression, $.member_expression))),
           '.',
-          field('property', alias($.identifier, $.property_identifier))
+          field(
+            'property',
+            choice(reserved('properties', alias($.identifier, $.property_identifier)), $.private_property_identifier)
+          )
         )
       ),
+
+    decorator_parenthesized_expression: ($) => seq('(', $._expressions, ')'),
 
     decorator_call_expression: ($) =>
       prec(
