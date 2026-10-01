@@ -104,6 +104,10 @@
         "named": true
       },
       {
+        "type": "parenthesized_expression",
+        "named": true
+      },
+      {
         "type": "rest_pattern",
         "named": true
       },
@@ -2507,6 +2511,10 @@
         },
         {
           "type": "object_pattern",
+          "named": true
+        },
+        {
+          "type": "parenthesized_expression",
           "named": true
         },
         {

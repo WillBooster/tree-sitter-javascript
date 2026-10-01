@@ -133,3 +133,40 @@ if ({a: 'b'} {c: 'd'}) {
         (MISSING ";"))
       (expression_statement
         (function_expression (formal_parameters (identifier)) (statement_block (expression_statement (identifier))))))))
+
+============================================
+Parenthesized targets in destructuring assignments
+============================================
+
+[(a), (b.c) = 1, ...(d)] = e;
+({ f: (g), h: (i.j) = 2, ...(k) } = l);
+for ([(m)] of n) {}
+
+---
+
+(program
+  (expression_statement
+    (assignment_expression
+      (array_pattern
+        (parenthesized_expression (identifier))
+        (assignment_pattern
+          (parenthesized_expression (member_expression (identifier) (property_identifier)))
+          (number))
+        (rest_pattern (parenthesized_expression (identifier))))
+      (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (assignment_expression
+        (object_pattern
+          (pair_pattern (property_identifier) (parenthesized_expression (identifier)))
+          (pair_pattern
+            (property_identifier)
+            (assignment_pattern
+              (parenthesized_expression (member_expression (identifier) (property_identifier)))
+              (number)))
+          (rest_pattern (parenthesized_expression (identifier))))
+        (identifier))))
+  (for_in_statement
+    (array_pattern (parenthesized_expression (identifier)))
+    (identifier)
+    (statement_block)))
