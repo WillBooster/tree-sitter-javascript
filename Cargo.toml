@@ -12,7 +12,7 @@ repository = "https://github.com/WillBooster/tree-sitter-javascript"
 version = "0.0.0"
 
 build = "bindings/rust/build.rs"
-include = ["bindings/rust/*", "grammar.js", "src/*", "tree-sitter.json", "/LICENSE"]
+include = ["bindings/rust/*", "grammar.js", "queries/*.scm", "src/*", "tree-sitter.json", "/LICENSE"]
 
 [lib]
 name = "tree_sitter_javascript"
