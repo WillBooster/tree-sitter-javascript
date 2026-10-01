@@ -5,19 +5,19 @@
     "": {
       "name": "@willbooster/tree-sitter-javascript",
       "devDependencies": {
+        "@playwright/test": "1.63.0",
         "@tsconfig/bun": "1.0.11",
         "@types/bun": "1.4.2",
         "@vitest/browser-playwright": "5.0.1",
         "@willbooster/oxfmt-config": "1.2.2",
         "@willbooster/oxlint-config": "1.4.8",
         "@willbooster/wb": "22.13.1",
-        "@willbooster/web-tree-sitter": "1.0.7",
+        "@willbooster/web-tree-sitter": "1.0.8",
         "conventional-changelog-conventionalcommits": "10.4.0",
         "lefthook": "2.1.14",
         "oxfmt": "0.70.0",
         "oxlint": "1.85.0",
         "oxlint-tsgolint": "7.0.2002",
-        "playwright": "1.63.0",
         "semantic-release": "25.0.9",
         "sort-package-json": "4.0.0",
         "tree-sitter-cli": "0.27.0",
@@ -301,6 +301,8 @@
 
     "@oxlint/binding-win32-x64-msvc": ["@oxlint/binding-win32-x64-msvc@1.85.0", "", { "os": "win32", "cpu": "x64" }, "sha512-pBebIPUpKKhWrhSMWhy8TdAZBewiXnfxmaAGxhzxM1068GagqFaTwgKlU6e+UyJ2sPR+VoHouhXuGJkQjsrDvA=="],
 
+    "@playwright/test": ["@playwright/test@1.63.0", "", { "dependencies": { "playwright": "1.63.0" }, "bin": { "playwright": "cli.js" } }, "sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ=="],
+
     "@pnpm/config.env-replace": ["@pnpm/config.env-replace@1.1.0", "", {}, "sha512-htyl8TWnKL7K/ESFa1oW2UB5lVDxuF5DpM7tBi6Hu2LNL3mWkIzNLG6N4zoCUP1lCKNxWy/3iu8mS8MvToGd6w=="],
 
     "@pnpm/network.ca-file": ["@pnpm/network.ca-file@1.0.2", "", { "dependencies": { "graceful-fs": "4.2.10" } }, "sha512-YcPQ8a0jwYU9bTdJDpXjMi7Brhkr1mXsXrUJvjqM2mQDgkRiz8jFaQGOdaLxgjtUfQgZhKy/O3cG/YwmgKaxLA=="],
@@ -471,7 +473,7 @@
 
     "@willbooster/wb": ["@willbooster/wb@22.13.1", "", { "dependencies": { "@textlint-rule/textlint-rule-no-invalid-control-character": "3.0.0", "@textlint/kernel": "15.8.0", "@textlint/module-interop": "15.8.0", "@textlint/textlint-plugin-markdown": "15.8.0", "chalk": "6.0.0", "dotenv": "18.0.1", "dotenv-expand": "13.0.0", "fast-glob": "3.3.3", "fastest-levenshtein": "1.0.16", "globby": "16.2.4", "jsonc-parser": "3.3.1", "minimal-promise-pool": "6.0.3", "semver": "7.8.5", "smol-toml": "1.8.0", "textlint-rule-no-zero-width-spaces": "1.0.1", "yargs": "18.1.0", "zod": "4.6.5" }, "bin": { "wb": "bin/index.js" } }, "sha512-yNeNEEPkAqybnlS8Jrk5B2palCkJ8GIkn5WAxZeR3LspvDDT/4BbWiofiwYMyDMrUMETesZMyFG54YpQFBi0Hw=="],
 
-    "@willbooster/web-tree-sitter": ["@willbooster/web-tree-sitter@1.0.7", "", { "dependencies": { "@types/emscripten": "^1.41.5" } }, "sha512-AIdrwsuZJyLpCDyYKTpnnnO/aspnpdYypB8mcRbGu1WwZokbqURFmB15wE9vQUoN4gG8HMgY+IYxim6xtfNwsQ=="],
+    "@willbooster/web-tree-sitter": ["@willbooster/web-tree-sitter@1.0.8", "", { "dependencies": { "@types/emscripten": "^1.41.5" } }, "sha512-mUrEFiJ7egylv2iYsgd46uCGBD/Qgv0Txan5jaz3Vsz188WKP13/aHSNWn7/1NkIQJeb4kC5i4TEam85W2ug/w=="],
 
     "agent-base": ["agent-base@9.0.0", "", {}, "sha512-TQf59BsZnytt8GdJKLPfUZ54g/iaUL2OWDSFCCvMOhsHduDQxO8xC4PNeyIkVcA5KwL2phPSv0douC0fgWzmnA=="],
 
