@@ -81,6 +81,7 @@ module.exports = grammar({
     $._line_break_after_binding,
     $._line_break_after_field,
     $._line_break_after_modifier,
+    $._line_break_before_attributes,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -179,9 +180,11 @@ module.exports = grammar({
         seq(
           'export',
           choice(
-            seq('*', $._from_clause),
-            seq($.namespace_export, $._from_clause),
-            seq($.export_clause, $._from_clause),
+            seq(
+              choice('*', $.namespace_export, $.export_clause),
+              $._from_clause,
+              optional(choice($.import_attribute, $._line_break_before_attributes))
+            ),
             alias($._local_export_clause, $.export_clause)
           ),
           $._semicolon
@@ -240,7 +243,7 @@ module.exports = grammar({
       seq(
         'import',
         choice(seq($.import_clause, $._from_clause), field('source', $.string)),
-        optional($.import_attribute),
+        optional(choice($.import_attribute, $._line_break_before_attributes)),
         $._semicolon
       ),
 
