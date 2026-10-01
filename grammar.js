@@ -500,7 +500,8 @@ module.exports = grammar({
         $.binary_expression,
         $.ternary_expression,
         $.update_expression,
-        $.new_expression,
+        // A `new` with arguments is a primary expression (see new_expression).
+        alias($._argumentless_new_expression, $.new_expression),
         $.yield_expression
       ),
 
@@ -527,7 +528,8 @@ module.exports = grammar({
         $.generator_function,
         $.class,
         $.meta_property,
-        $.call_expression
+        $.call_expression,
+        $.new_expression
       ),
 
     yield_expression: ($) =>
@@ -789,10 +791,7 @@ module.exports = grammar({
     call_expression: ($) =>
       choice(
         prec('call', seq(field('function', choice($.expression, $.import)), field('arguments', $.arguments))),
-        prec(
-          'template_call',
-          seq(field('function', choice($.primary_expression, $.new_expression)), field('arguments', $.template_string))
-        ),
+        prec('template_call', seq(field('function', $.primary_expression), field('arguments', $.template_string))),
         prec(
           'member',
           seq(
@@ -803,15 +802,16 @@ module.exports = grammar({
         )
       ),
 
+    // As in ECMAScript, a `new` with arguments is a member-level (primary) expression and one without them is not, so a
+    // member access, a call, or a further argument list binds to the nearest `new` with arguments: `new new A().b`
+    // constructs `new A().b`, and `new new A()(2)` constructs `new A()`.
     new_expression: ($) =>
-      prec.right(
-        'new',
-        seq(
-          'new',
-          field('constructor', choice($.primary_expression, $.new_expression)),
-          field('arguments', optional(prec.dynamic(1, $.arguments)))
-        )
-      ),
+      prec('new', seq('new', field('constructor', $._new_constructor), field('arguments', $.arguments))),
+
+    _argumentless_new_expression: ($) => prec.right('new', seq('new', field('constructor', $._new_constructor))),
+
+    _new_constructor: ($) =>
+      prec('new', choice($.primary_expression, alias($._argumentless_new_expression, $.new_expression))),
 
     await_expression: ($) => prec.dynamic(2, prec('unary_void', seq('await', $.expression))),
 
