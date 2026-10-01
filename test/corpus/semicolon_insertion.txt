@@ -690,3 +690,20 @@ class A {
       (field_definition (property_identifier) (number))
       (method_definition (property_identifier) (formal_parameters) (statement_block))
       (method_definition (property_identifier) (formal_parameters) (statement_block)))))
+
+============================================
+Fields named static, get, or set before the end of a class body
+============================================
+
+class A {
+  static
+}
+class B {
+  get
+}
+
+---
+
+(program
+  (class_declaration (identifier) (class_body (field_definition (property_identifier))))
+  (class_declaration (identifier) (class_body (field_definition (property_identifier)))))

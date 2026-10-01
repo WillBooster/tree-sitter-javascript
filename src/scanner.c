@@ -193,10 +193,11 @@ typedef enum {
     LINE_BREAK_AFTER_BINDING_NAME,
     // After a class field name without an initializer: only `=` (an initializer) or `(` (a method) continues it.
     LINE_BREAK_AFTER_FIELD_NAME,
-    // After `static` in a class body, which a line break never separates from the member it starts.
+    // After `static` at the start of a class member: a line break continues the member unless a `}` or the end of input
+    // follows, which leaves a field named `static`.
     LINE_BREAK_AFTER_MODIFIER_WORD,
-    // After `get` or `set` in a class body: only a `*` on the next line ends the field, since an accessor cannot be a
-    // generator.
+    // After `get` or `set` at the start of a class member: as after `static`, except that a `*` also ends the field,
+    // since an accessor cannot be a generator.
     LINE_BREAK_AFTER_ACCESSOR_WORD,
 } LineBreakRule;
 
