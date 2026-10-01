@@ -6967,46 +6967,104 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "STRING",
-              "value": "static"
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
               "type": "SEQ",
               "members": [
                 {
-                  "type": "FIELD",
-                  "name": "property",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "_field_name"
-                  }
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "STRING",
+                      "value": "static"
+                    },
+                    {
+                      "type": "BLANK"
+                    }
+                  ]
                 },
                 {
                   "type": "CHOICE",
                   "members": [
                     {
-                      "type": "CHOICE",
+                      "type": "SEQ",
                       "members": [
                         {
-                          "type": "SYMBOL",
-                          "name": "_initializer"
+                          "type": "FIELD",
+                          "name": "property",
+                          "content": {
+                            "type": "SYMBOL",
+                            "name": "_field_name"
+                          }
                         },
                         {
-                          "type": "SYMBOL",
-                          "name": "_line_break_after_field"
+                          "type": "CHOICE",
+                          "members": [
+                            {
+                              "type": "CHOICE",
+                              "members": [
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "_initializer"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "_line_break_after_field"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "BLANK"
+                            }
+                          ]
                         }
                       ]
                     },
                     {
-                      "type": "BLANK"
+                      "type": "SEQ",
+                      "members": [
+                        {
+                          "type": "FIELD",
+                          "name": "property",
+                          "content": {
+                            "type": "ALIAS",
+                            "content": {
+                              "type": "CHOICE",
+                              "members": [
+                                {
+                                  "type": "STRING",
+                                  "value": "get"
+                                },
+                                {
+                                  "type": "STRING",
+                                  "value": "set"
+                                }
+                              ]
+                            },
+                            "named": true,
+                            "value": "property_identifier"
+                          }
+                        },
+                        {
+                          "type": "CHOICE",
+                          "members": [
+                            {
+                              "type": "CHOICE",
+                              "members": [
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "_initializer"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "_line_break_after_modifier"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "BLANK"
+                            }
+                          ]
+                        }
+                      ]
                     }
                   ]
                 }
@@ -7021,21 +7079,8 @@
                   "content": {
                     "type": "ALIAS",
                     "content": {
-                      "type": "CHOICE",
-                      "members": [
-                        {
-                          "type": "STRING",
-                          "value": "get"
-                        },
-                        {
-                          "type": "STRING",
-                          "value": "set"
-                        },
-                        {
-                          "type": "STRING",
-                          "value": "static"
-                        }
-                      ]
+                      "type": "STRING",
+                      "value": "static"
                     },
                     "named": true,
                     "value": "property_identifier"
@@ -7054,6 +7099,49 @@
                         {
                           "type": "SYMBOL",
                           "name": "_line_break_after_modifier"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "BLANK"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": "static"
+                },
+                {
+                  "type": "FIELD",
+                  "name": "property",
+                  "content": {
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "STRING",
+                      "value": "static"
+                    },
+                    "named": true,
+                    "value": "property_identifier"
+                  }
+                },
+                {
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "SYMBOL",
+                          "name": "_initializer"
+                        },
+                        {
+                          "type": "SYMBOL",
+                          "name": "_line_break_after_field"
                         }
                       ]
                     },

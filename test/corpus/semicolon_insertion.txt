@@ -593,6 +593,8 @@ class A {
   c() {}
   set
   [d](v) {}
+  static static
+  e() {}
 }
 
 ---
@@ -607,7 +609,9 @@ class A {
       (method_definition
         (computed_property_name (identifier))
         (formal_parameters (identifier))
-        (statement_block)))))
+        (statement_block))
+      (field_definition (property_identifier))
+      (method_definition (property_identifier) (formal_parameters) (statement_block)))))
 
 ============================================
 Semicolons at the start of the line after a declaration or return

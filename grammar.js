@@ -1150,13 +1150,27 @@ module.exports = grammar({
     field_definition: ($) =>
       seq(
         repeat(field('decorator', $.decorator)),
-        optional('static'),
         choice(
-          seq(field('property', $._field_name), optional(choice($._initializer, $._line_break_after_field))),
-          // A line break after these words continues a getter, setter, or static member.
           seq(
-            field('property', alias(choice(...MEMBER_MODIFIERS), $.property_identifier)),
+            optional('static'),
+            choice(
+              seq(field('property', $._field_name), optional(choice($._initializer, $._line_break_after_field))),
+              // A line break after `get` or `set` continues a getter or setter.
+              seq(
+                field('property', alias(choice('get', 'set'), $.property_identifier)),
+                optional(choice($._initializer, $._line_break_after_modifier))
+              )
+            )
+          ),
+          // A line break after a leading `static` continues a static member; after `static static`, it ends the field.
+          seq(
+            field('property', alias('static', $.property_identifier)),
             optional(choice($._initializer, $._line_break_after_modifier))
+          ),
+          seq(
+            'static',
+            field('property', alias('static', $.property_identifier)),
+            optional(choice($._initializer, $._line_break_after_field))
           )
         )
       ),
