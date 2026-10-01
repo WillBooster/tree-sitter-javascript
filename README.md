@@ -57,8 +57,9 @@ const parser = new Parser();
 parser.setLanguage(await Language.load(javascript));
 ```
 
-The package also ships the node types in `src/node-types.json`, and `grammar.js` and the queries in `queries/` for
-grammars that extend this one (e.g. `require('@willbooster/tree-sitter-javascript/grammar')`).
+The package also ships the node types in `src/node-types.json`, the highlight, injection, locals, and tags queries in
+`queries/` that `tree-sitter.json` lists, and `grammar.js` for grammars that extend this one (e.g.
+`require('@willbooster/tree-sitter-javascript/grammar')`). The crate ships `tree-sitter.json` and `queries/` too.
 
 In Rust, depend on the [crate](https://crates.io/crates/willbooster-tree-sitter-javascript) and on
 [willbooster-tree-sitter](https://crates.io/crates/willbooster-tree-sitter), the runtime this package is tested and
@@ -107,7 +108,9 @@ cargo test
   Node.js compatibility (`test/unit/workers.test.ts`). Run `bun run test/ci-setup` once before the first
   run to install Chromium and, on Linux, the system libraries it needs;
 - a check that `package.json` and `Cargo.lock` lock the same WillBooster/tree-sitter runtime version
-  (`test/unit/runtimeVersion.test.ts`).
+  (`test/unit/runtimeVersion.test.ts`);
+- a check that the queries `tree-sitter.json` lists compile against the Wasm build and are in both the npm package and
+  the crate (`test/unit/queries.test.ts`).
 
 The tests and `script/parse-examples` compile the parser into `.tmp/tree-sitter-lib` instead of the CLI's cache shared
 by every checkout; `script/fuzz-corpus` builds a per-run parser in `.tmp/fuzz` and deletes it afterwards.

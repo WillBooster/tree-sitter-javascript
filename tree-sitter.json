@@ -7,6 +7,10 @@
       "scope": "source.js",
       "path": ".",
       "file-types": ["js", "mjs", "cjs", "jsx"],
+      "highlights": ["queries/highlights.scm", "queries/highlights-jsx.scm", "queries/highlights-params.scm"],
+      "injections": "queries/injections.scm",
+      "locals": "queries/locals.scm",
+      "tags": "queries/tags.scm",
       "injection-regex": "^(js|javascript)$"
     }
   ],
