@@ -79,7 +79,7 @@ Hash-bang lines ending at carriage returns
 Static getters split by carriage returns
 ========================================
 
-class A {  static get  a() {}  static  get  b() {}  static get  = 1}
+class A {  static get  a() {}  static  get  b() {}  static get  = 1  get  c() {}  static  d() {}}
 
 ---
 
@@ -89,7 +89,9 @@ class A {  static get  a() {}  static  get  b() {}  static get  = 1}
     (class_body
       (method_definition (property_identifier) (formal_parameters) (statement_block))
       (method_definition (property_identifier) (formal_parameters) (statement_block))
-      (field_definition (property_identifier) (number)))))
+      (field_definition (property_identifier) (number))
+      (method_definition (property_identifier) (formal_parameters) (statement_block))
+      (method_definition (property_identifier) (formal_parameters) (statement_block)))))
 
 =================================
 Whitespace after carriage returns
