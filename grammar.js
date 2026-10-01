@@ -292,7 +292,14 @@ module.exports = grammar({
       seq(field('kind', choice('let', 'const')), commaSep1($.variable_declarator), $._semicolon),
 
     using_declaration: ($) =>
-      seq(field('kind', choice('using', seq('await', 'using'))), commaSep1($.variable_declarator), $._semicolon),
+      seq(
+        field('kind', choice('using', seq('await', 'using'))),
+        commaSep1(alias($._using_declarator, $.variable_declarator)),
+        $._semicolon
+      ),
+
+    _using_declarator: ($) =>
+      seq(field('name', choice($.identifier, alias('of', $.identifier))), optional($._initializer)),
 
     variable_declarator: ($) =>
       seq(
@@ -320,30 +327,45 @@ module.exports = grammar({
       seq(
         'for',
         '(',
-        choice(
-          field(
-            'initializer',
-            choice(
-              alias($.for_lexical_declaration, $.lexical_declaration),
-              alias($.for_variable_declaration, $.variable_declaration)
-            )
-          ),
-          seq(field('initializer', $._expressions), ';'),
-          field('initializer', $.empty_statement)
-        ),
-        field('condition', choice(seq($._expressions, ';'), $.empty_statement)),
+        $._for_initializer,
+        $._for_condition,
         field('increment', optional($._expressions)),
         ')',
         field('body', $.statement)
       ),
 
+    // Extracted into rules because tree-sitter expands a `choice` written inline in the `seq` above into one production
+    // per alternative, each repeating the parse states of the rest of the header (about 30 KB of Wasm). They are hidden
+    // so that `initializer` and `condition` stay fields of `for_statement` and no node type is added.
+    _for_initializer: ($) =>
+      choice(
+        field(
+          'initializer',
+          choice(
+            alias($.for_lexical_declaration, $.lexical_declaration),
+            alias($.for_variable_declaration, $.variable_declaration),
+            alias($._for_using_declaration, $.using_declaration)
+          )
+        ),
+        seq(field('initializer', $._expressions), ';'),
+        field('initializer', $.empty_statement)
+      ),
+
+    _for_condition: ($) => field('condition', choice(seq($._expressions, ';'), $.empty_statement)),
+
     // ECMAScript inserts no semicolon inside a for header, so these declarations end only with `;`. Accepting an
     // automatic semicolon there made `for (let x\n of y)` ambiguous until `of`, and an incremental reparse could
-    // reuse a declaration built when that ambiguity was resolved differently. The rules are visible and only used
-    // through aliases: a hidden rule would make `for_statement` inherit their `kind` field.
+    // reuse a declaration built when that ambiguity was resolved differently.
     for_lexical_declaration: ($) => seq(field('kind', choice('let', 'const')), commaSep1($.variable_declarator), ';'),
 
     for_variable_declaration: ($) => seq('var', commaSep1($.variable_declarator), ';'),
+
+    _for_using_declaration: ($) =>
+      seq(
+        field('kind', choice('using', seq('await', 'using'))),
+        commaSep1(alias($._using_declarator, $.variable_declarator)),
+        ';'
+      ),
 
     for_in_statement: ($) => seq('for', optional('await'), $._for_header, field('body', $.statement)),
 
@@ -363,7 +385,7 @@ module.exports = grammar({
           ),
           seq(
             field('kind', choice('using', seq('await', 'using'))),
-            field('left', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern))
+            field('left', choice($.identifier, alias('of', $.identifier)))
           )
         ),
         field('operator', choice('in', 'of')),
@@ -1152,7 +1174,7 @@ module.exports = grammar({
 
     computed_property_name: ($) => seq('[', $.expression, ']'),
 
-    _reserved_identifier: () => choice('get', 'set', 'async', 'await', 'static', 'export', 'let'),
+    _reserved_identifier: () => choice('get', 'set', 'async', 'await', 'static', 'export', 'let', 'using'),
 
     _semicolon: ($) => choice($._automatic_semicolon, ';'),
   },
