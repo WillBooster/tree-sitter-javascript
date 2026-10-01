@@ -641,3 +641,15 @@ function f() {
         (call_expression
           (member_expression (array (identifier)) (property_identifier))
           (arguments (identifier)))))))
+
+============================================
+Operators after yield and a line break
+============================================
+
+yield
+* 2
+
+---
+
+(program
+  (expression_statement (yield_expression (number))))

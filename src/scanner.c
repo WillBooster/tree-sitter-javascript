@@ -187,8 +187,7 @@ static bool ends_statement_after_block_arrow(TSLexer *lexer, bool *scanned_comme
 typedef enum {
     // Decided by the characters that follow.
     LINE_BREAK_BY_NEXT_TOKEN,
-    // After `return`, `yield`, `break`, or `continue`, which ECMAScript forbids a line break after. Only a bare `yield`
-    // can be continued, by the `,` or `:` of an enclosing expression or declaration.
+    // After `return`, `yield`, `break`, or `continue`, which ECMAScript forbids a line break after.
     LINE_BREAK_ENDS,
     // After a declared name without an initializer: only `=` or `,` continues the declaration.
     LINE_BREAK_AFTER_BINDING_NAME,
@@ -269,7 +268,24 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
     }
     switch (rule) {
         case LINE_BREAK_ENDS:
-            return before_slash || (lexer->lookahead != ',' && lexer->lookahead != ':');
+            // A token that can start a statement starts the next one; any other token is left to the rules below,
+            // which keep a bare `yield` continued by an enclosing `,` or `:`, and `yield` as a script's identifier
+            // continued by an operator.
+            switch (lexer->lookahead) {
+                case '`':
+                case '[':
+                case '(':
+                case '+':
+                case '-':
+                case '<':
+                    return true;
+                default:
+                    if (before_slash) {
+                        return true;
+                    }
+                    break;
+            }
+            break;
         case LINE_BREAK_AFTER_BINDING_NAME:
             return before_slash || (lexer->lookahead != '=' && lexer->lookahead != ',');
         case LINE_BREAK_AFTER_FIELD_NAME:
