@@ -1177,7 +1177,7 @@ module.exports = grammar({
 
     formal_parameters: ($) => seq('(', optional(seq(commaSep1($._formal_parameter), optional(','))), ')'),
 
-    class_static_block: ($) => seq('static', field('body', $.statement_block)),
+    class_static_block: ($) => seq('static', field('body', alias($._class_member_body, $.statement_block))),
 
     // This negative dynamic precedence ensures that during error recovery,
     // unfinished constructs are generally treated as literal expressions,
@@ -1194,13 +1194,13 @@ module.exports = grammar({
         optional(choice('get', 'set', '*')),
         field('name', $._property_name),
         field('parameters', $.formal_parameters),
-        field('body', alias($._method_body, $.statement_block))
+        field('body', alias($._class_member_body, $.statement_block))
       ),
 
-    // A rule of its own rather than statement_block: sharing it let tree-sitter merge the state after a method's `}` with
-    // the one after a function expression's `}`, where `in`, `instanceof`, and `extends` are keywords, so a method with
-    // one of those names could not follow another method.
-    _method_body: ($) => seq('{', repeat($.statement), '}'),
+    // The body of a method or a static block, a rule of its own rather than statement_block: sharing it let tree-sitter
+    // merge the state after the body's `}` with the one after a function expression's `}`, where `in`, `instanceof`,
+    // and `extends` are keywords, so a class member with one of those names could not follow.
+    _class_member_body: ($) => seq('{', repeat($.statement), '}'),
 
     pair: ($) => seq(field('key', $._property_name), ':', field('value', $.expression)),
 

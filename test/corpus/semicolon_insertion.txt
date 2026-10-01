@@ -660,3 +660,29 @@ yield
 
 (program
   (expression_statement (yield_expression (number))))
+
+============================================
+Class members named in, instanceof, or extends after bodies
+============================================
+
+class A {
+  static {}
+  in() {}
+  a() {}
+  instanceof = 1
+  b() {}
+  extends() {}
+}
+
+---
+
+(program
+  (class_declaration
+    (identifier)
+    (class_body
+      (class_static_block (statement_block))
+      (method_definition (property_identifier) (formal_parameters) (statement_block))
+      (method_definition (property_identifier) (formal_parameters) (statement_block))
+      (field_definition (property_identifier) (number))
+      (method_definition (property_identifier) (formal_parameters) (statement_block))
+      (method_definition (property_identifier) (formal_parameters) (statement_block)))))
