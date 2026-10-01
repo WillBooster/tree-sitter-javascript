@@ -2097,8 +2097,17 @@
           "value": "debugger"
         },
         {
-          "type": "SYMBOL",
-          "name": "_semicolon"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_semicolon"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "_line_break_ends_statement"
+            }
+          ]
         }
       ]
     },

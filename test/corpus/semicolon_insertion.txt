@@ -446,6 +446,8 @@ function* f() {
     , i = 1
   j = k ? yield
     : l
+  debugger
+  (m)
   for (;;) {
     break
     (h)
@@ -477,6 +479,8 @@ function* f() {
         (assignment_expression
           (identifier)
           (ternary_expression (identifier) (yield_expression) (identifier))))
+      (debugger_statement)
+      (expression_statement (parenthesized_expression (identifier)))
       (for_statement
         (empty_statement)
         (empty_statement)

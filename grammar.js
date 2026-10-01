@@ -441,7 +441,7 @@ module.exports = grammar({
         choice($._semicolon, $._line_break_ends_statement)
       ),
 
-    debugger_statement: ($) => seq('debugger', $._semicolon),
+    debugger_statement: ($) => seq('debugger', choice($._semicolon, $._line_break_ends_statement)),
 
     return_statement: ($) =>
       seq('return', choice(seq(optional($._expressions), $._semicolon), $._line_break_ends_statement)),
