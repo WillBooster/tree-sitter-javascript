@@ -1021,6 +1021,10 @@
         {
           "type": "member_expression",
           "named": true
+        },
+        {
+          "type": "parenthesized_expression",
+          "named": true
         }
       ]
     }

@@ -6791,6 +6791,10 @@
               },
               "named": true,
               "value": "call_expression"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "parenthesized_expression"
             }
           ]
         }
@@ -6832,13 +6836,26 @@
             "type": "FIELD",
             "name": "property",
             "content": {
-              "type": "ALIAS",
-              "content": {
-                "type": "SYMBOL",
-                "name": "identifier"
-              },
-              "named": true,
-              "value": "property_identifier"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "RESERVED",
+                  "content": {
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "identifier"
+                    },
+                    "named": true,
+                    "value": "property_identifier"
+                  },
+                  "context_name": "properties"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "private_property_identifier"
+                }
+              ]
             }
           }
         ]
@@ -6868,6 +6885,10 @@
                   },
                   "named": true,
                   "value": "member_expression"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "parenthesized_expression"
                 }
               ]
             }
