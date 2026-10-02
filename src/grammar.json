@@ -2189,47 +2189,43 @@
       "value": ";"
     },
     "labeled_statement": {
-      "type": "PREC_DYNAMIC",
-      "value": -1,
-      "content": {
-        "type": "SEQ",
-        "members": [
-          {
-            "type": "FIELD",
-            "name": "label",
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "label",
+          "content": {
+            "type": "ALIAS",
             "content": {
-              "type": "ALIAS",
-              "content": {
-                "type": "CHOICE",
-                "members": [
-                  {
-                    "type": "SYMBOL",
-                    "name": "identifier"
-                  },
-                  {
-                    "type": "SYMBOL",
-                    "name": "_reserved_identifier"
-                  }
-                ]
-              },
-              "named": true,
-              "value": "statement_identifier"
-            }
-          },
-          {
-            "type": "STRING",
-            "value": ":"
-          },
-          {
-            "type": "FIELD",
-            "name": "body",
-            "content": {
-              "type": "SYMBOL",
-              "name": "statement"
-            }
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "identifier"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_reserved_identifier"
+                }
+              ]
+            },
+            "named": true,
+            "value": "statement_identifier"
           }
-        ]
-      }
+        },
+        {
+          "type": "STRING",
+          "value": ":"
+        },
+        {
+          "type": "FIELD",
+          "name": "body",
+          "content": {
+            "type": "SYMBOL",
+            "name": "statement"
+          }
+        }
+      ]
     },
     "switch_body": {
       "type": "SEQ",
@@ -7757,10 +7753,6 @@
       "object_assignment_pattern"
     ],
     [
-      "labeled_statement",
-      "_property_name"
-    ],
-    [
       "computed_property_name",
       "array"
     ],
@@ -7906,6 +7898,16 @@
       {
         "type": "STRING",
         "value": "object"
+      }
+    ],
+    [
+      {
+        "type": "SYMBOL",
+        "name": "labeled_statement"
+      },
+      {
+        "type": "SYMBOL",
+        "name": "_property_name"
       }
     ],
     [

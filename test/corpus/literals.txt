@@ -42,16 +42,26 @@ Unicode identifiers
 ============================================
 
 const últimaVez = 1
-{ 県: '大阪府', '': '' }
+x = { 県: '大阪府', '': '' }
 
 ---
 
 (program
-  (lexical_declaration (variable_declarator (identifier) (number)))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (number)))
   (expression_statement
-    (object
-      (pair (property_identifier) (string (string_fragment)))
-      (pair (string) (string)))))
+    (assignment_expression
+      (identifier)
+      (object
+        (pair
+          (property_identifier)
+          (string
+            (string_fragment)))
+        (pair
+          (string)
+          (string))))))
 
 ==========================================
 Strings containing comment-like content
