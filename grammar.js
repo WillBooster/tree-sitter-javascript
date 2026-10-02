@@ -491,7 +491,6 @@ module.exports = grammar({
     expression: ($) =>
       choice(
         $.primary_expression,
-        $._jsx_element,
         $.assignment_expression,
         $.augmented_assignment_expression,
         $.await_expression,
@@ -504,6 +503,7 @@ module.exports = grammar({
 
     primary_expression: ($) =>
       choice(
+        $._jsx_element,
         $.subscript_expression,
         $.member_expression,
         $.parenthesized_expression,

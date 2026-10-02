@@ -2634,3 +2634,103 @@ d = <e>
         (jsx_text)
         (jsx_self_closing_element (identifier))
         (jsx_closing_element (identifier))))))
+
+============================================
+JSX elements as primary expressions
+============================================
+
+new <a />;
+<a />?.();
+<a /> `t`;
+class C extends <a /> `t` {}
+new <A.B />();
+(<><a /></>)[0];
+
+new <a></a>();
+<a></a>?.();
+<a></a> `t`;
+new <></>;
+<></>?.();
+
+---
+
+(program
+  (expression_statement
+    (new_expression
+      (jsx_self_closing_element
+        (identifier))))
+  (expression_statement
+    (call_expression
+      (jsx_self_closing_element
+        (identifier))
+      (optional_chain)
+      (arguments)))
+  (expression_statement
+    (call_expression
+      (jsx_self_closing_element
+        (identifier))
+      (template_string
+        (string_fragment))))
+  (class_declaration
+    (identifier)
+    (class_heritage
+      (call_expression
+        (jsx_self_closing_element
+          (identifier))
+        (template_string
+          (string_fragment))))
+    (class_body))
+  (expression_statement
+    (new_expression
+      (jsx_self_closing_element
+        (member_expression
+          (identifier)
+          (property_identifier)))
+      (arguments)))
+  (expression_statement
+    (subscript_expression
+      (parenthesized_expression
+        (jsx_element
+          (jsx_opening_element)
+          (jsx_self_closing_element
+            (identifier))
+          (jsx_closing_element)))
+      (number)))
+  (expression_statement
+    (new_expression
+      (jsx_element
+        (jsx_opening_element
+          (identifier))
+        (jsx_closing_element
+          (identifier)))
+      (arguments)))
+  (expression_statement
+    (call_expression
+      (jsx_element
+        (jsx_opening_element
+          (identifier))
+        (jsx_closing_element
+          (identifier)))
+      (optional_chain)
+      (arguments)))
+  (expression_statement
+    (call_expression
+      (jsx_element
+        (jsx_opening_element
+          (identifier))
+        (jsx_closing_element
+          (identifier)))
+      (template_string
+        (string_fragment))))
+  (expression_statement
+    (new_expression
+      (jsx_element
+        (jsx_opening_element)
+        (jsx_closing_element))))
+  (expression_statement
+    (call_expression
+      (jsx_element
+        (jsx_opening_element)
+        (jsx_closing_element))
+      (optional_chain)
+      (arguments))))
