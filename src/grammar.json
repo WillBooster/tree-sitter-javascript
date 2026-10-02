@@ -2423,10 +2423,6 @@
         },
         {
           "type": "SYMBOL",
-          "name": "_jsx_element"
-        },
-        {
-          "type": "SYMBOL",
           "name": "assignment_expression"
         },
         {
@@ -2462,6 +2458,10 @@
     "primary_expression": {
       "type": "CHOICE",
       "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_jsx_element"
+        },
         {
           "type": "SYMBOL",
           "name": "subscript_expression"
