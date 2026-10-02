@@ -137,6 +137,9 @@ module.exports = grammar({
     ['member', 'template_call', 'new', 'call', $.expression],
     ['declaration', 'literal'],
     [$.primary_expression, $.statement_block, 'object'],
+    // A `{` that may begin both a block and an object starts a statement or an arrow function's body, where ECMAScript
+    // reads it as a block, so `{a: 1}` there is a labeled statement in a block.
+    [$.labeled_statement, $._property_name],
     [$.meta_property, $.import],
     [$.import_statement, $.import],
     [$.export_statement, $.primary_expression],
@@ -159,7 +162,6 @@ module.exports = grammar({
     [$.object, $.object_pattern],
     [$.assignment_expression, $.pattern],
     [$.assignment_expression, $.object_assignment_pattern],
-    [$.labeled_statement, $._property_name],
     [$.computed_property_name, $.array],
     [$.binary_expression, $._initializer],
   ],
@@ -454,13 +456,10 @@ module.exports = grammar({
     empty_statement: () => ';',
 
     labeled_statement: ($) =>
-      prec.dynamic(
-        -1,
-        seq(
-          field('label', alias(choice($.identifier, $._reserved_identifier), $.statement_identifier)),
-          ':',
-          field('body', $.statement)
-        )
+      seq(
+        field('label', alias(choice($.identifier, $._reserved_identifier), $.statement_identifier)),
+        ':',
+        field('body', $.statement)
       ),
 
     //

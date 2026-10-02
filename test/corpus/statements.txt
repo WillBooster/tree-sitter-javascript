@@ -1163,7 +1163,7 @@ const of = 2;
 Comments
 ============================================
 
-{
+x = {
 
   // This is a property
   aProperty: 1,
@@ -1178,17 +1178,19 @@ Comments
 
 (program
   (expression_statement
-    (object
-      (comment)
-      (pair
-        (property_identifier)
-        (number))
-      (comment)
-      (pair
-        (property_identifier)
-        (function_expression
-          (formal_parameters)
-          (statement_block))))))
+    (assignment_expression
+      (identifier)
+      (object
+        (comment)
+        (pair
+          (property_identifier)
+          (number))
+        (comment)
+        (pair
+          (property_identifier)
+          (function_expression
+            (formal_parameters)
+            (statement_block)))))))
 
 ==========================================
 Comments between statements
@@ -1585,6 +1587,56 @@ while (true) {
       body: (statement_block
         (continue_statement
           label: (statement_identifier))))))
+
+============================================
+Labeled statements in braces that start a statement or an arrow function body
+============================================
+
+{a: 1}
+{a: b}[0];
+() => {a: 1}
+x = () => {async: b => {c: 1}};
+
+---
+
+(program
+  (statement_block
+    (labeled_statement
+      (statement_identifier)
+      (expression_statement
+        (number))))
+  (statement_block
+    (labeled_statement
+      (statement_identifier)
+      (expression_statement
+        (identifier))))
+  (expression_statement
+    (array
+      (number)))
+  (expression_statement
+    (arrow_function
+      (formal_parameters)
+      (statement_block
+        (labeled_statement
+          (statement_identifier)
+          (expression_statement
+            (number))))))
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (arrow_function
+        (formal_parameters)
+        (statement_block
+          (labeled_statement
+            (statement_identifier)
+            (expression_statement
+              (arrow_function
+                (identifier)
+                (statement_block
+                  (labeled_statement
+                    (statement_identifier)
+                    (expression_statement
+                      (number))))))))))))
 
 ============================================
 Debugger statements
