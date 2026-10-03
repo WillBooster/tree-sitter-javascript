@@ -3331,3 +3331,127 @@ async function asyncOperand() {
       (expression_statement (await_expression (call_expression (identifier) (arguments (identifier)))))
       (expression_statement (await_expression (subscript_expression (identifier) (number))))
       (expression_statement (await_expression (call_expression (identifier) (template_string (string_fragment))))))))
+
+====================
+Legacy call assignment targets with ordinary and parenthesized chains
+====================
+
+foo().bar[0]() = 1;
+(foo?.bar)() = 1;
+import("x")() = 1;
+foo`tag`() = 1;
+
+---
+
+(program
+  (expression_statement
+    (assignment_expression
+      (call_expression
+        (subscript_expression
+          (member_expression (call_expression (identifier) (arguments)) (property_identifier))
+          (number))
+        (arguments))
+      (number)))
+  (expression_statement
+    (assignment_expression
+      (call_expression
+        (parenthesized_expression (member_expression (identifier) (optional_chain) (property_identifier)))
+        (arguments))
+      (number)))
+  (expression_statement
+    (assignment_expression
+      (call_expression (call_expression (import) (arguments (string (string_fragment)))) (arguments))
+      (number)))
+  (expression_statement
+    (assignment_expression
+      (call_expression (call_expression (identifier) (template_string (string_fragment))) (arguments))
+      (number))))
+
+====================
+Optional member chains cannot form legacy call assignment targets
+:error
+====================
+
+foo?.bar() = 1;
+
+---
+
+====================
+Optional call chains cannot form legacy call assignment targets
+:error
+====================
+
+foo?.()() = 1;
+
+---
+
+====================
+Optional index chains cannot form legacy call assignment targets
+:error
+====================
+
+foo?.[0]() = 1;
+
+---
+
+====================
+Optional chains followed by members cannot form legacy call assignment targets
+:error
+====================
+
+foo?.bar.baz() = 1;
+
+---
+
+====================
+Optional chains followed by indexes cannot form legacy call assignment targets
+:error
+====================
+
+foo?.bar[0]() = 1;
+
+---
+
+====================
+Legacy call targets after constructed and parenthesized values
+====================
+
+new Foo.bar[0]()() = 1;
+(new Foo)() = 1;
+new Foo`tag`()() = 1;
+
+---
+
+(program
+  (expression_statement
+    (assignment_expression
+      (call_expression
+        (new_expression (subscript_expression (member_expression (identifier) (property_identifier)) (number)) (arguments))
+        (arguments))
+      (number)))
+  (expression_statement
+    (assignment_expression
+      (call_expression (parenthesized_expression (new_expression (identifier))) (arguments))
+      (number)))
+  (expression_statement
+    (assignment_expression
+      (call_expression (new_expression (call_expression (identifier) (template_string (string_fragment))) (arguments)) (arguments))
+      (number))))
+
+====================
+Optional constructor chains cannot form legacy call targets
+:error
+====================
+
+new foo?.bar()() = 1;
+
+---
+
+====================
+A constructor call is not a legacy function call assignment target
+:error
+====================
+
+new Foo() = 1;
+
+---

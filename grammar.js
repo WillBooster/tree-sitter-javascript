@@ -99,6 +99,7 @@ module.exports = grammar({
     $._formal_parameter,
     $._expressions,
     $._await_primary_expression,
+    $._primary_atom,
     $._semicolon,
     $._identifier,
     $._reserved_identifier,
@@ -151,18 +152,27 @@ module.exports = grammar({
   ],
 
   conflicts: ($) => [
+    [$.primary_expression, $._call_assignment_constructor],
+    [$.primary_expression, $.arrow_function, $._call_assignment_constructor],
+    [$.call_expression, $._call_assignment_import],
+    [$.primary_expression, $._call_assignment_function],
+    [$.primary_expression, $.await_expression, $._call_assignment_function],
+    [$.primary_expression, $.arrow_function, $._call_assignment_function],
+    [$.primary_expression, $._call_assignment_function, $._property_name],
+    [$.primary_expression, $.await_expression, $._call_assignment_function, $._property_name],
+    [$.primary_expression, $.arrow_function, $._call_assignment_function, $._property_name],
+    [$.primary_expression, $._call_assignment_function, $.method_definition],
+    [$._await_operand, $.primary_expression, $._call_assignment_function],
+    [$._await_operand, $.primary_expression, $.await_expression, $._call_assignment_function],
+    [$._await_operand, $.primary_expression, $.arrow_function, $._call_assignment_function],
     [$.expression, $._await_operand],
     [$.primary_expression, $._await_operand],
     [$.primary_expression, $._await_operand, $.await_expression],
     [$._await_operand, $.await_expression],
-    [$.primary_expression, $._await_operand, $.arrow_function],
     [$._await_yield_operand, $.yield_expression],
     [$._local_export_specifier, $._module_export_name],
-    [$.primary_expression, $._property_name],
     [$.primary_expression, $.await_expression],
-    [$.primary_expression, $.await_expression, $._property_name],
     [$.primary_expression, $.arrow_function],
-    [$.primary_expression, $.arrow_function, $._property_name],
     [$.primary_expression, $.method_definition],
     [$.primary_expression, $.rest_pattern],
     [$.primary_expression, $.pattern],
@@ -570,9 +580,17 @@ module.exports = grammar({
 
     _await_primary_expression: ($) =>
       choice(
-        $._jsx_element,
+        $._primary_atom,
         $.subscript_expression,
         $.member_expression,
+        $.call_expression,
+        $.new_expression,
+        alias($._argumentless_new_expression, $.new_expression)
+      ),
+
+    _primary_atom: ($) =>
+      choice(
+        $._jsx_element,
         $.parenthesized_expression,
         $._identifier,
         alias($._reserved_identifier, $.identifier),
@@ -590,10 +608,7 @@ module.exports = grammar({
         $.function_expression,
         $.generator_function,
         $.class,
-        $.meta_property,
-        $.call_expression,
-        $.new_expression,
-        alias($._argumentless_new_expression, $.new_expression)
+        $.meta_property
       ),
 
     yield_expression: ($) =>
@@ -920,7 +935,76 @@ module.exports = grammar({
       ),
 
     _call_assignment_target: ($) =>
-      prec('call', seq(field('function', $.primary_expression), field('arguments', $.arguments))),
+      prec('call', seq(field('function', $._call_assignment_function), field('arguments', $.arguments))),
+
+    _call_assignment_function: ($) =>
+      choice(
+        $._primary_atom,
+        alias($._call_assignment_target, $.call_expression),
+        alias($._call_assignment_member, $.member_expression),
+        alias($._call_assignment_subscript, $.subscript_expression),
+        alias($._call_assignment_tag, $.call_expression),
+        alias($._call_assignment_import, $.call_expression),
+        alias($._call_assignment_new, $.new_expression)
+      ),
+
+    _call_assignment_member: ($) =>
+      prec(
+        'member',
+        seq(
+          field('object', $._call_assignment_function),
+          '.',
+          field(
+            'property',
+            choice($.private_property_identifier, reserved('properties', alias($.identifier, $.property_identifier)))
+          )
+        )
+      ),
+
+    _call_assignment_subscript: ($) =>
+      prec.right('member', seq(field('object', $._call_assignment_function), '[', field('index', $._expressions), ']')),
+
+    _call_assignment_tag: ($) =>
+      prec('template_call', seq(field('function', $._call_assignment_function), field('arguments', $.template_string))),
+
+    _call_assignment_import: ($) => prec('call', seq(field('function', $.import), field('arguments', $.arguments))),
+
+    _call_assignment_new: ($) =>
+      prec('new', seq('new', field('constructor', $._call_assignment_constructor), field('arguments', $.arguments))),
+
+    _call_assignment_constructor: ($) =>
+      choice(
+        $._primary_atom,
+        alias($._call_assignment_new, $.new_expression),
+        alias($._call_assignment_constructor_member, $.member_expression),
+        alias($._call_assignment_constructor_subscript, $.subscript_expression),
+        alias($._call_assignment_constructor_tag, $.call_expression)
+      ),
+
+    _call_assignment_constructor_member: ($) =>
+      prec(
+        'member',
+        seq(
+          field('object', $._call_assignment_constructor),
+          '.',
+          field(
+            'property',
+            choice($.private_property_identifier, reserved('properties', alias($.identifier, $.property_identifier)))
+          )
+        )
+      ),
+
+    _call_assignment_constructor_subscript: ($) =>
+      prec.right(
+        'member',
+        seq(field('object', $._call_assignment_constructor), '[', field('index', $._expressions), ']')
+      ),
+
+    _call_assignment_constructor_tag: ($) =>
+      prec(
+        'template_call',
+        seq(field('function', $._call_assignment_constructor), field('arguments', $.template_string))
+      ),
 
     assignment_expression: ($) =>
       prec.right(
