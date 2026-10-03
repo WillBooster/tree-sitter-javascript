@@ -2460,7 +2460,7 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "primary_expression"
+          "name": "_await_primary_expression"
         },
         {
           "type": "SYMBOL",
@@ -2486,6 +2486,19 @@
       ]
     },
     "primary_expression": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_await_primary_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "arrow_function"
+        }
+      ]
+    },
+    "_await_primary_expression": {
       "type": "CHOICE",
       "members": [
         {
@@ -2564,10 +2577,6 @@
         {
           "type": "SYMBOL",
           "name": "function_expression"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "arrow_function"
         },
         {
           "type": "SYMBOL",
@@ -4377,10 +4386,6 @@
               "members": [
                 {
                   "type": "SYMBOL",
-                  "name": "expression"
-                },
-                {
-                  "type": "SYMBOL",
                   "name": "primary_expression"
                 },
                 {
@@ -4446,17 +4451,8 @@
             "type": "FIELD",
             "name": "object",
             "content": {
-              "type": "CHOICE",
-              "members": [
-                {
-                  "type": "SYMBOL",
-                  "name": "expression"
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "primary_expression"
-                }
-              ]
+              "type": "SYMBOL",
+              "name": "primary_expression"
             }
           },
           {
@@ -7757,6 +7753,24 @@
       "_await_operand"
     ],
     [
+      "primary_expression",
+      "_await_operand"
+    ],
+    [
+      "primary_expression",
+      "_await_operand",
+      "await_expression"
+    ],
+    [
+      "_await_operand",
+      "await_expression"
+    ],
+    [
+      "primary_expression",
+      "_await_operand",
+      "arrow_function"
+    ],
+    [
       "_await_operand",
       "yield_expression"
     ],
@@ -8123,6 +8137,7 @@
     "_call_signature",
     "_formal_parameter",
     "_expressions",
+    "_await_primary_expression",
     "_semicolon",
     "_identifier",
     "_reserved_identifier",

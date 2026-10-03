@@ -3157,3 +3157,35 @@ function script() {
         (while_statement
           (parenthesized_expression (true))
           (statement_block (break_statement (statement_identifier))))))))
+
+====================
+Await identifiers before async arrows with parenthesized parameters
+====================
+
+await
+async () => 1;
+await
+async (x) => 1;
+await
+async (x = ({text: ")"})) => {};
+await
+async (x);
+
+---
+
+(program
+  (expression_statement (identifier))
+  (expression_statement (arrow_function (formal_parameters) (number)))
+  (expression_statement (identifier))
+  (expression_statement (arrow_function (formal_parameters (identifier)) (number)))
+  (expression_statement (identifier))
+  (expression_statement
+    (arrow_function
+      (formal_parameters
+        (assignment_pattern
+          (identifier)
+          (parenthesized_expression
+            (object (pair (property_identifier) (string (string_fragment)))))))
+      (statement_block)))
+  (expression_statement
+    (await_expression (call_expression (identifier) (arguments (identifier))))))

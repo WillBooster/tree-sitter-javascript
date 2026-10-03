@@ -316,6 +316,10 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
                     scan_identifier(lexer, parameter, sizeof(parameter));
                     scan_whitespace_and_comments(lexer, scanned_content, true);
                 }
+                if (ascii_word && strcmp(word, "async") == 0 && lexer->lookahead == '(') {
+                    lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
+                    return true;
+                }
                 if (lexer->lookahead == '=') {
                     skip(lexer);
                     return lexer->lookahead == '>';

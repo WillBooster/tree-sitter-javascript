@@ -81,7 +81,7 @@ module.exports = grammar({
     $._line_break_after_modifier,
     $._line_break_before_attributes,
     $._line_break_after_await,
-    // Emitted before a brace to preserve both an await operand and an identifier statement followed by a block.
+    // Preserves an operand and an identifier statement when a following brace or async arrow head admits both paths.
     $._await_identifier_line_break,
   ],
 
@@ -98,6 +98,7 @@ module.exports = grammar({
     $._call_signature,
     $._formal_parameter,
     $._expressions,
+    $._await_primary_expression,
     $._semicolon,
     $._identifier,
     $._reserved_identifier,
@@ -151,6 +152,10 @@ module.exports = grammar({
 
   conflicts: ($) => [
     [$.expression, $._await_operand],
+    [$.primary_expression, $._await_operand],
+    [$.primary_expression, $._await_operand, $.await_expression],
+    [$._await_operand, $.await_expression],
+    [$.primary_expression, $._await_operand, $.arrow_function],
     [$._await_operand, $.yield_expression],
     [$._local_export_specifier, $._module_export_name],
     [$.primary_expression, $._property_name],
@@ -507,14 +512,16 @@ module.exports = grammar({
 
     _await_operand: ($) =>
       choice(
-        $.primary_expression,
+        $._await_primary_expression,
         $.await_expression,
         $.unary_expression,
         $.update_expression,
         alias('yield', $.identifier)
       ),
 
-    primary_expression: ($) =>
+    primary_expression: ($) => choice($._await_primary_expression, $.arrow_function),
+
+    _await_primary_expression: ($) =>
       choice(
         $._jsx_element,
         $.subscript_expression,
@@ -534,7 +541,6 @@ module.exports = grammar({
         $.object,
         $.array,
         $.function_expression,
-        $.arrow_function,
         $.generator_function,
         $.class,
         $.meta_property,
@@ -836,7 +842,7 @@ module.exports = grammar({
       prec(
         'member',
         seq(
-          field('object', choice($.expression, $.primary_expression, $.import)),
+          field('object', choice($.primary_expression, $.import)),
           choice('.', field('optional_chain', $.optional_chain)),
           field(
             'property',
@@ -849,7 +855,7 @@ module.exports = grammar({
       prec.right(
         'member',
         seq(
-          field('object', choice($.expression, $.primary_expression)),
+          field('object', $.primary_expression),
           optional(field('optional_chain', $.optional_chain)),
           '[',
           field('index', $._expressions),
