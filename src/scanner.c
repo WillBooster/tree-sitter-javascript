@@ -22,6 +22,7 @@ enum TokenType {
     LINE_BREAK_BEFORE_ATTRIBUTES,
     LINE_BREAK_AFTER_AWAIT,
     AWAIT_IDENTIFIER_LINE_BREAK,
+    LINE_BREAK_AFTER_AWAIT_OPERAND,
 };
 
 typedef struct {
@@ -216,8 +217,7 @@ typedef enum {
     LINE_BREAK_AFTER_ACCESSOR_WORD,
     // After the source of an import or re-export: only the `with` of its attributes continues it.
     LINE_BREAK_BEFORE_IMPORT_ATTRIBUTES,
-    LINE_BREAK_AFTER_AWAIT_OPERATOR,
-    LINE_BREAK_BEFORE_AWAIT_BLOCK,
+    LINE_BREAK_AFTER_AWAIT_KEYWORD,
 } LineBreakRule;
 
 static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule, bool *scanned_content);
@@ -292,9 +292,8 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
         return false;
     }
     switch (rule) {
-        case LINE_BREAK_BEFORE_AWAIT_BLOCK:
-        case LINE_BREAK_AFTER_AWAIT_OPERATOR:
-            if (rule == LINE_BREAK_BEFORE_AWAIT_BLOCK && !before_slash && lexer->lookahead == '{') {
+        case LINE_BREAK_AFTER_AWAIT_KEYWORD:
+            if (!before_slash && lexer->lookahead == '{') {
                 lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
                 return true;
             }
@@ -316,8 +315,7 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
                     scan_identifier(lexer, parameter, sizeof(parameter));
                     scan_whitespace_and_comments(lexer, scanned_content, true);
                 }
-                if (rule == LINE_BREAK_BEFORE_AWAIT_BLOCK && ascii_word && strcmp(word, "async") == 0 &&
-                    lexer->lookahead == '(') {
+                if (ascii_word && strcmp(word, "async") == 0 && lexer->lookahead == '(') {
                     lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
                     return true;
                 }
@@ -326,11 +324,8 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
                     return lexer->lookahead != '=';
                 }
                 if (!ascii_word) {
-                    if (rule == LINE_BREAK_BEFORE_AWAIT_BLOCK) {
-                        lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
-                        return true;
-                    }
-                    return false;
+                    lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
+                    return true;
                 }
                 if (strcmp(word, "import") == 0) {
                     return lexer->lookahead != '(' && lexer->lookahead != '.';
@@ -350,11 +345,8 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
                         return true;
                     }
                 }
-                if (rule == LINE_BREAK_BEFORE_AWAIT_BLOCK) {
-                    lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
-                    return true;
-                }
-                return false;
+                lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
+                return true;
             }
             switch (lexer->lookahead) {
                 case '.':
@@ -750,8 +742,10 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         bool after_block_arrow = valid_symbols[ARROW_FUNCTION_BLOCK_END];
         bool scanned_content = false;
         LineBreakRule rule = LINE_BREAK_BY_NEXT_TOKEN;
-        if (valid_symbols[LINE_BREAK_AFTER_AWAIT]) {
-            rule = valid_symbols[AWAIT_IDENTIFIER_LINE_BREAK] ? LINE_BREAK_BEFORE_AWAIT_BLOCK : LINE_BREAK_AFTER_AWAIT_OPERATOR;
+        if (valid_symbols[LINE_BREAK_AFTER_AWAIT_OPERAND]) {
+            rule = LINE_BREAK_BY_NEXT_TOKEN;
+        } else if (valid_symbols[LINE_BREAK_AFTER_AWAIT]) {
+            rule = LINE_BREAK_AFTER_AWAIT_KEYWORD;
         } else if (valid_symbols[LINE_BREAK_ENDS_STATEMENT]) {
             rule = LINE_BREAK_ENDS;
         } else if (valid_symbols[LINE_BREAK_AFTER_BINDING]) {

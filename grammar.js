@@ -83,6 +83,7 @@ module.exports = grammar({
     $._line_break_after_await,
     // Preserves operand and identifier-statement paths before a following brace or identifier-headed expression.
     $._await_identifier_line_break,
+    $._line_break_after_await_operand,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -521,17 +522,11 @@ module.exports = grammar({
       ),
 
     _await_operand: ($) =>
-      choice(
-        $._await_primary_expression,
-        $.await_expression,
-        $.unary_expression,
-        $.update_expression,
-        $._await_yield_operand
-      ),
+      choice($._await_primary_expression, $.await_expression, $.unary_expression, $.update_expression),
 
     _await_yield_operand: ($) =>
       choice(
-        seq(alias('yield', $.identifier), optional($._line_break_after_await)),
+        alias('yield', $.identifier),
         alias($._await_yield_call, $.call_expression),
         alias($._await_yield_member, $.member_expression),
         alias($._await_yield_subscript, $.subscript_expression)
@@ -894,9 +889,14 @@ module.exports = grammar({
     await_expression: ($) =>
       prec.dynamic(
         2,
-        prec(
+        prec.right(
           'unary_void',
-          seq('await', optional($._await_identifier_line_break), optional($._line_break_after_await), $._await_operand)
+          seq(
+            'await',
+            optional($._await_identifier_line_break),
+            optional($._line_break_after_await),
+            choice($._await_operand, seq($._await_yield_operand, optional($._line_break_after_await_operand)))
+          )
         )
       ),
 
@@ -1032,10 +1032,12 @@ module.exports = grammar({
       prec.right(
         'assign',
         seq(
-          field('left', $._augmented_assignment_lhs),
-          field(
-            'operator',
-            choice('+=', '-=', '*=', '/=', '%=', '^=', '&=', '|=', '>>=', '>>>=', '<<=', '**=', '&&=', '||=', '??=')
+          choice(
+            seq(
+              field('left', choice($._augmented_assignment_lhs, alias($._call_assignment_target, $.call_expression))),
+              field('operator', choice('+=', '-=', '*=', '/=', '%=', '^=', '&=', '|=', '>>=', '>>>=', '<<=', '**='))
+            ),
+            seq(field('left', $._augmented_assignment_lhs), field('operator', choice('&&=', '||=', '??=')))
           ),
           field('right', $.expression)
         )

@@ -3455,3 +3455,99 @@ A constructor call is not a legacy function call assignment target
 new Foo() = 1;
 
 ---
+
+====================
+Completed await yield operands before literal and unary statements
+====================
+
+async function f() {
+  await yield
+  "s";
+  await yield
+  1;
+  await yield
+  .5;
+  await yield
+  !x;
+  await yield
+  ~x;
+  await await x
+  "s";
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement (await_expression (identifier)))
+      (expression_statement (string (string_fragment)))
+      (expression_statement (await_expression (identifier)))
+      (expression_statement (number))
+      (expression_statement (await_expression (identifier)))
+      (expression_statement (number))
+      (expression_statement (await_expression (identifier)))
+      (expression_statement (unary_expression (identifier)))
+      (expression_statement (await_expression (identifier)))
+      (expression_statement (unary_expression (identifier)))
+      (expression_statement (await_expression (await_expression (identifier))))
+      (expression_statement (string (string_fragment))))))
+
+====================
+Legacy call targets for arithmetic compound assignments
+====================
+
+await
+(x) += 1;
+foo().bar[0]() *= 2;
+
+---
+
+(program
+  (expression_statement
+    (augmented_assignment_expression
+      (call_expression (identifier) (arguments (identifier)))
+      (number)))
+  (expression_statement
+    (augmented_assignment_expression
+      (call_expression
+        (subscript_expression
+          (member_expression (call_expression (identifier) (arguments)) (property_identifier))
+          (number))
+        (arguments))
+      (number))))
+
+====================
+A call is not a logical and assignment target
+:error
+====================
+
+foo() &&= 1;
+
+---
+
+(ERROR)
+
+====================
+A call is not a logical or assignment target
+:error
+====================
+
+foo() ||= 1;
+
+---
+
+(ERROR)
+
+====================
+A call is not a nullish assignment target
+:error
+====================
+
+foo() ??= 1;
+
+---
+
+(ERROR)
