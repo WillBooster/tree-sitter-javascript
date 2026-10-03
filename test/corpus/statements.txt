@@ -1712,3 +1712,43 @@ let x = { a: //  3
           (property_identifier)
           (comment)
           (number))))))
+
+================================================================================
+Export declarations across line breaks
+================================================================================
+
+export
+class C {}
+export
+{}
+export /* comment */
+function f() {}
+const obj = { export: 1 };
+obj.export;
+
+--------------------------------------------------------------------------------
+
+(program
+  (export_statement
+    (class_declaration
+      (identifier)
+      (class_body)))
+  (export_statement
+    (export_clause))
+  (export_statement
+    (comment)
+    (function_declaration
+      (identifier)
+      (formal_parameters)
+      (statement_block)))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (object
+        (pair
+          (property_identifier)
+          (number)))))
+  (expression_statement
+    (member_expression
+      (identifier)
+      (property_identifier))))
