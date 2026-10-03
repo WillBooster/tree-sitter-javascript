@@ -50,7 +50,7 @@ const NAMED_RESERVED_WORDS = new Set(['this', 'super', 'true', 'false', 'null'])
 
 // Words that are keywords only in some positions and identifiers elsewhere.
 const MEMBER_MODIFIERS = ['get', 'set', 'static'];
-const CONTEXTUAL_KEYWORDS = ['async', 'await', 'export', 'let', 'using'];
+const CONTEXTUAL_KEYWORDS = ['async', 'await', 'let', 'using'];
 
 // oxlint-disable-next-line unicorn/prefer-module -- This package is CommonJS, so tree-sitter loads grammar.js as CommonJS.
 module.exports = grammar({
@@ -81,7 +81,7 @@ module.exports = grammar({
     $._line_break_after_modifier,
     $._line_break_before_attributes,
     $._line_break_after_await,
-    // Preserves an operand and an identifier statement when a following brace or async arrow head admits both paths.
+    // Preserves operand and identifier-statement paths before a following brace or identifier-headed expression.
     $._await_identifier_line_break,
   ],
 
