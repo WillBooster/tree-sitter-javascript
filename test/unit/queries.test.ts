@@ -188,3 +188,41 @@ test('retains canonical callees in recovered legacy call assignments', async () 
     parser.delete();
   }
 });
+
+test('preserves consuming await keyword ranges across operand lookahead', async () => {
+  const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
+  const parser = new Parser();
+  parser.setLanguage(language);
+  const query = new Query(language, '"await" @keyword');
+  try {
+    const sources = [
+      ['async function f(){return /*before*/ await /*\n*/ let.foo;}', 1],
+      ['async function f(){await await //after\nlet[0];}', 2],
+      ['async function f(){for await(const x of xs){} await using resource=foo();}', 2],
+      ['function f(){const await=1;return await;}', 0],
+    ] as const;
+    for (const [source, count] of sources) {
+      const tree = parser.parse(source)!;
+      try {
+        expect(tree.rootNode.hasError, source).toBe(false);
+        const keywords = query.captures(tree.rootNode);
+        expect(keywords, source).toHaveLength(count);
+        for (const { node } of keywords) {
+          expect(node.text, source).toBe('await');
+          expect(node.endIndex - node.startIndex, source).toBe(5);
+        }
+        for (const node of tree.rootNode.descendantsOfType('await_expression')) {
+          expect(node.text, source).toMatch(/^await\b/);
+        }
+        expect(tree.rootNode.descendantsOfType('comment'), source).toHaveLength(
+          source.match(/\/\*|\/\//g)?.length ?? 0
+        );
+      } finally {
+        tree.delete();
+      }
+    }
+  } finally {
+    query.delete();
+    parser.delete();
+  }
+});

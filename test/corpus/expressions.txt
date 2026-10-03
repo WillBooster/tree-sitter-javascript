@@ -3629,6 +3629,10 @@ useEffect(() => () => { cleanup(); }, [dep]);
 f(a => b => {}, (1));
 f(a => b => {}, `t`);
 f(a => b => {}, +1);
+export const m = options => next => async args => { return next(args); };
+export const following = { value: 1 };
+f(x => c ? 1 : () => {}, [1]);
+f(x => y = () => {}, [1]);
 
 ---
 
@@ -3690,6 +3694,57 @@ f(a => b => {}, +1);
             (identifier)
             (statement_block)))
         (unary_expression
+          (number)))))
+  (export_statement
+    (lexical_declaration
+      (variable_declarator
+        (identifier)
+        (arrow_function
+          (identifier)
+          (arrow_function
+            (identifier)
+            (arrow_function
+              (identifier)
+              (statement_block
+                (return_statement
+                  (call_expression
+                    (identifier)
+                    (arguments
+                      (identifier)))))))))))
+  (export_statement
+    (lexical_declaration
+      (variable_declarator
+        (identifier)
+        (object
+          (pair
+            (property_identifier)
+            (number))))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (arrow_function
+          (identifier)
+          (ternary_expression
+            (identifier)
+            (number)
+            (arrow_function
+              (formal_parameters)
+              (statement_block))))
+        (array
+          (number)))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (arrow_function
+          (identifier)
+          (assignment_expression
+            (identifier)
+            (arrow_function
+              (formal_parameters)
+              (statement_block))))
+        (array
           (number))))))
 
 ====================
@@ -3785,3 +3840,110 @@ async function f() {
       (expression_statement
         (parenthesized_expression
           (identifier))))))
+
+====================
+Contextual let identifiers as await operands
+====================
+
+async function f() {
+  await
+  let.foo;
+  await
+  let(x);
+  await
+  let[0];
+  return await
+  let;
+}
+function g() {
+  await
+  let x = 1;
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (await_expression
+          (member_expression
+            (identifier)
+            (property_identifier))))
+      (expression_statement
+        (await_expression
+          (call_expression
+            (identifier)
+            (arguments
+              (identifier)))))
+      (expression_statement
+        (await_expression
+          (subscript_expression
+            (identifier)
+            (number))))
+      (return_statement
+        (await_expression
+          (identifier)))))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (identifier))
+      (lexical_declaration
+        (variable_declarator
+          (identifier)
+          (number))))))
+
+
+====================
+Await yield identifiers before member assignments
+====================
+
+await
+yield.p = 1;
+function f() {
+  await
+  yield.p += 1;
+  await
+  yield.p(1).q = 1;
+}
+
+---
+
+(program
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (assignment_expression
+      (member_expression
+        (yield_expression)
+        (property_identifier))
+      (number)))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (augmented_assignment_expression
+          (member_expression
+            (yield_expression)
+            (property_identifier))
+          (number)))
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (assignment_expression
+          (member_expression
+            (call_expression
+              (member_expression
+                (yield_expression)
+                (property_identifier))
+              (arguments
+                (number)))
+            (property_identifier))
+          (number))))))

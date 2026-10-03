@@ -1093,7 +1093,12 @@
                 "type": "SEQ",
                 "members": [
                   {
-                    "type": "STRING",
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "_await_keyword"
+                    },
+                    "named": false,
                     "value": "await"
                   },
                   {
@@ -1591,7 +1596,12 @@
                 "type": "SEQ",
                 "members": [
                   {
-                    "type": "STRING",
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "_await_keyword"
+                    },
+                    "named": false,
                     "value": "await"
                   },
                   {
@@ -1655,7 +1665,12 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "STRING",
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_await_keyword"
+              },
+              "named": false,
               "value": "await"
             },
             {
@@ -1820,7 +1835,12 @@
                         "type": "SEQ",
                         "members": [
                           {
-                            "type": "STRING",
+                            "type": "ALIAS",
+                            "content": {
+                              "type": "SYMBOL",
+                              "name": "_await_keyword"
+                            },
+                            "named": false,
                             "value": "await"
                           },
                           {
@@ -4300,7 +4320,12 @@
           "type": "SEQ",
           "members": [
             {
-              "type": "STRING",
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_await_keyword"
+              },
+              "named": false,
               "value": "await"
             },
             {
@@ -7706,8 +7731,8 @@
           "value": "async"
         },
         {
-          "type": "STRING",
-          "value": "await"
+          "type": "SYMBOL",
+          "name": "_await_keyword"
         },
         {
           "type": "STRING",
@@ -7729,6 +7754,10 @@
         {
           "type": "SYMBOL",
           "name": "_await_identifier_line_break"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_await_yield_identifier_start"
         },
         {
           "type": "STRING",
@@ -8116,6 +8145,10 @@
     {
       "type": "SYMBOL",
       "name": "_postfix_update_end"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_await_keyword"
     }
   ],
   "inline": [

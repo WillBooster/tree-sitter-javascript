@@ -93,11 +93,12 @@ module.exports = grammar({
     $._completed_arrow_function,
     // Emitted identifier token at the direct await-operand start, preserving normal yield parsing elsewhere.
     $._await_yield_identifier,
-    // Emitted zero-width lookahead decision, followed by a never-emitted lexical context flag.
+    // Emitted zero-width decision preserves direct operands and identifier statements before yield.
     $._await_yield_identifier_start,
     $._await_yield_identifier_context,
     // Emitted zero-width after a postfix update; carries the pending statement boundary across reuse.
     $._postfix_update_end,
+    $._await_keyword,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -327,7 +328,7 @@ module.exports = grammar({
 
     using_declaration: ($) =>
       seq(
-        field('kind', choice('using', seq('await', 'using'))),
+        field('kind', choice('using', seq(alias($._await_keyword, 'await'), 'using'))),
         commaSep1(alias($._using_declarator, $.variable_declarator)),
         $._semicolon
       ),
@@ -396,12 +397,13 @@ module.exports = grammar({
 
     _for_using_declaration: ($) =>
       seq(
-        field('kind', choice('using', seq('await', 'using'))),
+        field('kind', choice('using', seq(alias($._await_keyword, 'await'), 'using'))),
         commaSep1(alias($._using_declarator, $.variable_declarator)),
         ';'
       ),
 
-    for_in_statement: ($) => seq('for', optional('await'), $._for_header, field('body', $._statement)),
+    for_in_statement: ($) =>
+      seq('for', optional(alias($._await_keyword, 'await')), $._for_header, field('body', $._statement)),
 
     _for_header: ($) =>
       seq(
@@ -418,7 +420,7 @@ module.exports = grammar({
             field('left', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern))
           ),
           seq(
-            field('kind', choice('using', seq('await', 'using'))),
+            field('kind', choice('using', seq(alias($._await_keyword, 'await'), 'using'))),
             field('left', choice($.identifier, alias('of', $.identifier)))
           )
         ),
@@ -835,7 +837,7 @@ module.exports = grammar({
         prec.right(
           'unary_void',
           seq(
-            'await',
+            alias($._await_keyword, 'await'),
             optional($._await_identifier_line_break),
             optional(seq($._await_yield_identifier_start, optional($._await_yield_identifier_context))),
             optional($._line_break_after_await),
@@ -1273,9 +1275,11 @@ module.exports = grammar({
 
     computed_property_name: ($) => seq('[', $.expression, ']'),
 
-    _reserved_identifier: () => choice(...MEMBER_MODIFIERS, ...CONTEXTUAL_KEYWORDS),
+    _reserved_identifier: ($) =>
+      choice(...MEMBER_MODIFIERS, ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? $._await_keyword : word))),
 
-    _semicolon: ($) => choice($._automatic_semicolon, $._await_identifier_line_break, ';'),
+    _semicolon: ($) =>
+      choice($._automatic_semicolon, $._await_identifier_line_break, $._await_yield_identifier_start, ';'),
   },
 });
 
