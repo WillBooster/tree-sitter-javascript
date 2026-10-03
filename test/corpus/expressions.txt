@@ -2999,3 +2999,161 @@ function script() {
         (assignment_expression
           (identifier)
           (identifier))))))
+
+====================
+Await identifiers before blocks in assignment and return statements
+====================
+
+function script() {
+  x = await
+  { foo(); }
+  return await
+  { foo(); }
+}
+async function asyncOperand() {
+  x = await
+  { foo: 1 };
+  return await
+  { foo: 1 };
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (assignment_expression
+          (identifier)
+          (identifier)))
+      (statement_block
+        (expression_statement
+          (call_expression
+            (identifier)
+            (arguments))))
+      (return_statement
+        (identifier))
+      (statement_block
+        (expression_statement
+          (call_expression
+            (identifier)
+            (arguments))))))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (assignment_expression
+          (identifier)
+          (await_expression
+            (object
+              (pair
+                (property_identifier)
+                (number))))))
+      (return_statement
+        (await_expression
+          (object
+            (pair
+              (property_identifier)
+              (number))))))))
+
+====================
+Await identifiers before yield statements
+====================
+
+function* generator() {
+  await
+  yield value;
+  await
+  yield /* inline */ "value";
+  await
+  yield * values;
+  await
+  yield /pattern/;
+}
+async function asyncOperand() {
+  await
+  yield;
+  await
+  yield + value;
+}
+
+---
+
+(program
+  (generator_function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (yield_expression
+          (identifier)))
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (yield_expression
+          (comment)
+          (string
+            (string_fragment))))
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (yield_expression
+          (identifier)))
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (yield_expression
+          (regex
+            (regex_pattern))))))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (await_expression
+          (identifier)))
+      (expression_statement
+        (binary_expression
+          (await_expression
+            (identifier))
+          (identifier))))))
+
+====================
+Await identifiers before arrows and escaped labels
+====================
+
+await
+x => 1;
+await
+async x => 1;
+x = await
+y => 1;
+function script() {
+  await
+  \u{61}: while (true) { break a; }
+}
+
+---
+
+(program
+  (expression_statement (identifier))
+  (expression_statement (arrow_function (identifier) (number)))
+  (expression_statement (identifier))
+  (expression_statement (arrow_function (identifier) (number)))
+  (expression_statement (assignment_expression (identifier) (identifier)))
+  (expression_statement (arrow_function (identifier) (number)))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement (identifier))
+      (labeled_statement
+        (statement_identifier)
+        (while_statement
+          (parenthesized_expression (true))
+          (statement_block (break_statement (statement_identifier))))))))

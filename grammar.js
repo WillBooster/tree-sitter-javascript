@@ -73,16 +73,15 @@ module.exports = grammar({
     // _arrow_function_block_continuation, since the arrow function may be, e.g., an argument.
     $._arrow_function_block_end,
     $._arrow_function_block_continuation,
-    // Sentinels that the scanner never emits: the grammar allows each only where a line break has a fixed meaning, so
-    // the scanner can tell from the valid symbols how to treat one there (see LineBreakRule in src/scanner.c). Each is an
-    // alternative to what follows its position rather than an optional token before it, since an optional token would
-    // duplicate the parse states after it.
+    // These never-emitted context flags let the scanner choose a line-break rule from the valid symbols. Keep a flag
+    // optional when its alternative would make a required named child optional in node-types.json.
     $._line_break_ends_statement,
     $._line_break_after_binding,
     $._line_break_after_field,
     $._line_break_after_modifier,
     $._line_break_before_attributes,
     $._line_break_after_await,
+    // Emitted before a brace to preserve both an await operand and an identifier statement followed by a block.
     $._await_identifier_line_break,
   ],
 
@@ -137,6 +136,7 @@ module.exports = grammar({
     ],
     ['assign', $.primary_expression],
     ['member', 'template_call', 'new', 'call', $.expression],
+    ['member', 'template_call', 'new', 'call', $._await_operand],
     ['declaration', 'literal'],
     [$.primary_expression, $.statement_block, 'object'],
     // A `{` that may begin both a block and an object starts a statement or an arrow function's body, where ECMAScript
@@ -150,7 +150,8 @@ module.exports = grammar({
   ],
 
   conflicts: ($) => [
-    [$.expression_statement, $.await_expression],
+    [$.expression, $._await_operand],
+    [$._await_operand, $.yield_expression],
     [$._local_export_specifier, $._module_export_name],
     [$.primary_expression, $._property_name],
     [$.primary_expression, $.await_expression],
@@ -303,8 +304,7 @@ module.exports = grammar({
         $.labeled_statement
       ),
 
-    expression_statement: ($) =>
-      choice(seq($._expressions, $._semicolon), seq(alias('await', $.identifier), $._await_identifier_line_break)),
+    expression_statement: ($) => seq($._expressions, $._semicolon),
 
     variable_declaration: ($) => seq('var', commaSep1($.variable_declarator), $._semicolon),
 
@@ -503,6 +503,15 @@ module.exports = grammar({
         $.ternary_expression,
         $.update_expression,
         $.yield_expression
+      ),
+
+    _await_operand: ($) =>
+      choice(
+        $.primary_expression,
+        $.await_expression,
+        $.unary_expression,
+        $.update_expression,
+        alias('yield', $.identifier)
       ),
 
     primary_expression: ($) =>
@@ -792,7 +801,7 @@ module.exports = grammar({
 
     call_expression: ($) =>
       choice(
-        prec('call', seq(field('function', choice($.expression, $.import)), field('arguments', $.arguments))),
+        prec('call', seq(field('function', choice($.primary_expression, $.import)), field('arguments', $.arguments))),
         prec('template_call', seq(field('function', $.primary_expression), field('arguments', $.template_string))),
         prec(
           'member',
@@ -819,7 +828,7 @@ module.exports = grammar({
         2,
         prec(
           'unary_void',
-          seq('await', optional($._await_identifier_line_break), choice($.expression, $._line_break_after_await))
+          seq('await', optional($._await_identifier_line_break), optional($._line_break_after_await), $._await_operand)
         )
       ),
 
@@ -1253,7 +1262,7 @@ module.exports = grammar({
 
     _reserved_identifier: () => choice(...MEMBER_MODIFIERS, ...CONTEXTUAL_KEYWORDS),
 
-    _semicolon: ($) => choice($._automatic_semicolon, ';'),
+    _semicolon: ($) => choice($._automatic_semicolon, $._await_identifier_line_break, ';'),
   },
 });
 

@@ -222,6 +222,7 @@ typedef enum {
 
 static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule, bool *scanned_content);
 static bool scan_identifier(TSLexer *lexer, char *word, unsigned capacity);
+static bool follows_yield_operand(TSLexer *lexer);
 
 /**
  * @param after_block_arrow Whether an arrow function's block body has just ended.
@@ -304,8 +305,20 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
                 *scanned_content = true;
                 char word[16] = {0};
                 bool ascii_word = scan_identifier(lexer, word, sizeof(word));
+                if (ascii_word && strcmp(word, "yield") == 0) {
+                    return follows_yield_operand(lexer);
+                }
                 if (scan_whitespace_and_comments(lexer, scanned_content, true) != REJECT && lexer->lookahead == ':') {
                     return true;
+                }
+                if (ascii_word && strcmp(word, "async") == 0 && is_identifier_part(lexer->lookahead)) {
+                    char parameter[16] = {0};
+                    scan_identifier(lexer, parameter, sizeof(parameter));
+                    scan_whitespace_and_comments(lexer, scanned_content, true);
+                }
+                if (lexer->lookahead == '=') {
+                    skip(lexer);
+                    return lexer->lookahead == '>';
                 }
                 if (!ascii_word) {
                     return false;
@@ -459,10 +472,65 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
     return true;
 }
 
+static bool follows_yield_operand(TSLexer *lexer) {
+    for (;;) {
+        while (is_whitespace(lexer->lookahead)) {
+            if (is_line_terminator(lexer->lookahead)) {
+                return false;
+            }
+            skip(lexer);
+        }
+        if (lexer->lookahead != '/') {
+            break;
+        }
+        skip(lexer);
+        if (lexer->lookahead == '/') {
+            return false;
+        }
+        if (lexer->lookahead != '*') {
+            return true;
+        }
+        skip(lexer);
+        for (;;) {
+            if (lexer->eof(lexer) || is_line_terminator(lexer->lookahead)) {
+                return false;
+            }
+            bool after_asterisk = lexer->lookahead == '*';
+            skip(lexer);
+            if (after_asterisk && lexer->lookahead == '/') {
+                skip(lexer);
+                break;
+            }
+        }
+    }
+    return is_identifier_part(lexer->lookahead) || lexer->lookahead == '*' || lexer->lookahead == ':' ||
+           lexer->lookahead == '{' || lexer->lookahead == '\'' || lexer->lookahead == '"' ||
+           lexer->lookahead == '!' || lexer->lookahead == '~';
+}
+
 static bool scan_identifier(TSLexer *lexer, char *word, unsigned capacity) {
     unsigned length = 0;
     bool ascii_word = true;
     while (is_identifier_part(lexer->lookahead)) {
+        if (lexer->lookahead == '\\') {
+            ascii_word = false;
+            skip(lexer);
+            if (lexer->lookahead == 'u') {
+                skip(lexer);
+                if (lexer->lookahead == '{') {
+                    skip(lexer);
+                    while (is_ascii_digit(lexer->lookahead) ||
+                           (lexer->lookahead >= 'a' && lexer->lookahead <= 'f') ||
+                           (lexer->lookahead >= 'A' && lexer->lookahead <= 'F')) {
+                        skip(lexer);
+                    }
+                    if (lexer->lookahead == '}') {
+                        skip(lexer);
+                    }
+                }
+            }
+            continue;
+        }
         if (lexer->lookahead > 0x7F || length == capacity - 1) {
             ascii_word = false;
         } else {

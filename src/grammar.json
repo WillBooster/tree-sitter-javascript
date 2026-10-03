@@ -950,38 +950,15 @@
       ]
     },
     "expression_statement": {
-      "type": "CHOICE",
+      "type": "SEQ",
       "members": [
         {
-          "type": "SEQ",
-          "members": [
-            {
-              "type": "SYMBOL",
-              "name": "_expressions"
-            },
-            {
-              "type": "SYMBOL",
-              "name": "_semicolon"
-            }
-          ]
+          "type": "SYMBOL",
+          "name": "_expressions"
         },
         {
-          "type": "SEQ",
-          "members": [
-            {
-              "type": "ALIAS",
-              "content": {
-                "type": "STRING",
-                "value": "await"
-              },
-              "named": true,
-              "value": "identifier"
-            },
-            {
-              "type": "SYMBOL",
-              "name": "_await_identifier_line_break"
-            }
-          ]
+          "type": "SYMBOL",
+          "name": "_semicolon"
         }
       ]
     },
@@ -2475,6 +2452,36 @@
         {
           "type": "SYMBOL",
           "name": "yield_expression"
+        }
+      ]
+    },
+    "_await_operand": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "primary_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "await_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "unary_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "update_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "yield"
+          },
+          "named": true,
+          "value": "identifier"
         }
       ]
     },
@@ -4181,7 +4188,7 @@
                   "members": [
                     {
                       "type": "SYMBOL",
-                      "name": "expression"
+                      "name": "primary_expression"
                     },
                     {
                       "type": "SYMBOL",
@@ -4341,13 +4348,16 @@
               "members": [
                 {
                   "type": "SYMBOL",
-                  "name": "expression"
+                  "name": "_line_break_after_await"
                 },
                 {
-                  "type": "SYMBOL",
-                  "name": "_line_break_after_await"
+                  "type": "BLANK"
                 }
               ]
+            },
+            {
+              "type": "SYMBOL",
+              "name": "_await_operand"
             }
           ]
         }
@@ -7716,6 +7726,10 @@
           "name": "_automatic_semicolon"
         },
         {
+          "type": "SYMBOL",
+          "name": "_await_identifier_line_break"
+        },
+        {
           "type": "STRING",
           "value": ";"
         }
@@ -7739,8 +7753,12 @@
   ],
   "conflicts": [
     [
-      "expression_statement",
-      "await_expression"
+      "expression",
+      "_await_operand"
+    ],
+    [
+      "_await_operand",
+      "yield_expression"
     ],
     [
       "_local_export_specifier",
@@ -7922,6 +7940,28 @@
       {
         "type": "SYMBOL",
         "name": "expression"
+      }
+    ],
+    [
+      {
+        "type": "STRING",
+        "value": "member"
+      },
+      {
+        "type": "STRING",
+        "value": "template_call"
+      },
+      {
+        "type": "STRING",
+        "value": "new"
+      },
+      {
+        "type": "STRING",
+        "value": "call"
+      },
+      {
+        "type": "SYMBOL",
+        "name": "_await_operand"
       }
     ],
     [

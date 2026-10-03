@@ -584,10 +584,22 @@
     "fields": {},
     "children": {
       "multiple": false,
-      "required": false,
+      "required": true,
       "types": [
         {
-          "type": "expression",
+          "type": "await_expression",
+          "named": true
+        },
+        {
+          "type": "primary_expression",
+          "named": true
+        },
+        {
+          "type": "unary_expression",
+          "named": true
+        },
+        {
+          "type": "update_expression",
           "named": true
         }
       ]
@@ -768,11 +780,11 @@
         "required": true,
         "types": [
           {
-            "type": "expression",
+            "type": "import",
             "named": true
           },
           {
-            "type": "import",
+            "type": "primary_expression",
             "named": true
           }
         ]
@@ -1202,10 +1214,6 @@
       "types": [
         {
           "type": "expression",
-          "named": true
-        },
-        {
-          "type": "identifier",
           "named": true
         },
         {
