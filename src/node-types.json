@@ -595,111 +595,7 @@
       "required": true,
       "types": [
         {
-          "type": "array",
-          "named": true
-        },
-        {
-          "type": "await_expression",
-          "named": true
-        },
-        {
-          "type": "call_expression",
-          "named": true
-        },
-        {
-          "type": "class",
-          "named": true
-        },
-        {
-          "type": "false",
-          "named": true
-        },
-        {
-          "type": "function_expression",
-          "named": true
-        },
-        {
-          "type": "generator_function",
-          "named": true
-        },
-        {
-          "type": "identifier",
-          "named": true
-        },
-        {
-          "type": "jsx_element",
-          "named": true
-        },
-        {
-          "type": "jsx_self_closing_element",
-          "named": true
-        },
-        {
-          "type": "member_expression",
-          "named": true
-        },
-        {
-          "type": "meta_property",
-          "named": true
-        },
-        {
-          "type": "new_expression",
-          "named": true
-        },
-        {
-          "type": "null",
-          "named": true
-        },
-        {
-          "type": "number",
-          "named": true
-        },
-        {
-          "type": "object",
-          "named": true
-        },
-        {
-          "type": "parenthesized_expression",
-          "named": true
-        },
-        {
-          "type": "regex",
-          "named": true
-        },
-        {
-          "type": "string",
-          "named": true
-        },
-        {
-          "type": "subscript_expression",
-          "named": true
-        },
-        {
-          "type": "super",
-          "named": true
-        },
-        {
-          "type": "template_string",
-          "named": true
-        },
-        {
-          "type": "this",
-          "named": true
-        },
-        {
-          "type": "true",
-          "named": true
-        },
-        {
-          "type": "unary_expression",
-          "named": true
-        },
-        {
-          "type": "undefined",
-          "named": true
-        },
-        {
-          "type": "update_expression",
+          "type": "expression",
           "named": true
         }
       ]
@@ -880,11 +776,11 @@
         "required": true,
         "types": [
           {
-            "type": "import",
+            "type": "expression",
             "named": true
           },
           {
-            "type": "primary_expression",
+            "type": "import",
             "named": true
           }
         ]
@@ -2179,11 +2075,11 @@
         "required": true,
         "types": [
           {
-            "type": "import",
+            "type": "expression",
             "named": true
           },
           {
-            "type": "primary_expression",
+            "type": "import",
             "named": true
           }
         ]
@@ -2746,7 +2642,7 @@
         "required": true,
         "types": [
           {
-            "type": "primary_expression",
+            "type": "expression",
             "named": true
           }
         ]

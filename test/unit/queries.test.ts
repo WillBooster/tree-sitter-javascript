@@ -64,3 +64,57 @@ for (const [packageKind, listFiles] of Object.entries(listPublishedFiles)) {
     }
   );
 }
+
+// Identical printed trees can lose supertype membership when a filtered hidden rule replaces the public expression
+// rules. Check captures through the shipped parser, including the contextual yield-identifier operand paths.
+test('captures canonical expression supertypes in await operands and callees', async () => {
+  const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
+  const parser = new Parser();
+  parser.setLanguage(language);
+  const tree = parser.parse(`async function f() {
+    await g(x);
+    await yield(x);
+    await yield.foo;
+    await yield[index];
+    await yield\`tag\`;
+    await yield;
+    await
+    yield in values;
+    await /* comment */ yield.foo;
+    await
+    /* comment */
+    yield.foo;
+    const h = async () => await g(x);
+  }`)!;
+  const operands = new Query(language, '(await_expression (expression) @operand)');
+  const primaryOperands = new Query(language, '(await_expression (primary_expression) @operand)');
+  const callees = new Query(language, '(call_expression function: (expression) @callee)');
+  const primaryCallees = new Query(language, '(call_expression function: (primary_expression) @callee)');
+  try {
+    expect(tree.rootNode.hasError).toBe(false);
+    expect(tree.rootNode.descendantsOfType('comment')).toHaveLength(2);
+    for (const query of [operands, primaryOperands]) {
+      const captured = new Set(query.captures(tree.rootNode).map(({ node }) => node.id));
+      for (const awaitNode of tree.rootNode.descendantsOfType('await_expression')) {
+        const operand = awaitNode.namedChildren.find((node) => node.type !== 'comment')!;
+        expect(captured, operand.text).toContain(operand.id);
+      }
+    }
+    for (const query of [callees, primaryCallees]) {
+      const captured = new Set(query.captures(tree.rootNode).map(({ node }) => node.id));
+      for (const call of tree.rootNode.descendantsOfType('call_expression')) {
+        if (call.childForFieldName('arguments')!.type === 'arguments') {
+          const callee = call.childForFieldName('function')!;
+          expect(captured, callee.text).toContain(callee.id);
+        }
+      }
+    }
+  } finally {
+    operands.delete();
+    primaryOperands.delete();
+    callees.delete();
+    primaryCallees.delete();
+    tree.delete();
+    parser.delete();
+  }
+});

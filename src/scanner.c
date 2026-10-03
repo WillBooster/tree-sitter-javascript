@@ -20,9 +20,15 @@ enum TokenType {
     LINE_BREAK_AFTER_FIELD,
     LINE_BREAK_AFTER_MODIFIER,
     LINE_BREAK_BEFORE_ATTRIBUTES,
+    STATEMENT_BOUNDARY,
     LINE_BREAK_AFTER_AWAIT,
     AWAIT_IDENTIFIER_LINE_BREAK,
-    LINE_BREAK_AFTER_AWAIT_OPERAND,
+    ARROW_EXPRESSION_BODY_END,
+    AWAIT_OPERAND_END,
+    COMPLETED_ARROW_FUNCTION,
+    AWAIT_YIELD_IDENTIFIER,
+    AWAIT_YIELD_IDENTIFIER_START,
+    AWAIT_YIELD_IDENTIFIER_CONTEXT,
 };
 
 typedef struct {
@@ -244,6 +250,13 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
                 return false;
             }
 
+            if (after_block_arrow && lexer->eof(lexer)) {
+                return true;
+            }
+
+            if (result == NO_NEWLINE && rule == LINE_BREAK_AFTER_AWAIT_KEYWORD) {
+                return false;
+            }
             if (result == ACCEPT || result == ACCEPT_IN_BLOCK_COMMENT) {
                 if (after_block_arrow || rule != LINE_BREAK_BY_NEXT_TOKEN) {
                     return scan_after_line_break(lexer, after_block_arrow, rule, scanned_content);
@@ -305,7 +318,11 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
                 char word[16] = {0};
                 bool ascii_word = scan_identifier(lexer, word, sizeof(word));
                 if (ascii_word && strcmp(word, "yield") == 0) {
-                    return follows_yield_operand(lexer);
+                    if (follows_yield_operand(lexer)) {
+                        return true;
+                    }
+                    lexer->result_symbol = AWAIT_YIELD_IDENTIFIER_START;
+                    return true;
                 }
                 if (scan_whitespace_and_comments(lexer, scanned_content, true) != REJECT && lexer->lookahead == ':') {
                     return true;
@@ -520,7 +537,14 @@ static bool follows_yield_operand(TSLexer *lexer) {
     if (lexer->lookahead == '+' || lexer->lookahead == '-') {
         int32_t sign = lexer->lookahead;
         skip(lexer);
-        return lexer->lookahead == sign;
+        if (lexer->lookahead != sign) {
+            return false;
+        }
+        skip(lexer);
+        bool scanned_content = false;
+        scan_whitespace_and_comments(lexer, &scanned_content, true);
+        return !lexer->eof(lexer) && lexer->lookahead != ';' && lexer->lookahead != '}' && lexer->lookahead != ')' &&
+               lexer->lookahead != ']' && lexer->lookahead != ',' && lexer->lookahead != ':';
     }
     return lexer->lookahead == '*' || lexer->lookahead == ':' || lexer->lookahead == '(' ||
            lexer->lookahead == '[' || lexer->lookahead == '{' || lexer->lookahead == '`' ||
@@ -715,6 +739,121 @@ static bool scan_jsx_text(TSLexer *lexer) {
     }
 }
 
+// Filtered expression subsets lose public supertype query paths. These boundaries keep canonical expression rules:
+// postfix continuations remain in both bodies, while binary continuations remain in an arrow body only.
+static bool scan_expression_end(TSLexer *lexer, bool after_await) {
+    lexer->mark_end(lexer);
+    lexer->result_symbol = after_await ? AWAIT_OPERAND_END : ARROW_EXPRESSION_BODY_END;
+    bool saw_newline = false;
+    for (;;) {
+        while (is_whitespace(lexer->lookahead)) {
+            saw_newline |= is_line_terminator(lexer->lookahead);
+            skip(lexer);
+        }
+        if (lexer->lookahead != '/') {
+            break;
+        }
+        skip(lexer);
+        if (lexer->lookahead == '/') {
+            while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) {
+                skip(lexer);
+            }
+        } else if (lexer->lookahead == '*') {
+            skip(lexer);
+            bool closed = false;
+            while (!lexer->eof(lexer)) {
+                saw_newline |= is_line_terminator(lexer->lookahead);
+                if (lexer->lookahead == '*') {
+                    skip(lexer);
+                    if (lexer->lookahead == '/') {
+                        skip(lexer);
+                        closed = true;
+                        break;
+                    }
+                } else {
+                    skip(lexer);
+                }
+            }
+            if (!closed) {
+                return false;
+            }
+        } else {
+            return after_await;
+        }
+    }
+    switch (lexer->lookahead) {
+        case '(':
+        case '[':
+        case '`':
+            return false;
+        case '?':
+            skip(lexer);
+            return after_await && lexer->lookahead != '.';
+        case '=':
+        case '*':
+        case '%':
+        case '<':
+        case '>':
+        case '^':
+        case '|':
+        case '&':
+            return after_await;
+        case '.':
+            skip(lexer);
+            return is_ascii_digit(lexer->lookahead);
+        case '+':
+        case '-': {
+            int32_t sign = lexer->lookahead;
+            skip(lexer);
+            return after_await ? lexer->lookahead != sign || saw_newline : saw_newline && lexer->lookahead == sign;
+        }
+        case '!':
+            skip(lexer);
+            return after_await || lexer->lookahead != '=';
+        case ';':
+        case ',':
+        case ':':
+        case ')':
+        case ']':
+        case '}':
+            return true;
+        case 'i':
+            if (after_await) {
+                return true;
+            }
+            skip(lexer);
+            if (lexer->lookahead != 'n') {
+                return saw_newline;
+            }
+            skip(lexer);
+            if (!is_identifier_part(lexer->lookahead)) {
+                return false;
+            }
+            return saw_newline && !scan_word(lexer, "stanceof");
+        default:
+            return lexer->eof(lexer) || saw_newline;
+    }
+}
+
+static bool scan_await_yield_identifier(TSLexer *lexer) {
+    bool scanned_content = false;
+    if (scan_whitespace_and_comments(lexer, &scanned_content, true) == REJECT || scanned_content) {
+        return false;
+    }
+    for (const char *word = "yield"; *word; word++) {
+        if (lexer->lookahead != *word) {
+            return false;
+        }
+        advance(lexer);
+    }
+    if (is_identifier_part(lexer->lookahead)) {
+        return false;
+    }
+    lexer->mark_end(lexer);
+    lexer->result_symbol = AWAIT_YIELD_IDENTIFIER;
+    return true;
+}
+
 bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer, const bool *valid_symbols) {
     Scanner *scanner = (Scanner *)payload;
 
@@ -738,13 +877,26 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         return true;
     }
 
+    if (valid_symbols[AWAIT_YIELD_IDENTIFIER_CONTEXT] && valid_symbols[AWAIT_YIELD_IDENTIFIER]) {
+        return scan_await_yield_identifier(lexer);
+    }
+
+    if (valid_symbols[AWAIT_OPERAND_END]) {
+        if (valid_symbols[COMPLETED_ARROW_FUNCTION]) {
+            return false;
+        }
+        return scan_expression_end(lexer, true);
+    }
+
+    if (valid_symbols[ARROW_EXPRESSION_BODY_END] && !valid_symbols[ARROW_FUNCTION_BLOCK_END]) {
+        return scan_expression_end(lexer, false);
+    }
+
     if (valid_symbols[AUTOMATIC_SEMICOLON] || valid_symbols[ARROW_FUNCTION_BLOCK_END]) {
         bool after_block_arrow = valid_symbols[ARROW_FUNCTION_BLOCK_END];
         bool scanned_content = false;
         LineBreakRule rule = LINE_BREAK_BY_NEXT_TOKEN;
-        if (valid_symbols[LINE_BREAK_AFTER_AWAIT_OPERAND]) {
-            rule = LINE_BREAK_BY_NEXT_TOKEN;
-        } else if (valid_symbols[LINE_BREAK_AFTER_AWAIT]) {
+        if (valid_symbols[LINE_BREAK_AFTER_AWAIT]) {
             rule = LINE_BREAK_AFTER_AWAIT_KEYWORD;
         } else if (valid_symbols[LINE_BREAK_ENDS_STATEMENT]) {
             rule = LINE_BREAK_ENDS;
@@ -762,10 +914,25 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
             lexer->result_symbol = ARROW_FUNCTION_BLOCK_END;
             scanner->automatic_semicolon_pending = true;
         }
+        if (ret && !after_block_arrow && valid_symbols[STATEMENT_BOUNDARY] && lexer->result_symbol == AUTOMATIC_SEMICOLON) {
+            lexer->result_symbol = STATEMENT_BOUNDARY;
+        }
         if (!ret && !scanned_content && valid_symbols[TERNARY_QMARK] && lexer->lookahead == '?') {
             return scan_ternary_qmark(lexer);
         }
+        if (!ret && !scanned_content && valid_symbols[AWAIT_YIELD_IDENTIFIER] && valid_symbols[LINE_BREAK_AFTER_AWAIT] && lexer->lookahead == 'y') {
+            return scan_await_yield_identifier(lexer);
+        }
         return ret;
+    }
+
+    if (valid_symbols[AWAIT_YIELD_IDENTIFIER] && valid_symbols[LINE_BREAK_AFTER_AWAIT]) {
+        while (is_whitespace(lexer->lookahead)) {
+            skip(lexer);
+        }
+        if (lexer->lookahead == 'y') {
+            return scan_await_yield_identifier(lexer);
+        }
     }
 
     if (valid_symbols[TERNARY_QMARK]) {

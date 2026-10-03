@@ -3528,8 +3528,6 @@ foo() &&= 1;
 
 ---
 
-(ERROR)
-
 ====================
 A call is not a logical or assignment target
 :error
@@ -3538,8 +3536,6 @@ A call is not a logical or assignment target
 foo() ||= 1;
 
 ---
-
-(ERROR)
 
 ====================
 A call is not a nullish assignment target
@@ -3550,4 +3546,95 @@ foo() ??= 1;
 
 ---
 
-(ERROR)
+====================
+Await call bodies in block-contained async arrows
+====================
+
+function f() {
+  x = async () => await g(a);
+  return async () => await g.h(a);
+}
+{ async () => await g(a); }
+f(async () => await g(a));
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (assignment_expression
+          (identifier)
+          (arrow_function
+            (formal_parameters)
+            (await_expression (call_expression (identifier) (arguments (identifier)))))))
+      (return_statement
+        (arrow_function
+          (formal_parameters)
+          (await_expression
+            (call_expression (member_expression (identifier) (property_identifier)) (arguments (identifier))))))))
+  (statement_block
+    (expression_statement
+      (arrow_function
+        (formal_parameters)
+        (await_expression (call_expression (identifier) (arguments (identifier)))))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (arrow_function
+          (formal_parameters)
+          (await_expression (call_expression (identifier) (arguments (identifier)))))))))
+
+====================
+Parenthesized arrows remain postfix and constructor targets
+====================
+
+(async () => await g(a))(b);
+(async () => await g(a)).field;
+new (async () => await g(a))(b);
+
+---
+
+(program
+  (expression_statement
+    (call_expression
+      (parenthesized_expression
+        (arrow_function (formal_parameters) (await_expression (call_expression (identifier) (arguments (identifier))))))
+      (arguments (identifier))))
+  (expression_statement
+    (member_expression
+      (parenthesized_expression
+        (arrow_function (formal_parameters) (await_expression (call_expression (identifier) (arguments (identifier))))))
+      (property_identifier)))
+  (expression_statement
+    (new_expression
+      (parenthesized_expression
+        (arrow_function (formal_parameters) (await_expression (call_expression (identifier) (arguments (identifier))))))
+      (arguments (identifier)))))
+
+====================
+Await yield postfix updates without prefix operands
+====================
+
+async function f(){return await
+yield++;}
+async function g(){return await /* comment */ yield--;}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (return_statement
+        (await_expression (update_expression (identifier))))))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (return_statement
+        (await_expression (comment) (update_expression (identifier)))))))
