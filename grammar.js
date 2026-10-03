@@ -521,7 +521,7 @@ module.exports = grammar({
 
     _await_yield_operand: ($) =>
       choice(
-        alias('yield', $.identifier),
+        seq(alias('yield', $.identifier), optional($._line_break_after_await)),
         alias($._await_yield_call, $.call_expression),
         alias($._await_yield_member, $.member_expression),
         alias($._await_yield_subscript, $.subscript_expression)

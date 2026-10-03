@@ -3307,3 +3307,27 @@ await
     (assignment_expression
       (call_expression (identifier) (arguments (identifier)))
       (number))))
+
+====================
+Await yield identifier postfix continuations across line breaks
+====================
+
+async function asyncOperand() {
+  await yield
+  (x);
+  await yield
+  [0];
+  await yield
+  `tag`;
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement (await_expression (call_expression (identifier) (arguments (identifier)))))
+      (expression_statement (await_expression (subscript_expression (identifier) (number))))
+      (expression_statement (await_expression (call_expression (identifier) (template_string (string_fragment))))))))
