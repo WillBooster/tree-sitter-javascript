@@ -2765,6 +2765,12 @@ async function f() {
 }
 function script() {
   await
+  label: while (true) { break label; }
+  await
+  thisIsAnEspeciallyLongLabel /* comment */: while (true) { break thisIsAnEspeciallyLongLabel; }
+  await
+  日本語: while (true) { break 日本語; }
+  await
   .member;
   await
   in value;
@@ -2832,6 +2838,37 @@ function script() {
     (identifier)
     (formal_parameters)
     (statement_block
+      (expression_statement
+        (identifier))
+      (labeled_statement
+        (statement_identifier)
+        (while_statement
+          (parenthesized_expression
+            (true))
+          (statement_block
+            (break_statement
+              (statement_identifier)))))
+      (expression_statement
+        (identifier))
+      (labeled_statement
+        (statement_identifier)
+        (comment)
+        (while_statement
+          (parenthesized_expression
+            (true))
+          (statement_block
+            (break_statement
+              (statement_identifier)))))
+      (expression_statement
+        (identifier))
+      (labeled_statement
+        (statement_identifier)
+        (while_statement
+          (parenthesized_expression
+            (true))
+          (statement_block
+            (break_statement
+              (statement_identifier)))))
       (expression_statement
         (member_expression
           (identifier)

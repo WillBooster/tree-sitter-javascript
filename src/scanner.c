@@ -292,12 +292,20 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
             if (is_identifier_part(lexer->lookahead) && !is_ascii_digit(lexer->lookahead)) {
                 char word[16] = {0};
                 unsigned length = 0;
+                bool ascii_word = true;
                 while (is_identifier_part(lexer->lookahead)) {
                     if (lexer->lookahead > 0x7F || length == sizeof(word) - 1) {
-                        return false;
+                        ascii_word = false;
+                    } else {
+                        word[length++] = (char)lexer->lookahead;
                     }
-                    word[length++] = (char)lexer->lookahead;
                     skip(lexer);
+                }
+                if (scan_whitespace_and_comments(lexer, scanned_comment, true) != REJECT && lexer->lookahead == ':') {
+                    return true;
+                }
+                if (!ascii_word) {
+                    return false;
                 }
                 static const char *const statements[] = {
                     "break", "case", "catch", "const", "continue", "debugger", "default", "do", "else", "enum",
