@@ -50,7 +50,7 @@ const NAMED_RESERVED_WORDS = new Set(['this', 'super', 'true', 'false', 'null'])
 
 // Words that are keywords only in some positions and identifiers elsewhere.
 const MEMBER_MODIFIERS = ['get', 'set', 'static'];
-const CONTEXTUAL_KEYWORDS = ['async', 'await', 'export', 'let', 'using'];
+const CONTEXTUAL_KEYWORDS = ['async', 'await', 'let', 'using'];
 
 // oxlint-disable-next-line unicorn/prefer-module -- This package is CommonJS, so tree-sitter loads grammar.js as CommonJS.
 module.exports = grammar({

@@ -7532,10 +7532,6 @@
                 },
                 {
                   "type": "STRING",
-                  "value": "export"
-                },
-                {
-                  "type": "STRING",
                   "value": "let"
                 },
                 {
@@ -7649,10 +7645,6 @@
         {
           "type": "STRING",
           "value": "await"
-        },
-        {
-          "type": "STRING",
-          "value": "export"
         },
         {
           "type": "STRING",
