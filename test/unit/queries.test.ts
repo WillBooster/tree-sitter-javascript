@@ -169,12 +169,21 @@ test('retains canonical callees in recovered legacy call assignments', async () 
     new Query(language, '(call_expression function: (primary_expression) @callee)'),
   ];
   try {
-    for (const source of ['foo().bar() = 1;', 'foo().bar() += 1;', 'new (foo?.bar)()() = 1;']) {
+    for (const [source, expectedCallees] of [
+      ['foo().bar() = 1;', ['foo().bar', 'foo']],
+      ['foo().bar() += 1;', ['foo().bar', 'foo']],
+      ['new (foo?.bar)()() = 1;', ['new (foo?.bar)()']],
+    ] as const) {
       const tree = parser.parse(source)!;
       try {
+        const calls = tree.rootNode.descendantsOfType('call_expression');
+        expect(
+          calls.map((call) => call.childForFieldName('function')!.text),
+          source
+        ).toEqual(expectedCallees);
         for (const query of queries) {
           const captured = new Set(query.captures(tree.rootNode).map(({ node }) => node.id));
-          for (const call of tree.rootNode.descendantsOfType('call_expression')) {
+          for (const call of calls) {
             const callee = call.childForFieldName('function')!;
             expect(captured, `${source}: ${callee.text}`).toContain(callee.id);
           }
