@@ -2,6 +2,7 @@
 #include "tree_sitter/parser.h"
 
 #include <stdio.h>
+#include <string.h>
 
 enum TokenType {
     AUTOMATIC_SEMICOLON,
@@ -19,6 +20,7 @@ enum TokenType {
     LINE_BREAK_AFTER_FIELD,
     LINE_BREAK_AFTER_MODIFIER,
     LINE_BREAK_BEFORE_ATTRIBUTES,
+    LINE_BREAK_AFTER_AWAIT,
 };
 
 typedef struct {
@@ -213,6 +215,7 @@ typedef enum {
     LINE_BREAK_AFTER_ACCESSOR_WORD,
     // After the source of an import or re-export: only the `with` of its attributes continues it.
     LINE_BREAK_BEFORE_IMPORT_ATTRIBUTES,
+    LINE_BREAK_AFTER_AWAIT_OPERATOR,
 } LineBreakRule;
 
 static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule, bool *scanned_comment);
@@ -285,6 +288,54 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
         return false;
     }
     switch (rule) {
+        case LINE_BREAK_AFTER_AWAIT_OPERATOR:
+            if (lexer->lookahead == '.') {
+                skip(lexer);
+                return !is_ascii_digit(lexer->lookahead);
+            }
+            if (is_identifier_part(lexer->lookahead) && !is_ascii_digit(lexer->lookahead)) {
+                char word[16] = {0};
+                unsigned length = 0;
+                while (is_identifier_part(lexer->lookahead)) {
+                    if (lexer->lookahead > 0x7F || length == sizeof(word) - 1) {
+                        return false;
+                    }
+                    word[length++] = (char)lexer->lookahead;
+                    skip(lexer);
+                }
+                static const char *const statements[] = {
+                    "break", "case", "catch", "const", "continue", "debugger", "default", "do", "else", "enum",
+                    "export", "extends", "finally", "for", "if", "in", "instanceof", "let", "return", "switch",
+                    "throw", "try", "var", "while", "with",
+                };
+                for (unsigned i = 0; i < sizeof(statements) / sizeof(statements[0]); i++) {
+                    if (strcmp(word, statements[i]) == 0) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            switch (lexer->lookahead) {
+                case '{':
+                case '[':
+                case '(':
+                case '`':
+                case '\'':
+                case '"':
+                case '/':
+                case '+':
+                case '-':
+                case '!':
+                case '~':
+                case '<':
+                    return false;
+                default:
+                    if (is_ascii_digit(lexer->lookahead)) {
+                        return false;
+                    }
+                    break;
+            }
+            break;
         case LINE_BREAK_ENDS:
             // A token that can start a statement starts the next one; any other token is left to the rules below,
             // which keep a bare `yield` continued by an enclosing `,` or `:`, and `yield` as a script's identifier
@@ -574,7 +625,9 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         bool after_block_arrow = valid_symbols[ARROW_FUNCTION_BLOCK_END];
         bool scanned_comment = false;
         LineBreakRule rule = LINE_BREAK_BY_NEXT_TOKEN;
-        if (valid_symbols[LINE_BREAK_ENDS_STATEMENT]) {
+        if (valid_symbols[LINE_BREAK_AFTER_AWAIT]) {
+            rule = LINE_BREAK_AFTER_AWAIT_OPERATOR;
+        } else if (valid_symbols[LINE_BREAK_ENDS_STATEMENT]) {
             rule = LINE_BREAK_ENDS;
         } else if (valid_symbols[LINE_BREAK_AFTER_BINDING]) {
             rule = LINE_BREAK_AFTER_BINDING_NAME;

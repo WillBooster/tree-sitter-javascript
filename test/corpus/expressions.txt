@@ -2734,3 +2734,108 @@ new <></>;
         (jsx_closing_element))
       (optional_chain)
       (arguments))))
+
+====================
+Await across line breaks
+====================
+
+await
+.5;
+await
+value;
+x = await
+value;
+await
+{};
+await /* split
+*/ value;
+await // split
+value;
+await
+++value;
+await
+[1];
+await
+/r/g;
+await
+function f() {};
+async function f() {
+  return await
+  value;
+}
+function script() {
+  await;
+  await
+  return;
+  await.member;
+  await = value;
+}
+
+---
+
+(program
+  (expression_statement
+    (await_expression
+      (number)))
+  (expression_statement
+    (await_expression
+      (identifier)))
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (await_expression
+        (identifier))))
+  (expression_statement
+    (await_expression
+      (object)))
+  (expression_statement
+    (await_expression
+      (comment)
+      (identifier)))
+  (expression_statement
+    (await_expression
+      (comment)
+      (identifier)))
+  (expression_statement
+    (await_expression
+      (update_expression
+        (identifier))))
+  (expression_statement
+    (await_expression
+      (array
+        (number))))
+  (expression_statement
+    (await_expression
+      (regex
+        (regex_pattern)
+        (regex_flags))))
+  (expression_statement
+    (await_expression
+      (function_expression
+        (identifier)
+        (formal_parameters)
+        (statement_block))))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (return_statement
+        (await_expression
+          (identifier)))))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (identifier))
+      (return_statement)
+      (expression_statement
+        (member_expression
+          (identifier)
+          (property_identifier)))
+      (expression_statement
+        (assignment_expression
+          (identifier)
+          (identifier))))))

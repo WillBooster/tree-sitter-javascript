@@ -82,6 +82,7 @@ module.exports = grammar({
     $._line_break_after_field,
     $._line_break_after_modifier,
     $._line_break_before_attributes,
+    $._line_break_after_await,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -810,7 +811,8 @@ module.exports = grammar({
 
     _argumentless_new_expression: ($) => prec.right('new', seq('new', field('constructor', $.primary_expression))),
 
-    await_expression: ($) => prec.dynamic(2, prec('unary_void', seq('await', $.expression))),
+    await_expression: ($) =>
+      prec.dynamic(2, prec('unary_void', seq('await', choice($.expression, $._line_break_after_await)))),
 
     member_expression: ($) =>
       prec(

@@ -4302,8 +4302,17 @@
               "value": "await"
             },
             {
-              "type": "SYMBOL",
-              "name": "expression"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "expression"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_line_break_after_await"
+                }
+              ]
             }
           ]
         }
@@ -8021,6 +8030,10 @@
     {
       "type": "SYMBOL",
       "name": "_line_break_before_attributes"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_line_break_after_await"
     }
   ],
   "inline": [
