@@ -2767,7 +2767,25 @@ async function f() {
   return await
   value;
 }
+async function conditional() {
+  await
+  value ? yes : no;
+}
+await
+import value from "module";
+await
+import("module");
+await
+import.meta;
 function script() {
+  await
+  using resource = acquire();
+  await
+  using[0];
+  await
+  using in object;
+  await
+  using instanceof Constructor;
   await
   { return 1; }
   await /* split
@@ -2856,6 +2874,56 @@ function script() {
     (identifier)
     (formal_parameters)
     (statement_block
+      (expression_statement
+        (ternary_expression
+          (await_expression
+            (identifier))
+          (identifier)
+          (identifier)))))
+  (expression_statement
+    (identifier))
+  (import_statement
+    (import_clause
+      (identifier))
+    (string
+      (string_fragment)))
+  (expression_statement
+    (await_expression
+      (call_expression
+        (import)
+        (arguments
+          (string
+            (string_fragment))))))
+  (expression_statement
+    (await_expression
+      (meta_property)))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (identifier))
+      (using_declaration
+        (variable_declarator
+          (identifier)
+          (call_expression
+            (identifier)
+            (arguments))))
+      (expression_statement
+        (await_expression
+          (subscript_expression
+            (identifier)
+            (number))))
+      (expression_statement
+        (binary_expression
+          (await_expression
+            (identifier))
+          (identifier)))
+      (expression_statement
+        (binary_expression
+          (await_expression
+            (identifier))
+          (identifier)))
       (expression_statement
         (identifier))
       (statement_block
