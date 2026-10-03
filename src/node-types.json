@@ -1205,6 +1205,10 @@
           "named": true
         },
         {
+          "type": "identifier",
+          "named": true
+        },
+        {
           "type": "sequence_expression",
           "named": true
         }

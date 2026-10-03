@@ -21,6 +21,7 @@ enum TokenType {
     LINE_BREAK_AFTER_MODIFIER,
     LINE_BREAK_BEFORE_ATTRIBUTES,
     LINE_BREAK_AFTER_AWAIT,
+    AWAIT_IDENTIFIER_LINE_BREAK,
 };
 
 typedef struct {
@@ -216,6 +217,7 @@ typedef enum {
     // After the source of an import or re-export: only the `with` of its attributes continues it.
     LINE_BREAK_BEFORE_IMPORT_ATTRIBUTES,
     LINE_BREAK_AFTER_AWAIT_OPERATOR,
+    LINE_BREAK_BEFORE_AWAIT_BLOCK,
 } LineBreakRule;
 
 static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule, bool *scanned_comment);
@@ -288,7 +290,15 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
         return false;
     }
     switch (rule) {
+        case LINE_BREAK_BEFORE_AWAIT_BLOCK:
         case LINE_BREAK_AFTER_AWAIT_OPERATOR:
+            if (rule == LINE_BREAK_BEFORE_AWAIT_BLOCK && !before_slash && lexer->lookahead == '{') {
+                lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
+                return true;
+            }
+            if (before_slash) {
+                return false;
+            }
             if (is_identifier_part(lexer->lookahead) && !is_ascii_digit(lexer->lookahead)) {
                 char word[16] = {0};
                 unsigned length = 0;
@@ -631,7 +641,7 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         bool scanned_comment = false;
         LineBreakRule rule = LINE_BREAK_BY_NEXT_TOKEN;
         if (valid_symbols[LINE_BREAK_AFTER_AWAIT]) {
-            rule = LINE_BREAK_AFTER_AWAIT_OPERATOR;
+            rule = valid_symbols[AWAIT_IDENTIFIER_LINE_BREAK] ? LINE_BREAK_BEFORE_AWAIT_BLOCK : LINE_BREAK_AFTER_AWAIT_OPERATOR;
         } else if (valid_symbols[LINE_BREAK_ENDS_STATEMENT]) {
             rule = LINE_BREAK_ENDS;
         } else if (valid_symbols[LINE_BREAK_AFTER_BINDING]) {

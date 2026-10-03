@@ -83,6 +83,7 @@ module.exports = grammar({
     $._line_break_after_modifier,
     $._line_break_before_attributes,
     $._line_break_after_await,
+    $._await_identifier_line_break,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -149,6 +150,7 @@ module.exports = grammar({
   ],
 
   conflicts: ($) => [
+    [$.expression_statement, $.await_expression],
     [$._local_export_specifier, $._module_export_name],
     [$.primary_expression, $._property_name],
     [$.primary_expression, $.await_expression],
@@ -301,7 +303,8 @@ module.exports = grammar({
         $.labeled_statement
       ),
 
-    expression_statement: ($) => seq($._expressions, $._semicolon),
+    expression_statement: ($) =>
+      choice(seq($._expressions, $._semicolon), seq(alias('await', $.identifier), $._await_identifier_line_break)),
 
     variable_declaration: ($) => seq('var', commaSep1($.variable_declarator), $._semicolon),
 
@@ -812,7 +815,13 @@ module.exports = grammar({
     _argumentless_new_expression: ($) => prec.right('new', seq('new', field('constructor', $.primary_expression))),
 
     await_expression: ($) =>
-      prec.dynamic(2, prec('unary_void', seq('await', choice($.expression, $._line_break_after_await)))),
+      prec.dynamic(
+        2,
+        prec(
+          'unary_void',
+          seq('await', optional($._await_identifier_line_break), choice($.expression, $._line_break_after_await))
+        )
+      ),
 
     member_expression: ($) =>
       prec(

@@ -2758,12 +2758,22 @@ await
 await
 /r/g;
 await
+/return/;
+await
+/in/;
+await
 function f() {};
 async function f() {
   return await
   value;
 }
 function script() {
+  await
+  { return 1; }
+  await /* split
+  */ { return 1; }
+  await
+  /* between */ { value(); }
   await
   label: while (true) { break label; }
   await
@@ -2823,6 +2833,14 @@ function script() {
         (regex_flags))))
   (expression_statement
     (await_expression
+      (regex
+        (regex_pattern))))
+  (expression_statement
+    (await_expression
+      (regex
+        (regex_pattern))))
+  (expression_statement
+    (await_expression
       (function_expression
         (identifier)
         (formal_parameters)
@@ -2838,6 +2856,25 @@ function script() {
     (identifier)
     (formal_parameters)
     (statement_block
+      (expression_statement
+        (identifier))
+      (statement_block
+        (return_statement
+          (number)))
+      (expression_statement
+        (identifier))
+      (comment)
+      (statement_block
+        (return_statement
+          (number)))
+      (expression_statement
+        (identifier))
+      (comment)
+      (statement_block
+        (expression_statement
+          (call_expression
+            (identifier)
+            (arguments))))
       (expression_statement
         (identifier))
       (labeled_statement

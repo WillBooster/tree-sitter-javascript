@@ -950,15 +950,38 @@
       ]
     },
     "expression_statement": {
-      "type": "SEQ",
+      "type": "CHOICE",
       "members": [
         {
-          "type": "SYMBOL",
-          "name": "_expressions"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_expressions"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "_semicolon"
+            }
+          ]
         },
         {
-          "type": "SYMBOL",
-          "name": "_semicolon"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "STRING",
+                "value": "await"
+              },
+              "named": true,
+              "value": "identifier"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "_await_identifier_line_break"
+            }
+          ]
         }
       ]
     },
@@ -4300,6 +4323,18 @@
             {
               "type": "STRING",
               "value": "await"
+            },
+            {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_await_identifier_line_break"
+                },
+                {
+                  "type": "BLANK"
+                }
+              ]
             },
             {
               "type": "CHOICE",
@@ -7704,6 +7739,10 @@
   ],
   "conflicts": [
     [
+      "expression_statement",
+      "await_expression"
+    ],
+    [
       "_local_export_specifier",
       "_module_export_name"
     ],
@@ -8034,6 +8073,10 @@
     {
       "type": "SYMBOL",
       "name": "_line_break_after_await"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_await_identifier_line_break"
     }
   ],
   "inline": [
