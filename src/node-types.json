@@ -1042,6 +1042,18 @@
         "required": true,
         "types": [
           {
+            "type": "class_declaration",
+            "named": true
+          },
+          {
+            "type": "function_declaration",
+            "named": true
+          },
+          {
+            "type": "generator_function_declaration",
+            "named": true
+          },
+          {
             "type": "statement",
             "named": true
           }
@@ -1067,6 +1079,18 @@
       "multiple": false,
       "required": true,
       "types": [
+        {
+          "type": "class_declaration",
+          "named": true
+        },
+        {
+          "type": "function_declaration",
+          "named": true
+        },
+        {
+          "type": "generator_function_declaration",
+          "named": true
+        },
         {
           "type": "statement",
           "named": true
@@ -1137,7 +1161,27 @@
         "required": false,
         "types": [
           {
-            "type": "declaration",
+            "type": "class_declaration",
+            "named": true
+          },
+          {
+            "type": "function_declaration",
+            "named": true
+          },
+          {
+            "type": "generator_function_declaration",
+            "named": true
+          },
+          {
+            "type": "lexical_declaration",
+            "named": true
+          },
+          {
+            "type": "using_declaration",
+            "named": true
+          },
+          {
+            "type": "variable_declaration",
             "named": true
           }
         ]
@@ -1288,6 +1332,18 @@
         "required": true,
         "types": [
           {
+            "type": "class_declaration",
+            "named": true
+          },
+          {
+            "type": "function_declaration",
+            "named": true
+          },
+          {
+            "type": "generator_function_declaration",
+            "named": true
+          },
+          {
             "type": "statement",
             "named": true
           }
@@ -1401,6 +1457,18 @@
         "multiple": false,
         "required": true,
         "types": [
+          {
+            "type": "class_declaration",
+            "named": true
+          },
+          {
+            "type": "function_declaration",
+            "named": true
+          },
+          {
+            "type": "generator_function_declaration",
+            "named": true
+          },
           {
             "type": "statement",
             "named": true
@@ -1666,6 +1734,18 @@
         "multiple": false,
         "required": true,
         "types": [
+          {
+            "type": "class_declaration",
+            "named": true
+          },
+          {
+            "type": "function_declaration",
+            "named": true
+          },
+          {
+            "type": "generator_function_declaration",
+            "named": true
+          },
           {
             "type": "statement",
             "named": true
@@ -2010,6 +2090,18 @@
         "multiple": false,
         "required": true,
         "types": [
+          {
+            "type": "class_declaration",
+            "named": true
+          },
+          {
+            "type": "function_declaration",
+            "named": true
+          },
+          {
+            "type": "generator_function_declaration",
+            "named": true
+          },
           {
             "type": "statement",
             "named": true
@@ -2449,6 +2541,18 @@
       "required": false,
       "types": [
         {
+          "type": "class_declaration",
+          "named": true
+        },
+        {
+          "type": "function_declaration",
+          "named": true
+        },
+        {
+          "type": "generator_function_declaration",
+          "named": true
+        },
+        {
           "type": "hash_bang_line",
           "named": true
         },
@@ -2582,6 +2686,18 @@
       "required": false,
       "types": [
         {
+          "type": "class_declaration",
+          "named": true
+        },
+        {
+          "type": "function_declaration",
+          "named": true
+        },
+        {
+          "type": "generator_function_declaration",
+          "named": true
+        },
+        {
           "type": "statement",
           "named": true
         }
@@ -2679,6 +2795,18 @@
         "required": false,
         "types": [
           {
+            "type": "class_declaration",
+            "named": true
+          },
+          {
+            "type": "function_declaration",
+            "named": true
+          },
+          {
+            "type": "generator_function_declaration",
+            "named": true
+          },
+          {
             "type": "statement",
             "named": true
           }
@@ -2708,6 +2836,18 @@
         "multiple": true,
         "required": false,
         "types": [
+          {
+            "type": "class_declaration",
+            "named": true
+          },
+          {
+            "type": "function_declaration",
+            "named": true
+          },
+          {
+            "type": "generator_function_declaration",
+            "named": true
+          },
           {
             "type": "statement",
             "named": true
@@ -3043,6 +3183,18 @@
         "required": true,
         "types": [
           {
+            "type": "class_declaration",
+            "named": true
+          },
+          {
+            "type": "function_declaration",
+            "named": true
+          },
+          {
+            "type": "generator_function_declaration",
+            "named": true
+          },
+          {
             "type": "statement",
             "named": true
           }
@@ -3068,6 +3220,18 @@
         "multiple": false,
         "required": true,
         "types": [
+          {
+            "type": "class_declaration",
+            "named": true
+          },
+          {
+            "type": "function_declaration",
+            "named": true
+          },
+          {
+            "type": "generator_function_declaration",
+            "named": true
+          },
           {
             "type": "statement",
             "named": true
