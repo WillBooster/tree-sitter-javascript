@@ -118,3 +118,30 @@ test('captures canonical expression supertypes in await operands and callees', a
     parser.delete();
   }
 });
+
+// Expression-end lookahead must not turn peeked comments into skipped bytes of an emitted ternary token.
+test('preserves comments and expression captures in ternary arrow bodies', async () => {
+  const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
+  const parser = new Parser();
+  parser.setLanguage(language);
+  const query = new Query(language, '(arrow_function body: (expression) @body)');
+  try {
+    for (const comment of ['/* comment */', '/*\ncomment */', '// comment\n']) {
+      const source = `const f = x => a ${comment} ? b : c;`;
+      const tree = parser.parse(source)!;
+      try {
+        expect(tree.rootNode.hasError, source).toBe(false);
+        expect(tree.rootNode.descendantsOfType('comment').map((node) => node.text)).toEqual([comment.trim()]);
+        const body = tree.rootNode.descendantsOfType('arrow_function')[0]!.childForFieldName('body')!;
+        expect(body.type).toBe('ternary_expression');
+        expect(body.text).toBe(`a ${comment} ? b : c`);
+        expect(query.captures(tree.rootNode).map(({ node }) => node.id)).toContain(body.id);
+      } finally {
+        tree.delete();
+      }
+    }
+  } finally {
+    query.delete();
+    parser.delete();
+  }
+});

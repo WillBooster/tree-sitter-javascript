@@ -741,10 +741,11 @@ static bool scan_jsx_text(TSLexer *lexer) {
 
 // Filtered expression subsets lose public supertype query paths. These boundaries keep canonical expression rules:
 // postfix continuations remain in both bodies, while binary continuations remain in an arrow body only.
-static bool scan_expression_end(TSLexer *lexer, bool after_await) {
+static bool scan_expression_end(TSLexer *lexer, bool after_await, const bool *valid_symbols) {
     lexer->mark_end(lexer);
     lexer->result_symbol = after_await ? AWAIT_OPERAND_END : ARROW_EXPRESSION_BODY_END;
     bool saw_newline = false;
+    bool scanned_comment = false;
     for (;;) {
         while (is_whitespace(lexer->lookahead)) {
             saw_newline |= is_line_terminator(lexer->lookahead);
@@ -755,10 +756,12 @@ static bool scan_expression_end(TSLexer *lexer, bool after_await) {
         }
         skip(lexer);
         if (lexer->lookahead == '/') {
+            scanned_comment = true;
             while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) {
                 skip(lexer);
             }
         } else if (lexer->lookahead == '*') {
+            scanned_comment = true;
             skip(lexer);
             bool closed = false;
             while (!lexer->eof(lexer)) {
@@ -787,8 +790,11 @@ static bool scan_expression_end(TSLexer *lexer, bool after_await) {
         case '`':
             return false;
         case '?':
+            if (!after_await) {
+                return !scanned_comment && valid_symbols[TERNARY_QMARK] && scan_ternary_qmark(lexer);
+            }
             skip(lexer);
-            return after_await && lexer->lookahead != '.';
+            return lexer->lookahead != '.';
         case '=':
         case '*':
         case '%':
@@ -885,11 +891,11 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         if (valid_symbols[COMPLETED_ARROW_FUNCTION]) {
             return false;
         }
-        return scan_expression_end(lexer, true);
+        return scan_expression_end(lexer, true, valid_symbols);
     }
 
     if (valid_symbols[ARROW_EXPRESSION_BODY_END] && !valid_symbols[ARROW_FUNCTION_BLOCK_END]) {
-        return scan_expression_end(lexer, false);
+        return scan_expression_end(lexer, false, valid_symbols);
     }
 
     if (valid_symbols[AUTOMATIC_SEMICOLON] || valid_symbols[ARROW_FUNCTION_BLOCK_END]) {
