@@ -289,10 +289,6 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
     }
     switch (rule) {
         case LINE_BREAK_AFTER_AWAIT_OPERATOR:
-            if (lexer->lookahead == '.') {
-                skip(lexer);
-                return !is_ascii_digit(lexer->lookahead);
-            }
             if (is_identifier_part(lexer->lookahead) && !is_ascii_digit(lexer->lookahead)) {
                 char word[16] = {0};
                 unsigned length = 0;
@@ -305,7 +301,7 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
                 }
                 static const char *const statements[] = {
                     "break", "case", "catch", "const", "continue", "debugger", "default", "do", "else", "enum",
-                    "export", "extends", "finally", "for", "if", "in", "instanceof", "let", "return", "switch",
+                    "export", "finally", "for", "if", "let", "return", "switch",
                     "throw", "try", "var", "while", "with",
                 };
                 for (unsigned i = 0; i < sizeof(statements) / sizeof(statements[0]); i++) {
@@ -316,6 +312,7 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
                 return false;
             }
             switch (lexer->lookahead) {
+                case '.':
                 case '{':
                 case '[':
                 case '(':
