@@ -73,15 +73,16 @@ module.exports = grammar({
     // _arrow_function_block_continuation, since the arrow function may be, e.g., an argument.
     $._arrow_function_block_end,
     $._arrow_function_block_continuation,
-    // Sentinels that the scanner never emits: the grammar allows each only where a line break has a fixed meaning, so
-    // the scanner can tell from the valid symbols how to treat one there (see LineBreakRule in src/scanner.c). Each is an
-    // alternative to what follows its position rather than an optional token before it, since an optional token would
-    // duplicate the parse states after it.
+    // These never-emitted context flags let the scanner choose a line-break rule from the valid symbols. Keep a flag
+    // optional when its alternative would make a required named child optional in node-types.json.
     $._line_break_ends_statement,
     $._line_break_after_binding,
     $._line_break_after_field,
     $._line_break_after_modifier,
     $._line_break_before_attributes,
+    $._line_break_after_await,
+    // Preserves operand and identifier-statement paths before a following brace or identifier-headed expression.
+    $._await_identifier_line_break,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -97,6 +98,8 @@ module.exports = grammar({
     $._call_signature,
     $._formal_parameter,
     $._expressions,
+    $._await_primary_expression,
+    $._primary_atom,
     $._semicolon,
     $._identifier,
     $._reserved_identifier,
@@ -135,6 +138,7 @@ module.exports = grammar({
     ],
     ['assign', $.primary_expression],
     ['member', 'template_call', 'new', 'call', $.expression],
+    ['member', 'template_call', 'new', 'call', $._await_operand],
     ['declaration', 'literal'],
     [$.primary_expression, $.statement_block, 'object'],
     // A `{` that may begin both a block and an object starts a statement or an arrow function's body, where ECMAScript
@@ -148,12 +152,27 @@ module.exports = grammar({
   ],
 
   conflicts: ($) => [
+    [$.primary_expression, $._call_assignment_constructor],
+    [$.primary_expression, $.arrow_function, $._call_assignment_constructor],
+    [$.call_expression, $._call_assignment_import],
+    [$.primary_expression, $._call_assignment_function],
+    [$.primary_expression, $.await_expression, $._call_assignment_function],
+    [$.primary_expression, $.arrow_function, $._call_assignment_function],
+    [$.primary_expression, $._call_assignment_function, $._property_name],
+    [$.primary_expression, $.await_expression, $._call_assignment_function, $._property_name],
+    [$.primary_expression, $.arrow_function, $._call_assignment_function, $._property_name],
+    [$.primary_expression, $._call_assignment_function, $.method_definition],
+    [$._await_operand, $.primary_expression, $._call_assignment_function],
+    [$._await_operand, $.primary_expression, $.await_expression, $._call_assignment_function],
+    [$._await_operand, $.primary_expression, $.arrow_function, $._call_assignment_function],
+    [$.expression, $._await_operand],
+    [$.primary_expression, $._await_operand],
+    [$.primary_expression, $._await_operand, $.await_expression],
+    [$._await_operand, $.await_expression],
+    [$._await_yield_operand, $.yield_expression],
     [$._local_export_specifier, $._module_export_name],
-    [$.primary_expression, $._property_name],
     [$.primary_expression, $.await_expression],
-    [$.primary_expression, $.await_expression, $._property_name],
     [$.primary_expression, $.arrow_function],
-    [$.primary_expression, $.arrow_function, $._property_name],
     [$.primary_expression, $.method_definition],
     [$.primary_expression, $.rest_pattern],
     [$.primary_expression, $.pattern],
@@ -501,11 +520,77 @@ module.exports = grammar({
         $.yield_expression
       ),
 
-    primary_expression: ($) =>
+    _await_operand: ($) =>
       choice(
-        $._jsx_element,
+        $._await_primary_expression,
+        $.await_expression,
+        $.unary_expression,
+        $.update_expression,
+        $._await_yield_operand
+      ),
+
+    _await_yield_operand: ($) =>
+      choice(
+        seq(alias('yield', $.identifier), optional($._line_break_after_await)),
+        alias($._await_yield_call, $.call_expression),
+        alias($._await_yield_member, $.member_expression),
+        alias($._await_yield_subscript, $.subscript_expression)
+      ),
+
+    _await_yield_call: ($) =>
+      choice(
+        prec('call', seq(field('function', $._await_yield_operand), field('arguments', $.arguments))),
+        prec('template_call', seq(field('function', $._await_yield_operand), field('arguments', $.template_string))),
+        prec(
+          'member',
+          seq(
+            field('function', $._await_yield_operand),
+            field('optional_chain', $.optional_chain),
+            field('arguments', $.arguments)
+          )
+        )
+      ),
+
+    _await_yield_member: ($) =>
+      prec(
+        'member',
+        seq(
+          field('object', $._await_yield_operand),
+          choice('.', field('optional_chain', $.optional_chain)),
+          field(
+            'property',
+            choice($.private_property_identifier, reserved('properties', alias($.identifier, $.property_identifier)))
+          )
+        )
+      ),
+
+    _await_yield_subscript: ($) =>
+      prec.right(
+        'member',
+        seq(
+          field('object', $._await_yield_operand),
+          optional(field('optional_chain', $.optional_chain)),
+          '[',
+          field('index', $._expressions),
+          ']'
+        )
+      ),
+
+    primary_expression: ($) => choice($._await_primary_expression, $.arrow_function),
+
+    _await_primary_expression: ($) =>
+      choice(
+        $._primary_atom,
         $.subscript_expression,
         $.member_expression,
+        $.call_expression,
+        $.new_expression,
+        alias($._argumentless_new_expression, $.new_expression)
+      ),
+
+    _primary_atom: ($) =>
+      choice(
+        $._jsx_element,
         $.parenthesized_expression,
         $._identifier,
         alias($._reserved_identifier, $.identifier),
@@ -521,13 +606,9 @@ module.exports = grammar({
         $.object,
         $.array,
         $.function_expression,
-        $.arrow_function,
         $.generator_function,
         $.class,
-        $.meta_property,
-        $.call_expression,
-        $.new_expression,
-        alias($._argumentless_new_expression, $.new_expression)
+        $.meta_property
       ),
 
     yield_expression: ($) =>
@@ -788,7 +869,7 @@ module.exports = grammar({
 
     call_expression: ($) =>
       choice(
-        prec('call', seq(field('function', choice($.expression, $.import)), field('arguments', $.arguments))),
+        prec('call', seq(field('function', choice($.primary_expression, $.import)), field('arguments', $.arguments))),
         prec('template_call', seq(field('function', $.primary_expression), field('arguments', $.template_string))),
         prec(
           'member',
@@ -810,13 +891,20 @@ module.exports = grammar({
 
     _argumentless_new_expression: ($) => prec.right('new', seq('new', field('constructor', $.primary_expression))),
 
-    await_expression: ($) => prec.dynamic(2, prec('unary_void', seq('await', $.expression))),
+    await_expression: ($) =>
+      prec.dynamic(
+        2,
+        prec(
+          'unary_void',
+          seq('await', optional($._await_identifier_line_break), optional($._line_break_after_await), $._await_operand)
+        )
+      ),
 
     member_expression: ($) =>
       prec(
         'member',
         seq(
-          field('object', choice($.expression, $.primary_expression, $.import)),
+          field('object', choice($.primary_expression, $.import)),
           choice('.', field('optional_chain', $.optional_chain)),
           field(
             'property',
@@ -829,7 +917,7 @@ module.exports = grammar({
       prec.right(
         'member',
         seq(
-          field('object', choice($.expression, $.primary_expression)),
+          field('object', $.primary_expression),
           optional(field('optional_chain', $.optional_chain)),
           '[',
           field('index', $._expressions),
@@ -846,10 +934,89 @@ module.exports = grammar({
         $._destructuring_pattern
       ),
 
+    _call_assignment_target: ($) =>
+      prec('call', seq(field('function', $._call_assignment_function), field('arguments', $.arguments))),
+
+    _call_assignment_function: ($) =>
+      choice(
+        $._primary_atom,
+        alias($._call_assignment_target, $.call_expression),
+        alias($._call_assignment_member, $.member_expression),
+        alias($._call_assignment_subscript, $.subscript_expression),
+        alias($._call_assignment_tag, $.call_expression),
+        alias($._call_assignment_import, $.call_expression),
+        alias($._call_assignment_new, $.new_expression)
+      ),
+
+    _call_assignment_member: ($) =>
+      prec(
+        'member',
+        seq(
+          field('object', $._call_assignment_function),
+          '.',
+          field(
+            'property',
+            choice($.private_property_identifier, reserved('properties', alias($.identifier, $.property_identifier)))
+          )
+        )
+      ),
+
+    _call_assignment_subscript: ($) =>
+      prec.right('member', seq(field('object', $._call_assignment_function), '[', field('index', $._expressions), ']')),
+
+    _call_assignment_tag: ($) =>
+      prec('template_call', seq(field('function', $._call_assignment_function), field('arguments', $.template_string))),
+
+    _call_assignment_import: ($) => prec('call', seq(field('function', $.import), field('arguments', $.arguments))),
+
+    _call_assignment_new: ($) =>
+      prec('new', seq('new', field('constructor', $._call_assignment_constructor), field('arguments', $.arguments))),
+
+    _call_assignment_constructor: ($) =>
+      choice(
+        $._primary_atom,
+        alias($._call_assignment_new, $.new_expression),
+        alias($._call_assignment_constructor_member, $.member_expression),
+        alias($._call_assignment_constructor_subscript, $.subscript_expression),
+        alias($._call_assignment_constructor_tag, $.call_expression)
+      ),
+
+    _call_assignment_constructor_member: ($) =>
+      prec(
+        'member',
+        seq(
+          field('object', $._call_assignment_constructor),
+          '.',
+          field(
+            'property',
+            choice($.private_property_identifier, reserved('properties', alias($.identifier, $.property_identifier)))
+          )
+        )
+      ),
+
+    _call_assignment_constructor_subscript: ($) =>
+      prec.right(
+        'member',
+        seq(field('object', $._call_assignment_constructor), '[', field('index', $._expressions), ']')
+      ),
+
+    _call_assignment_constructor_tag: ($) =>
+      prec(
+        'template_call',
+        seq(field('function', $._call_assignment_constructor), field('arguments', $.template_string))
+      ),
+
     assignment_expression: ($) =>
       prec.right(
         'assign',
-        seq(field('left', choice($.parenthesized_expression, $._lhs_expression)), '=', field('right', $.expression))
+        seq(
+          field(
+            'left',
+            choice($.parenthesized_expression, $._lhs_expression, alias($._call_assignment_target, $.call_expression))
+          ),
+          '=',
+          field('right', $.expression)
+        )
       ),
 
     _augmented_assignment_lhs: ($) =>
@@ -1242,7 +1409,7 @@ module.exports = grammar({
 
     _reserved_identifier: () => choice(...MEMBER_MODIFIERS, ...CONTEXTUAL_KEYWORDS),
 
-    _semicolon: ($) => choice($._automatic_semicolon, ';'),
+    _semicolon: ($) => choice($._automatic_semicolon, $._await_identifier_line_break, ';'),
   },
 });
 
