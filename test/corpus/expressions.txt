@@ -3189,3 +3189,106 @@ async (x);
       (statement_block)))
   (expression_statement
     (await_expression (call_expression (identifier) (arguments (identifier))))))
+
+====================
+Await identifiers before following assignments
+====================
+
+await
+x = 1;
+await
+x += 1;
+await
+foo.bar = 1;
+await
+foo[index] ||= 1;
+await
+foo().bar = 1;
+await
+x == 1;
+await
+foo.bar;
+
+---
+
+(program
+  (expression_statement (identifier))
+  (expression_statement (assignment_expression (identifier) (number)))
+  (expression_statement (identifier))
+  (expression_statement (augmented_assignment_expression (identifier) (number)))
+  (expression_statement (identifier))
+  (expression_statement (assignment_expression (member_expression (identifier) (property_identifier)) (number)))
+  (expression_statement (identifier))
+  (expression_statement (augmented_assignment_expression (subscript_expression (identifier) (identifier)) (number)))
+  (expression_statement (identifier))
+  (expression_statement (assignment_expression (member_expression (call_expression (identifier) (arguments)) (property_identifier)) (number)))
+  (expression_statement (binary_expression (await_expression (identifier)) (number)))
+  (expression_statement (await_expression (member_expression (identifier) (property_identifier)))))
+
+====================
+Await identifiers before yield operand starts
+====================
+
+function* generator() {
+  await
+  yield(x);
+  await
+  yield[0];
+  await
+  yield .5;
+  await
+  yield ++x;
+  await
+  yield --x;
+  await
+  yield `template`;
+}
+
+---
+
+(program
+  (generator_function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement (identifier))
+      (expression_statement (yield_expression (parenthesized_expression (identifier))))
+      (expression_statement (identifier))
+      (expression_statement (yield_expression (array (number))))
+      (expression_statement (identifier))
+      (expression_statement (yield_expression (number)))
+      (expression_statement (identifier))
+      (expression_statement (yield_expression (update_expression (identifier))))
+      (expression_statement (identifier))
+      (expression_statement (yield_expression (update_expression (identifier))))
+      (expression_statement (identifier))
+      (expression_statement (yield_expression (template_string (string_fragment)))))))
+
+====================
+Await operands using yield identifiers and postfix syntax
+====================
+
+async function asyncOperand() {
+  await yield(x);
+  await yield.foo;
+  await yield[0];
+  await yield`tag`;
+  return await
+  yield in object;
+  return await
+  yield instanceof Constructor;
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement (await_expression (call_expression (identifier) (arguments (identifier)))))
+      (expression_statement (await_expression (member_expression (identifier) (property_identifier))))
+      (expression_statement (await_expression (subscript_expression (identifier) (number))))
+      (expression_statement (await_expression (call_expression (identifier) (template_string (string_fragment)))))
+      (return_statement (binary_expression (await_expression (identifier)) (identifier)))
+      (return_statement (binary_expression (await_expression (identifier)) (identifier))))))

@@ -316,15 +316,20 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
                     scan_identifier(lexer, parameter, sizeof(parameter));
                     scan_whitespace_and_comments(lexer, scanned_content, true);
                 }
-                if (ascii_word && strcmp(word, "async") == 0 && lexer->lookahead == '(') {
+                if (rule == LINE_BREAK_BEFORE_AWAIT_BLOCK && ascii_word && strcmp(word, "async") == 0 &&
+                    lexer->lookahead == '(') {
                     lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
                     return true;
                 }
                 if (lexer->lookahead == '=') {
                     skip(lexer);
-                    return lexer->lookahead == '>';
+                    return lexer->lookahead != '=';
                 }
                 if (!ascii_word) {
+                    if (rule == LINE_BREAK_BEFORE_AWAIT_BLOCK) {
+                        lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
+                        return true;
+                    }
                     return false;
                 }
                 if (strcmp(word, "import") == 0) {
@@ -344,6 +349,10 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
                     if (strcmp(word, statements[i]) == 0) {
                         return true;
                     }
+                }
+                if (rule == LINE_BREAK_BEFORE_AWAIT_BLOCK) {
+                    lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
+                    return true;
                 }
                 return false;
             }
@@ -507,9 +516,23 @@ static bool follows_yield_operand(TSLexer *lexer) {
             }
         }
     }
-    return is_identifier_part(lexer->lookahead) || lexer->lookahead == '*' || lexer->lookahead == ':' ||
-           lexer->lookahead == '{' || lexer->lookahead == '\'' || lexer->lookahead == '"' ||
-           lexer->lookahead == '!' || lexer->lookahead == '~';
+    if (is_identifier_part(lexer->lookahead)) {
+        char word[16] = {0};
+        bool ascii_word = scan_identifier(lexer, word, sizeof(word));
+        return !ascii_word || (strcmp(word, "in") != 0 && strcmp(word, "instanceof") != 0);
+    }
+    if (lexer->lookahead == '.') {
+        skip(lexer);
+        return is_ascii_digit(lexer->lookahead);
+    }
+    if (lexer->lookahead == '+' || lexer->lookahead == '-') {
+        int32_t sign = lexer->lookahead;
+        skip(lexer);
+        return lexer->lookahead == sign;
+    }
+    return lexer->lookahead == '*' || lexer->lookahead == ':' || lexer->lookahead == '(' ||
+           lexer->lookahead == '[' || lexer->lookahead == '{' || lexer->lookahead == '`' ||
+           lexer->lookahead == '\'' || lexer->lookahead == '"' || lexer->lookahead == '!' || lexer->lookahead == '~';
 }
 
 static bool scan_identifier(TSLexer *lexer, char *word, unsigned capacity) {

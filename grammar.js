@@ -156,7 +156,7 @@ module.exports = grammar({
     [$.primary_expression, $._await_operand, $.await_expression],
     [$._await_operand, $.await_expression],
     [$.primary_expression, $._await_operand, $.arrow_function],
-    [$._await_operand, $.yield_expression],
+    [$._await_yield_operand, $.yield_expression],
     [$._local_export_specifier, $._module_export_name],
     [$.primary_expression, $._property_name],
     [$.primary_expression, $.await_expression],
@@ -516,7 +516,54 @@ module.exports = grammar({
         $.await_expression,
         $.unary_expression,
         $.update_expression,
-        alias('yield', $.identifier)
+        $._await_yield_operand
+      ),
+
+    _await_yield_operand: ($) =>
+      choice(
+        alias('yield', $.identifier),
+        alias($._await_yield_call, $.call_expression),
+        alias($._await_yield_member, $.member_expression),
+        alias($._await_yield_subscript, $.subscript_expression)
+      ),
+
+    _await_yield_call: ($) =>
+      choice(
+        prec('call', seq(field('function', $._await_yield_operand), field('arguments', $.arguments))),
+        prec('template_call', seq(field('function', $._await_yield_operand), field('arguments', $.template_string))),
+        prec(
+          'member',
+          seq(
+            field('function', $._await_yield_operand),
+            field('optional_chain', $.optional_chain),
+            field('arguments', $.arguments)
+          )
+        )
+      ),
+
+    _await_yield_member: ($) =>
+      prec(
+        'member',
+        seq(
+          field('object', $._await_yield_operand),
+          choice('.', field('optional_chain', $.optional_chain)),
+          field(
+            'property',
+            choice($.private_property_identifier, reserved('properties', alias($.identifier, $.property_identifier)))
+          )
+        )
+      ),
+
+    _await_yield_subscript: ($) =>
+      prec.right(
+        'member',
+        seq(
+          field('object', $._await_yield_operand),
+          optional(field('optional_chain', $.optional_chain)),
+          '[',
+          field('index', $._expressions),
+          ']'
+        )
       ),
 
     primary_expression: ($) => choice($._await_primary_expression, $.arrow_function),
