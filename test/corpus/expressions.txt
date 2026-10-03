@@ -807,6 +807,71 @@ class Bar {
             (number)))))))
 
 ============================================
+Await Class Property Fields
+============================================
+
+class Foo {
+  await = 1;
+  await;
+  static await = 2;
+  other = 3;
+  await() {}
+  get await() { return 4; }
+}
+
+const Bar = class {
+  await /* field */ = 5;
+};
+
+export default class extends Foo {
+  static await;
+}
+
+---
+
+(program
+  (class_declaration
+    (identifier)
+    (class_body
+      (field_definition
+        (property_identifier)
+        (number))
+      (field_definition
+        (property_identifier))
+      (field_definition
+        (property_identifier)
+        (number))
+      (field_definition
+        (property_identifier)
+        (number))
+      (method_definition
+        (property_identifier)
+        (formal_parameters)
+        (statement_block))
+      (method_definition
+        (property_identifier)
+        (formal_parameters)
+        (statement_block
+          (return_statement
+            (number))))))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (class
+        (class_body
+          (field_definition
+            (property_identifier)
+            (comment)
+            (number))))))
+  (export_statement
+    (class
+      (class_heritage
+        (identifier))
+      (class_body
+        (field_definition
+          (property_identifier))))))
+
+============================================
 Private Class Property Fields
 ============================================
 

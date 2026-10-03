@@ -7615,8 +7615,8 @@
                   "value": "async"
                 },
                 {
-                  "type": "STRING",
-                  "value": "await"
+                  "type": "SYMBOL",
+                  "name": "_await_keyword"
                 },
                 {
                   "type": "STRING",

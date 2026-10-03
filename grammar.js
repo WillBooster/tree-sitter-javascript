@@ -1253,7 +1253,10 @@ module.exports = grammar({
       reserved(
         'properties',
         choice(
-          alias(choice($.identifier, ...CONTEXTUAL_KEYWORDS), $.property_identifier),
+          alias(
+            choice($.identifier, ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? $._await_keyword : word))),
+            $.property_identifier
+          ),
           $.private_property_identifier,
           $.string,
           $.number,
