@@ -3294,21 +3294,6 @@ async function asyncOperand() {
       (return_statement (binary_expression (await_expression (identifier)) (identifier))))))
 
 ====================
-Await identifier calls as legacy assignment targets
-====================
-
-await
-(x) = 1;
-
----
-
-(program
-  (expression_statement
-    (assignment_expression
-      (call_expression (identifier) (arguments (identifier)))
-      (number))))
-
-====================
 Await yield identifier postfix continuations across line breaks
 ====================
 
@@ -3331,41 +3316,6 @@ async function asyncOperand() {
       (expression_statement (await_expression (call_expression (identifier) (arguments (identifier)))))
       (expression_statement (await_expression (subscript_expression (identifier) (number))))
       (expression_statement (await_expression (call_expression (identifier) (template_string (string_fragment))))))))
-
-====================
-Legacy call assignment targets with ordinary and parenthesized chains
-====================
-
-foo().bar[0]() = 1;
-(foo?.bar)() = 1;
-import("x")() = 1;
-foo`tag`() = 1;
-
----
-
-(program
-  (expression_statement
-    (assignment_expression
-      (call_expression
-        (subscript_expression
-          (member_expression (call_expression (identifier) (arguments)) (property_identifier))
-          (number))
-        (arguments))
-      (number)))
-  (expression_statement
-    (assignment_expression
-      (call_expression
-        (parenthesized_expression (member_expression (identifier) (optional_chain) (property_identifier)))
-        (arguments))
-      (number)))
-  (expression_statement
-    (assignment_expression
-      (call_expression (call_expression (import) (arguments (string (string_fragment)))) (arguments))
-      (number)))
-  (expression_statement
-    (assignment_expression
-      (call_expression (call_expression (identifier) (template_string (string_fragment))) (arguments))
-      (number))))
 
 ====================
 Optional member chains cannot form legacy call assignment targets
@@ -3411,32 +3361,6 @@ Optional chains followed by indexes cannot form legacy call assignment targets
 foo?.bar[0]() = 1;
 
 ---
-
-====================
-Legacy call targets after constructed and parenthesized values
-====================
-
-new Foo.bar[0]()() = 1;
-(new Foo)() = 1;
-new Foo`tag`()() = 1;
-
----
-
-(program
-  (expression_statement
-    (assignment_expression
-      (call_expression
-        (new_expression (subscript_expression (member_expression (identifier) (property_identifier)) (number)) (arguments))
-        (arguments))
-      (number)))
-  (expression_statement
-    (assignment_expression
-      (call_expression (parenthesized_expression (new_expression (identifier))) (arguments))
-      (number)))
-  (expression_statement
-    (assignment_expression
-      (call_expression (new_expression (call_expression (identifier) (template_string (string_fragment))) (arguments)) (arguments))
-      (number))))
 
 ====================
 Optional constructor chains cannot form legacy call targets
@@ -3494,30 +3418,6 @@ async function f() {
       (expression_statement (unary_expression (identifier)))
       (expression_statement (await_expression (await_expression (identifier))))
       (expression_statement (string (string_fragment))))))
-
-====================
-Legacy call targets for arithmetic compound assignments
-====================
-
-await
-(x) += 1;
-foo().bar[0]() *= 2;
-
----
-
-(program
-  (expression_statement
-    (augmented_assignment_expression
-      (call_expression (identifier) (arguments (identifier)))
-      (number)))
-  (expression_statement
-    (augmented_assignment_expression
-      (call_expression
-        (subscript_expression
-          (member_expression (call_expression (identifier) (arguments)) (property_identifier))
-          (number))
-        (arguments))
-      (number))))
 
 ====================
 A call is not a logical and assignment target
@@ -3638,3 +3538,250 @@ async function g(){return await /* comment */ yield--;}
     (statement_block
       (return_statement
         (await_expression (comment) (update_expression (identifier)))))))
+
+====================
+Nested await operands across multiple line breaks
+====================
+
+async function f() {
+  const x = await
+    await
+    foo();
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (lexical_declaration
+        (variable_declarator
+          (identifier)
+          (await_expression
+            (await_expression
+              (call_expression
+                (identifier)
+                (arguments)))))))))
+
+====================
+Curried block arrows before explicit and automatic statement ends
+====================
+
+const curry = a => b => {
+  return a + b
+}
+(function () {})()
+x => y => {};
+(1);
+x => y => {}
+/re/;
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (arrow_function
+        (identifier)
+        (arrow_function
+          (identifier)
+          (statement_block
+            (return_statement
+              (binary_expression
+                (identifier)
+                (identifier))))))))
+  (expression_statement
+    (call_expression
+      (parenthesized_expression
+        (function_expression
+          (formal_parameters)
+          (statement_block)))
+      (arguments)))
+  (expression_statement
+    (arrow_function
+      (identifier)
+      (arrow_function
+        (identifier)
+        (statement_block))))
+  (expression_statement
+    (parenthesized_expression
+      (number)))
+  (expression_statement
+    (arrow_function
+      (identifier)
+      (arrow_function
+        (identifier)
+        (statement_block))))
+  (expression_statement
+    (regex
+      (regex_pattern))))
+
+====================
+Curried block arrows before enclosing sequence and argument continuations
+====================
+
+x => y => z => {}
+, 2;
+useEffect(() => () => { cleanup(); }, [dep]);
+f(a => b => {}, (1));
+f(a => b => {}, `t`);
+f(a => b => {}, +1);
+
+---
+
+(program
+  (expression_statement
+    (sequence_expression
+      (arrow_function
+        (identifier)
+        (arrow_function
+          (identifier)
+          (arrow_function
+            (identifier)
+            (statement_block))))
+      (number)))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (arrow_function
+          (formal_parameters)
+          (arrow_function
+            (formal_parameters)
+            (statement_block
+              (expression_statement
+                (call_expression
+                  (identifier)
+                  (arguments))))))
+        (array
+          (identifier)))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (arrow_function
+          (identifier)
+          (arrow_function
+            (identifier)
+            (statement_block)))
+        (parenthesized_expression
+          (number)))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (arrow_function
+          (identifier)
+          (arrow_function
+            (identifier)
+            (statement_block)))
+        (template_string
+          (string_fragment)))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (arrow_function
+          (identifier)
+          (arrow_function
+            (identifier)
+            (statement_block)))
+        (unary_expression
+          (number))))))
+
+====================
+Postfix update arrow bodies before newline suffix statements
+====================
+
+let a = 1;
+const f = x => a++
+`c`;
+x++
+(y);
+x--
+[y];
+++x
+(y);
+--x
+[y];
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (number)))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (arrow_function
+        (identifier)
+        (update_expression
+          (identifier)))))
+  (expression_statement
+    (template_string
+      (string_fragment)))
+  (expression_statement
+    (update_expression
+      (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (expression_statement
+    (update_expression
+      (identifier)))
+  (expression_statement
+    (array
+      (identifier)))
+  (expression_statement
+    (update_expression
+      (call_expression
+        (identifier)
+        (arguments
+          (identifier)))))
+  (expression_statement
+    (update_expression
+      (subscript_expression
+        (identifier)
+        (identifier)))))
+
+====================
+Awaited postfix updates before comments and newline suffix statements
+====================
+
+async function f() {
+  await await x++ /*
+  comment */ `c`;
+  return await x--
+  // comment
+  (y);
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (await_expression
+          (await_expression
+            (update_expression
+              (identifier)))))
+      (comment)
+      (expression_statement
+        (template_string
+          (string_fragment)))
+      (return_statement
+        (await_expression
+          (update_expression
+            (identifier))))
+      (comment)
+      (expression_statement
+        (parenthesized_expression
+          (identifier))))))

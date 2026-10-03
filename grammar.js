@@ -73,8 +73,8 @@ module.exports = grammar({
     // _arrow_function_block_continuation, since the arrow function may be, e.g., an argument.
     $._arrow_function_block_end,
     $._arrow_function_block_continuation,
-    // These never-emitted context flags let the scanner choose a line-break rule from the valid symbols. Keep a flag
-    // optional when its alternative would make a required named child optional in node-types.json.
+    // These never-emitted flags select LineBreakRule in src/scanner.c. Keep them alternatives to what follows:
+    // leading optional flags duplicate parse states.
     $._line_break_ends_statement,
     $._line_break_after_binding,
     $._line_break_after_field,
@@ -82,12 +82,12 @@ module.exports = grammar({
     $._line_break_before_attributes,
     // Emitted outside statement nodes to preserve their body ranges before trailing comments.
     $._statement_boundary,
+    // Await flags are optional exceptions: replacing a required operand with a flag makes its published child optional.
     // Never emitted: marks the direct await operand start for line-break and identifier lexing.
     $._line_break_after_await,
     // Preserves operand and identifier-statement paths before a following brace or identifier-headed expression.
     $._await_identifier_line_break,
     // Emitted zero-width boundaries retain canonical expression supertype paths for public queries.
-    $._arrow_expression_body_end,
     $._await_operand_end,
     // Never emitted: a completed direct arrow cannot serve as an await operand.
     $._completed_arrow_function,
@@ -96,6 +96,8 @@ module.exports = grammar({
     // Emitted zero-width lookahead decision, followed by a never-emitted lexical context flag.
     $._await_yield_identifier_start,
     $._await_yield_identifier_context,
+    // Emitted zero-width after a postfix update; carries the pending statement boundary across reuse.
+    $._postfix_update_end,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -111,7 +113,6 @@ module.exports = grammar({
     $._call_signature,
     $._formal_parameter,
     $._expressions,
-    $._primary_atom,
     $._semicolon,
     $._identifier,
     $._reserved_identifier,
@@ -163,21 +164,12 @@ module.exports = grammar({
   ],
 
   conflicts: ($) => [
-    [$._for_header, $.primary_expression, $._call_assignment_function],
-    [$._call_assignment_function, $._call_assignment_constructor],
-    [$.primary_expression, $.arrow_function, $._call_assignment_function, $._call_assignment_constructor],
-    [$.primary_expression, $.await_expression, $._call_assignment_function, $._call_assignment_constructor],
-    [$.primary_expression, $._call_assignment_function, $._call_assignment_constructor],
-    [$.call_expression, $._call_assignment_import],
-    [$.primary_expression, $._call_assignment_function],
-    [$.primary_expression, $.await_expression, $._call_assignment_function],
-    [$.primary_expression, $.arrow_function, $._call_assignment_function],
-    [$.primary_expression, $._call_assignment_function, $._property_name],
-    [$.primary_expression, $.await_expression, $._call_assignment_function, $._property_name],
-    [$.primary_expression, $.arrow_function, $._call_assignment_function, $._property_name],
-    [$.primary_expression, $._call_assignment_function, $.method_definition],
     [$._local_export_specifier, $._module_export_name],
+    [$.primary_expression, $._property_name],
     [$.primary_expression, $.await_expression],
+    [$.primary_expression, $.await_expression, $._property_name],
+    [$.primary_expression, $.arrow_function],
+    [$.primary_expression, $.arrow_function, $._property_name],
     [$.primary_expression, $.method_definition],
     [$.primary_expression, $.rest_pattern],
     [$.primary_expression, $.pattern],
@@ -529,17 +521,6 @@ module.exports = grammar({
 
     primary_expression: ($) =>
       choice(
-        $._primary_atom,
-        $.subscript_expression,
-        $.member_expression,
-        $.call_expression,
-        $.new_expression,
-        alias($._argumentless_new_expression, $.new_expression),
-        $.arrow_function
-      ),
-
-    _primary_atom: ($) =>
-      choice(
         $._jsx_element,
         $.parenthesized_expression,
         $._identifier,
@@ -559,7 +540,13 @@ module.exports = grammar({
         $.function_expression,
         $.generator_function,
         $.class,
-        $.meta_property
+        $.meta_property,
+        $.subscript_expression,
+        $.member_expression,
+        $.call_expression,
+        $.new_expression,
+        alias($._argumentless_new_expression, $.new_expression),
+        $.arrow_function
       ),
 
     yield_expression: ($) =>
@@ -793,21 +780,23 @@ module.exports = grammar({
       ),
 
     arrow_function: ($) =>
-      seq(
-        optional('async'),
-        choice(
-          field('parameter', choice(alias($._reserved_identifier, $.identifier), $.identifier)),
-          $._call_signature
-        ),
-        '=>',
-        choice(
-          seq(field('body', $.expression), $._arrow_expression_body_end),
-          seq(
-            field('body', $.statement_block),
-            optional(seq($._arrow_function_block_end, optional($._arrow_function_block_continuation)))
-          )
-        ),
-        optional($._completed_arrow_function)
+      prec.right(
+        seq(
+          optional('async'),
+          choice(
+            field('parameter', choice(alias($._reserved_identifier, $.identifier), $.identifier)),
+            $._call_signature
+          ),
+          '=>',
+          choice(
+            field('body', $.expression),
+            seq(
+              field('body', $.statement_block),
+              optional(seq($._arrow_function_block_end, optional($._arrow_function_block_continuation)))
+            )
+          ),
+          optional($._completed_arrow_function)
+        )
       ),
 
     // Override
@@ -890,89 +879,10 @@ module.exports = grammar({
         $._destructuring_pattern
       ),
 
-    _call_assignment_target: ($) =>
-      prec('call', seq(field('function', $._call_assignment_function), field('arguments', $.arguments))),
-
-    _call_assignment_function: ($) =>
-      choice(
-        $._primary_atom,
-        alias($._call_assignment_target, $.call_expression),
-        alias($._call_assignment_member, $.member_expression),
-        alias($._call_assignment_subscript, $.subscript_expression),
-        alias($._call_assignment_tag, $.call_expression),
-        alias($._call_assignment_import, $.call_expression),
-        alias($._call_assignment_new, $.new_expression)
-      ),
-
-    _call_assignment_member: ($) =>
-      prec(
-        'member',
-        seq(
-          field('object', $._call_assignment_function),
-          '.',
-          field(
-            'property',
-            choice($.private_property_identifier, reserved('properties', alias($.identifier, $.property_identifier)))
-          )
-        )
-      ),
-
-    _call_assignment_subscript: ($) =>
-      prec.right('member', seq(field('object', $._call_assignment_function), '[', field('index', $._expressions), ']')),
-
-    _call_assignment_tag: ($) =>
-      prec('template_call', seq(field('function', $._call_assignment_function), field('arguments', $.template_string))),
-
-    _call_assignment_import: ($) => prec('call', seq(field('function', $.import), field('arguments', $.arguments))),
-
-    _call_assignment_new: ($) =>
-      prec('new', seq('new', field('constructor', $._call_assignment_constructor), field('arguments', $.arguments))),
-
-    _call_assignment_constructor: ($) =>
-      choice(
-        $._primary_atom,
-        alias($._call_assignment_new, $.new_expression),
-        alias($._call_assignment_constructor_member, $.member_expression),
-        alias($._call_assignment_constructor_subscript, $.subscript_expression),
-        alias($._call_assignment_constructor_tag, $.call_expression)
-      ),
-
-    _call_assignment_constructor_member: ($) =>
-      prec(
-        'member',
-        seq(
-          field('object', $._call_assignment_constructor),
-          '.',
-          field(
-            'property',
-            choice($.private_property_identifier, reserved('properties', alias($.identifier, $.property_identifier)))
-          )
-        )
-      ),
-
-    _call_assignment_constructor_subscript: ($) =>
-      prec.right(
-        'member',
-        seq(field('object', $._call_assignment_constructor), '[', field('index', $._expressions), ']')
-      ),
-
-    _call_assignment_constructor_tag: ($) =>
-      prec(
-        'template_call',
-        seq(field('function', $._call_assignment_constructor), field('arguments', $.template_string))
-      ),
-
     assignment_expression: ($) =>
       prec.right(
         'assign',
-        seq(
-          field(
-            'left',
-            choice($.parenthesized_expression, $._lhs_expression, alias($._call_assignment_target, $.call_expression))
-          ),
-          '=',
-          field('right', $.expression)
-        )
+        seq(field('left', choice($.parenthesized_expression, $._lhs_expression)), '=', field('right', $.expression))
       ),
 
     _augmented_assignment_lhs: ($) =>
@@ -988,12 +898,10 @@ module.exports = grammar({
       prec.right(
         'assign',
         seq(
-          choice(
-            seq(
-              field('left', choice($._augmented_assignment_lhs, alias($._call_assignment_target, $.call_expression))),
-              field('operator', choice('+=', '-=', '*=', '/=', '%=', '^=', '&=', '|=', '>>=', '>>>=', '<<=', '**='))
-            ),
-            seq(field('left', $._augmented_assignment_lhs), field('operator', choice('&&=', '||=', '??=')))
+          field('left', $._augmented_assignment_lhs),
+          field(
+            'operator',
+            choice('+=', '-=', '*=', '/=', '%=', '^=', '&=', '|=', '>>=', '>>>=', '<<=', '**=', '&&=', '||=', '??=')
           ),
           field('right', $.expression)
         )
@@ -1067,7 +975,7 @@ module.exports = grammar({
     update_expression: ($) =>
       prec.left(
         choice(
-          seq(field('argument', $.expression), field('operator', choice('++', '--'))),
+          seq(field('argument', $.expression), field('operator', choice('++', '--')), $._postfix_update_end),
           seq(field('operator', choice('++', '--')), field('argument', $.expression))
         )
       ),

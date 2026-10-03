@@ -93,6 +93,20 @@ test('captures canonical expression supertypes in await operands and callees', a
   try {
     expect(tree.rootNode.hasError).toBe(false);
     expect(tree.rootNode.descendantsOfType('comment')).toHaveLength(2);
+    const awaitNodes = tree.rootNode.descendantsOfType('await_expression');
+    expect(awaitNodes.map((node) => node.namedChildren.find((child) => child.type !== 'comment')!.type)).toEqual([
+      'call_expression',
+      'call_expression',
+      'member_expression',
+      'subscript_expression',
+      'call_expression',
+      'identifier',
+      'identifier',
+      'member_expression',
+      'member_expression',
+      'call_expression',
+    ]);
+    expect(tree.rootNode.descendantsOfType('yield_expression')).toHaveLength(0);
     for (const query of [operands, primaryOperands]) {
       const captured = new Set(query.captures(tree.rootNode).map(({ node }) => node.id));
       for (const awaitNode of tree.rootNode.descendantsOfType('await_expression')) {
@@ -142,6 +156,35 @@ test('preserves comments and expression captures in ternary arrow bodies', async
     }
   } finally {
     query.delete();
+    parser.delete();
+  }
+});
+
+test('retains canonical callees in recovered legacy call assignments', async () => {
+  const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
+  const parser = new Parser();
+  parser.setLanguage(language);
+  const queries = [
+    new Query(language, '(call_expression function: (expression) @callee)'),
+    new Query(language, '(call_expression function: (primary_expression) @callee)'),
+  ];
+  try {
+    for (const source of ['foo().bar() = 1;', 'foo().bar() += 1;', 'new (foo?.bar)()() = 1;']) {
+      const tree = parser.parse(source)!;
+      try {
+        for (const query of queries) {
+          const captured = new Set(query.captures(tree.rootNode).map(({ node }) => node.id));
+          for (const call of tree.rootNode.descendantsOfType('call_expression')) {
+            const callee = call.childForFieldName('function')!;
+            expect(captured, `${source}: ${callee.text}`).toContain(callee.id);
+          }
+        }
+      } finally {
+        tree.delete();
+      }
+    }
+  } finally {
+    for (const query of queries) query.delete();
     parser.delete();
   }
 });
