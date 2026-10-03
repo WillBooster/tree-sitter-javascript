@@ -73,7 +73,7 @@ module.exports = grammar({
     // _arrow_function_block_continuation, since the arrow function may be, e.g., an argument.
     $._arrow_function_block_end,
     $._arrow_function_block_continuation,
-    // Sentinels that the scanner never emits: the grammar allows each only where a line break has a fixed meaning, so
+    // The _line_break_* sentinels are never emitted: the grammar allows each only where a line break has a fixed meaning, so
     // the scanner can tell from the valid symbols how to treat one there (see LineBreakRule in src/scanner.c). Each is an
     // alternative to what follows its position rather than an optional token before it, since an optional token would
     // duplicate the parse states after it.
@@ -82,6 +82,8 @@ module.exports = grammar({
     $._line_break_after_field,
     $._line_break_after_modifier,
     $._line_break_before_attributes,
+
+    $._statement_boundary,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -169,7 +171,9 @@ module.exports = grammar({
   word: ($) => $.identifier,
 
   rules: {
-    program: ($) => seq(optional($.hash_bang_line), repeat($.statement)),
+    program: ($) => seq(optional($.hash_bang_line), repeat($._statement)),
+
+    _statement: ($) => prec.right(seq($.statement, optional($._statement_boundary))),
 
     hash_bang_line: () => /#![^\n\r\u2028\u2029]*/,
 
@@ -323,16 +327,16 @@ module.exports = grammar({
         optional(choice($._initializer, $._line_break_after_binding))
       ),
 
-    statement_block: ($) => prec.right(seq('{', repeat($.statement), '}', optional($._automatic_semicolon))),
+    statement_block: ($) => prec.right(seq('{', repeat($._statement), '}')),
 
-    else_clause: ($) => seq('else', $.statement),
+    else_clause: ($) => seq('else', $._statement),
 
     if_statement: ($) =>
       prec.right(
         seq(
           'if',
           field('condition', $.parenthesized_expression),
-          field('consequence', $.statement),
+          field('consequence', $._statement),
           optional(field('alternative', $.else_clause))
         )
       ),
@@ -347,7 +351,7 @@ module.exports = grammar({
         $._for_condition,
         field('increment', optional($._expressions)),
         ')',
-        field('body', $.statement)
+        field('body', $._statement)
       ),
 
     // Extracted into rules because tree-sitter expands a `choice` written inline in the `seq` above into one production
@@ -383,7 +387,7 @@ module.exports = grammar({
         ';'
       ),
 
-    for_in_statement: ($) => seq('for', optional('await'), $._for_header, field('body', $.statement)),
+    for_in_statement: ($) => seq('for', optional('await'), $._for_header, field('body', $._statement)),
 
     _for_header: ($) =>
       seq(
@@ -409,13 +413,13 @@ module.exports = grammar({
         ')'
       ),
 
-    while_statement: ($) => seq('while', field('condition', $.parenthesized_expression), field('body', $.statement)),
+    while_statement: ($) => seq('while', field('condition', $.parenthesized_expression), field('body', $._statement)),
 
     do_statement: ($) =>
       prec.right(
         seq(
           'do',
-          field('body', $.statement),
+          field('body', $._statement),
           'while',
           field('condition', $.parenthesized_expression),
           optional($._semicolon)
@@ -430,7 +434,7 @@ module.exports = grammar({
         optional(field('finalizer', $.finally_clause))
       ),
 
-    with_statement: ($) => seq('with', field('object', $.parenthesized_expression), field('body', $.statement)),
+    with_statement: ($) => seq('with', field('object', $.parenthesized_expression), field('body', $._statement)),
 
     break_statement: ($) =>
       seq(
@@ -459,7 +463,7 @@ module.exports = grammar({
       seq(
         field('label', alias(choice($.identifier, $._reserved_identifier), $.statement_identifier)),
         ':',
-        field('body', $.statement)
+        field('body', $._statement)
       ),
 
     //
@@ -468,9 +472,9 @@ module.exports = grammar({
 
     switch_body: ($) => seq('{', repeat(choice($.switch_case, $.switch_default)), '}'),
 
-    switch_case: ($) => seq('case', field('value', $._expressions), ':', field('body', repeat($.statement))),
+    switch_case: ($) => seq('case', field('value', $._expressions), ':', field('body', repeat($._statement))),
 
-    switch_default: ($) => seq('default', ':', field('body', repeat($.statement))),
+    switch_default: ($) => seq('default', ':', field('body', repeat($._statement))),
 
     catch_clause: ($) =>
       seq(
@@ -704,8 +708,7 @@ module.exports = grammar({
           'class',
           field('name', $.identifier),
           optional($.class_heritage),
-          field('body', $.class_body),
-          optional($._automatic_semicolon)
+          field('body', $.class_body)
         )
       ),
 
@@ -731,8 +734,7 @@ module.exports = grammar({
           'function',
           field('name', $.identifier),
           $._call_signature,
-          field('body', $.statement_block),
-          optional($._automatic_semicolon)
+          field('body', $.statement_block)
         )
       ),
 
@@ -758,8 +760,7 @@ module.exports = grammar({
           '*',
           field('name', $.identifier),
           $._call_signature,
-          field('body', $.statement_block),
-          optional($._automatic_semicolon)
+          field('body', $.statement_block)
         )
       ),
 
@@ -1207,7 +1208,7 @@ module.exports = grammar({
     // The body of a method or a static block, a rule of its own rather than statement_block: sharing it let tree-sitter
     // merge the state after the body's `}` with the one after a function expression's `}`, where `in`, `instanceof`,
     // and `extends` are keywords, so a class member with one of those names could not follow.
-    _class_member_body: ($) => seq('{', repeat($.statement), '}'),
+    _class_member_body: ($) => seq('{', repeat($._statement), '}'),
 
     pair: ($) => seq(field('key', $._property_name), ':', field('value', $.expression)),
 
