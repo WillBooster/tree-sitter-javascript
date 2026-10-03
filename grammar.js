@@ -83,6 +83,7 @@ module.exports = grammar({
     $._line_break_after_await,
     // Preserves operand and identifier-statement paths before a following brace or identifier-headed expression.
     $._await_identifier_line_break,
+    // Never emitted: selects ordinary continuation rules after a completed yield-based await operand.
     $._line_break_after_await_operand,
   ],
 
