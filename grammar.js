@@ -919,10 +919,20 @@ module.exports = grammar({
         $._destructuring_pattern
       ),
 
+    _call_assignment_target: ($) =>
+      prec('call', seq(field('function', $.primary_expression), field('arguments', $.arguments))),
+
     assignment_expression: ($) =>
       prec.right(
         'assign',
-        seq(field('left', choice($.parenthesized_expression, $._lhs_expression)), '=', field('right', $.expression))
+        seq(
+          field(
+            'left',
+            choice($.parenthesized_expression, $._lhs_expression, alias($._call_assignment_target, $.call_expression))
+          ),
+          '=',
+          field('right', $.expression)
+        )
       ),
 
     _augmented_assignment_lhs: ($) =>

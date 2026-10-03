@@ -4753,6 +4753,31 @@
         }
       ]
     },
+    "_call_assignment_target": {
+      "type": "PREC",
+      "value": "call",
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "function",
+            "content": {
+              "type": "SYMBOL",
+              "name": "primary_expression"
+            }
+          },
+          {
+            "type": "FIELD",
+            "name": "arguments",
+            "content": {
+              "type": "SYMBOL",
+              "name": "arguments"
+            }
+          }
+        ]
+      }
+    },
     "assignment_expression": {
       "type": "PREC_RIGHT",
       "value": "assign",
@@ -4772,6 +4797,15 @@
                 {
                   "type": "SYMBOL",
                   "name": "_lhs_expression"
+                },
+                {
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_call_assignment_target"
+                  },
+                  "named": true,
+                  "value": "call_expression"
                 }
               ]
             }
