@@ -133,7 +133,6 @@ test('captures canonical expression supertypes in await operands and callees', a
   }
 });
 
-// Expression-end lookahead must not turn peeked comments into skipped bytes of an emitted ternary token.
 test('preserves comments and expression captures in ternary arrow bodies', async () => {
   const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
   const parser = new Parser();
