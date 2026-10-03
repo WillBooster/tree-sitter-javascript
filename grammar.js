@@ -73,7 +73,7 @@ module.exports = grammar({
     // _arrow_function_block_continuation, since the arrow function may be, e.g., an argument.
     $._arrow_function_block_end,
     $._arrow_function_block_continuation,
-    // Sentinels that the scanner never emits: the grammar allows each only where a line break has a fixed meaning, so
+    // The _line_break_* sentinels are never emitted: the grammar allows each only where a line break has a fixed meaning, so
     // the scanner can tell from the valid symbols how to treat one there (see LineBreakRule in src/scanner.c). Each is an
     // alternative to what follows its position rather than an optional token before it, since an optional token would
     // duplicate the parse states after it.
@@ -82,6 +82,8 @@ module.exports = grammar({
     $._line_break_after_field,
     $._line_break_after_modifier,
     $._line_break_before_attributes,
+
+    $._statement_boundary,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -171,14 +173,7 @@ module.exports = grammar({
   rules: {
     program: ($) => seq(optional($.hash_bang_line), repeat($._statement)),
 
-    _statement: ($) =>
-      choice(
-        $.statement,
-        seq(
-          choice($.statement_block, $.function_declaration, $.generator_function_declaration, $.class_declaration),
-          $._automatic_semicolon
-        )
-      ),
+    _statement: ($) => prec.right(seq($.statement, optional($._statement_boundary))),
 
     hash_bang_line: () => /#![^\n\r\u2028\u2029]*/,
 
@@ -204,24 +199,10 @@ module.exports = grammar({
           repeat(field('decorator', $.decorator)),
           'export',
           choice(
-            field('declaration', $._exported_declaration),
-            seq(
-              'default',
-              choice(field('declaration', $._exported_declaration), seq(field('value', $.expression), $._semicolon))
-            )
+            field('declaration', $.declaration),
+            seq('default', choice(field('declaration', $.declaration), seq(field('value', $.expression), $._semicolon)))
           )
         )
-      ),
-
-    _exported_declaration: ($) =>
-      choice(
-        seq(
-          choice($.function_declaration, $.generator_function_declaration, $.class_declaration),
-          optional($._automatic_semicolon)
-        ),
-        $.lexical_declaration,
-        $.variable_declaration,
-        $.using_declaration
       ),
 
     namespace_export: ($) => seq('*', 'as', $._module_export_name),

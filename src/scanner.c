@@ -19,6 +19,7 @@ enum TokenType {
     LINE_BREAK_AFTER_FIELD,
     LINE_BREAK_AFTER_MODIFIER,
     LINE_BREAK_BEFORE_ATTRIBUTES,
+    STATEMENT_BOUNDARY,
 };
 
 typedef struct {
@@ -235,6 +236,10 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
             WhitespaceResult result = scan_whitespace_and_comments(lexer, scanned_comment, false);
             if (result == REJECT) {
                 return false;
+            }
+
+            if (after_block_arrow && lexer->eof(lexer)) {
+                return true;
             }
 
             if (result == ACCEPT || result == ACCEPT_IN_BLOCK_COMMENT) {
@@ -589,6 +594,9 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         if (ret && after_block_arrow) {
             lexer->result_symbol = ARROW_FUNCTION_BLOCK_END;
             scanner->automatic_semicolon_pending = true;
+        }
+        if (ret && !after_block_arrow && valid_symbols[STATEMENT_BOUNDARY]) {
+            lexer->result_symbol = STATEMENT_BOUNDARY;
         }
         if (!ret && !scanned_comment && valid_symbols[TERNARY_QMARK] && lexer->lookahead == '?') {
             return scan_ternary_qmark(lexer);
