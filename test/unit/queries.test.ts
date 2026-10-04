@@ -487,9 +487,10 @@ test('retains resource for-of fields while rejecting for-in edits', async () => 
         'xs',
         ...(kind === 'await using' ? ['of'] : []),
       ]) {
-        let source = `async function f(){for(${kind} ${name} of items){consume(${name});}}`;
+        const prefix = `async function f(){for(${kind} ${name} `;
+        let source = `${prefix}of items){consume(${name});}}`;
         let tree = parser.parse(source)!;
-        const start = source.indexOf(' of ') + 1;
+        const start = prefix.length;
         const original = tree.rootNode.toString();
         try {
           for (const operator of ['of', 'in', 'of']) {
@@ -570,6 +571,8 @@ test('preserves ordinary using statement boundaries and expression captures', as
     in x;
     using
     \`t\`;
+    using // statement comment
+    next;
     { using }
   }`;
   const tree = parser.parse(source)!;
@@ -585,16 +588,27 @@ test('preserves ordinary using statement boundaries and expression captures', as
       'binary_expression',
       'call_expression',
       'identifier',
+      'identifier',
+      'identifier',
     ]);
-    expect(tree.rootNode.descendantsOfType('comment')).toHaveLength(2);
+    expect(tree.rootNode.descendantsOfType('comment').map((node) => node.parent?.type)).toEqual([
+      'ternary_expression',
+      'binary_expression',
+      'expression_statement',
+    ]);
     expect(tree.rootNode.descendantsOfType('statement_block')).toHaveLength(2);
-    for (const input of ['using', 'function f(){using}', 'function f(){{using}}']) {
+    for (const input of ['using', 'function f(){using}', 'function f(){{using}}', 'using // end', 'using /* end */']) {
       const bare = parser.parse(input)!;
       try {
         expect(bare.rootNode.hasError).toBe(false);
         expect(query.captures(bare.rootNode).map(({ node }) => [node.type, node.text])).toEqual([
           ['identifier', 'using'],
         ]);
+        for (const comment of bare.rootNode.descendantsOfType('comment')) {
+          expect(comment.parent?.type).toBe('expression_statement');
+          expect(comment.parent?.startIndex).toBe(input.indexOf('using'));
+          expect(comment.parent?.endIndex).toBe(comment.endIndex);
+        }
       } finally {
         bare.delete();
       }

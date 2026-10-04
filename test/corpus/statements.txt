@@ -2021,6 +2021,8 @@ function ordinary() {
   in x;
   using
   `t`;
+  using // statement comment
+  next;
   { using }
 }
 
@@ -2071,6 +2073,11 @@ function ordinary() {
           (identifier)
           (template_string
             (string_fragment))))
+      (expression_statement
+        (identifier)
+        (comment))
+      (expression_statement
+        (identifier))
       (statement_block
         (expression_statement
           (identifier))))))

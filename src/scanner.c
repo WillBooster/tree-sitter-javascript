@@ -239,14 +239,12 @@ static bool scan_identifier(TSLexer *lexer, char *word, unsigned capacity, bool 
 static bool follows_yield_operand(TSLexer *lexer);
 static bool scan_resource_binding(TSLexer *lexer, bool plain_for_of, bool *infix_operator);
 
-/**
- * @param after_block_arrow Whether an arrow function's block body has just ended.
- */
 static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, bool after_block_arrow,
-                                     LineBreakRule rule, bool *scanned_content) {
+                                     LineBreakRule rule, bool *scanned_content, const bool *resource_symbols) {
     lexer->result_symbol = AUTOMATIC_SEMICOLON;
     lexer->mark_end(lexer);
     bool line_break_in_block_comment = false;
+    bool resource_line_break = false;
 
     for (;;) {
         if (lexer->eof(lexer)) {
@@ -270,6 +268,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
                 return false;
             }
             if (result == ACCEPT || result == ACCEPT_IN_BLOCK_COMMENT) {
+                resource_line_break = true;
                 if (after_block_arrow || rule != LINE_BREAK_BY_NEXT_TOKEN) {
                     return scan_after_line_break(lexer, after_block_arrow, rule, scanned_content, false);
                 }
@@ -293,6 +292,16 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
         }
 
         if (!is_whitespace(lexer->lookahead)) {
+            if (resource_symbols && !resource_line_break && is_identifier_part(lexer->lookahead) &&
+                !is_ascii_digit(lexer->lookahead)) {
+                bool infix_operator = false;
+                *scanned_content = true;
+                if (scan_resource_binding(lexer, resource_symbols[PLAIN_RESOURCE_FOR_OF_CONTEXT], &infix_operator)) {
+                    lexer->result_symbol = RESOURCE_BINDING_START;
+                    return true;
+                }
+                return false;
+            }
             // Otherwise tree-sitter consumes the comments and calls the scanner again after them.
             return line_break_in_block_comment && scan_after_line_break(lexer, false, rule, scanned_content, false);
         }
@@ -757,7 +766,6 @@ static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statem
     lexer->mark_end(lexer);
     lexer->result_symbol = after_postfix ? POSTFIX_UPDATE_END : AWAIT_OPERAND_END;
     bool saw_newline = false;
-    bool scanned_comments = false;
     for (;;) {
         while (is_whitespace(lexer->lookahead)) {
             saw_newline |= is_line_terminator(lexer->lookahead);
@@ -768,12 +776,10 @@ static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statem
         }
         skip(lexer);
         if (lexer->lookahead == '/') {
-            scanned_comments = true;
             while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) {
                 skip(lexer);
             }
         } else if (lexer->lookahead == '*') {
-            scanned_comments = true;
             skip(lexer);
             while (!lexer->eof(lexer)) {
                 saw_newline |= is_line_terminator(lexer->lookahead);
@@ -804,16 +810,7 @@ static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statem
             return infix_operator && valid_symbols[AWAIT_OPERAND_END];
         }
         if (!valid_symbols[AWAIT_OPERAND_END]) {
-            bool scanned_content = false;
-            bool ret = valid_symbols[AUTOMATIC_SEMICOLON] &&
-                (saw_newline ? scan_after_line_break(lexer, false, LINE_BREAK_BY_NEXT_TOKEN, &scanned_content, false) :
-                 lexer->eof(lexer) || lexer->lookahead == '}' || lexer->is_at_included_range_start(lexer));
-            if (ret) {
-                lexer->result_symbol = valid_symbols[STATEMENT_BOUNDARY] ? STATEMENT_BOUNDARY : AUTOMATIC_SEMICOLON;
-            } else if (!scanned_comments && !scanned_content && valid_symbols[TERNARY_QMARK] && lexer->lookahead == '?') {
-                return scan_ternary_qmark(lexer);
-            }
-            return ret;
+            return false;
         }
     }
     if (after_postfix && lexer->lookahead != '(' && lexer->lookahead != '[' && lexer->lookahead != '`') {
@@ -1003,6 +1000,25 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         return scan_await_yield_identifier(lexer);
     }
 
+    if (!valid_symbols[AWAIT_OPERAND_END] &&
+        (valid_symbols[RESOURCE_BINDING_START] || valid_symbols[PLAIN_RESOURCE_FOR_OF_CONTEXT])) {
+        bool scanned_content = false;
+        bool ret = scan_automatic_semicolon(lexer, !valid_symbols[LOGICAL_OR], false, LINE_BREAK_BY_NEXT_TOKEN,
+                                            &scanned_content, valid_symbols);
+        if (ret && lexer->result_symbol == AUTOMATIC_SEMICOLON) {
+            if (!valid_symbols[AUTOMATIC_SEMICOLON]) {
+                return false;
+            }
+            if (valid_symbols[STATEMENT_BOUNDARY]) {
+                lexer->result_symbol = STATEMENT_BOUNDARY;
+            }
+        }
+        if (!ret && !scanned_content && valid_symbols[TERNARY_QMARK] && lexer->lookahead == '?') {
+            return scan_ternary_qmark(lexer);
+        }
+        return ret;
+    }
+
     if ((valid_symbols[AWAIT_OPERAND_END] && !valid_symbols[LINE_BREAK_AFTER_AWAIT]) ||
         valid_symbols[RESOURCE_BINDING_START] || valid_symbols[RESOURCE_BINDING_CONTINUATION] ||
         valid_symbols[PLAIN_RESOURCE_FOR_OF_CONTEXT]) {
@@ -1032,7 +1048,7 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         } else if (valid_symbols[LINE_BREAK_BEFORE_ATTRIBUTES]) {
             rule = LINE_BREAK_BEFORE_IMPORT_ATTRIBUTES;
         }
-        bool ret = scan_automatic_semicolon(lexer, !valid_symbols[LOGICAL_OR], after_block_arrow, rule, &scanned_content);
+        bool ret = scan_automatic_semicolon(lexer, !valid_symbols[LOGICAL_OR], after_block_arrow, rule, &scanned_content, NULL);
         if (ret && after_block_arrow) {
             lexer->result_symbol = ARROW_FUNCTION_BLOCK_END;
             scanner->automatic_semicolon_pending = true;
