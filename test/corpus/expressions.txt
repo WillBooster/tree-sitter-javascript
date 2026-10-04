@@ -864,7 +864,7 @@ export default class extends Foo {
             (comment)
             (number))))))
   (export_statement
-    (class
+    (class_declaration
       (class_heritage
         (identifier))
       (class_body

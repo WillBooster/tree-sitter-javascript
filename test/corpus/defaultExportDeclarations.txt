@@ -1,0 +1,119 @@
+==================
+Anonymous default function declarations end at their bodies
+==================
+
+export default function() {} /* after */
+(x)
+export default async function() {}
+[x]
+export default function*() {}
+`tag`
+export default async function*() {}
+(x)
+
+---
+
+(program
+  (export_statement
+    (function_declaration
+      (formal_parameters)
+      (statement_block)))
+  (comment)
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (export_statement
+    (function_declaration
+      (formal_parameters)
+      (statement_block)))
+  (expression_statement
+    (array
+      (identifier)))
+  (export_statement
+    (generator_function_declaration
+      (formal_parameters)
+      (statement_block)))
+  (expression_statement
+    (template_string
+      (string_fragment)))
+  (export_statement
+    (generator_function_declaration
+      (formal_parameters)
+      (statement_block)))
+  (expression_statement
+    (parenthesized_expression
+      (identifier))))
+
+==================
+Anonymous default class declarations end at their bodies
+==================
+
+export default class {}
+(x)
+export default class extends Base {} /* after */
+[x]
+export default class { method() {} }
+`tag`
+
+---
+
+(program
+  (export_statement
+    (class_declaration
+      (class_body)))
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (export_statement
+    (class_declaration
+      (class_heritage
+        (identifier))
+      (class_body)))
+  (comment)
+  (expression_statement
+    (array
+      (identifier)))
+  (export_statement
+    (class_declaration
+      (class_body
+        (method_definition
+          (property_identifier)
+          (formal_parameters)
+          (statement_block)))))
+  (expression_statement
+    (template_string
+      (string_fragment))))
+
+==================
+Parenthesized default expressions retain expression suffixes
+==================
+
+export default (function() {})(x)
+export default (class {})[x]
+export default (() => x)`tag`
+
+---
+
+(program
+  (export_statement
+    (call_expression
+      (parenthesized_expression
+        (function_expression
+          (formal_parameters)
+          (statement_block)))
+      (arguments
+        (identifier))))
+  (export_statement
+    (subscript_expression
+      (parenthesized_expression
+        (class
+          (class_body)))
+      (identifier)))
+  (export_statement
+    (call_expression
+      (parenthesized_expression
+        (arrow_function
+          (formal_parameters)
+          (identifier)))
+      (template_string
+        (string_fragment)))))

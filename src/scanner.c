@@ -35,6 +35,8 @@ enum TokenType {
     RESOURCE_BINDING_START,
     RESOURCE_BINDING_CONTINUATION,
     PLAIN_RESOURCE_FOR_OF_CONTEXT,
+    EXPORT_DEFAULT,
+    DEFAULT_DECLARATION_START,
     REGEX_FLAGS_START,
 };
 
@@ -45,7 +47,11 @@ typedef struct {
     // A reused block arrow or postfix update can bypass the boundary state; serialize the pending semicolon.
     // Nested await end tokens must not clear it before the enclosing statement consumes it.
     bool automatic_semicolon_pending;
+    bool default_declaration_pending;
 } Scanner;
+
+static bool scan_export_default(Scanner *scanner, TSLexer *lexer);
+static bool scan_default_trivia(TSLexer *lexer, bool allow_line_breaks);
 
 void *tree_sitter_javascript_external_scanner_create() { return ts_calloc(1, sizeof(Scanner)); }
 
@@ -54,12 +60,14 @@ void tree_sitter_javascript_external_scanner_destroy(void *payload) { ts_free(pa
 unsigned tree_sitter_javascript_external_scanner_serialize(void *payload, char *buffer) {
     Scanner *scanner = (Scanner *)payload;
     buffer[0] = (char)scanner->automatic_semicolon_pending;
-    return 1;
+    buffer[1] = (char)scanner->default_declaration_pending;
+    return 2;
 }
 
 void tree_sitter_javascript_external_scanner_deserialize(void *payload, const char *buffer, unsigned length) {
     Scanner *scanner = (Scanner *)payload;
     scanner->automatic_semicolon_pending = length > 0 && buffer[0];
+    scanner->default_declaration_pending = length > 1 && buffer[1];
 }
 
 static inline void advance(TSLexer *lexer) { lexer->advance(lexer, false); }
@@ -979,6 +987,21 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         return scan_template_chars(lexer);
     }
 
+    if (valid_symbols[EXPORT_DEFAULT] ||
+        (valid_symbols[DEFAULT_DECLARATION_START] && scanner->default_declaration_pending)) {
+        while (is_whitespace(lexer->lookahead)) skip(lexer);
+        if (valid_symbols[EXPORT_DEFAULT] && lexer->lookahead == 'd') {
+            return scan_export_default(scanner, lexer);
+        }
+        if (valid_symbols[DEFAULT_DECLARATION_START] && scanner->default_declaration_pending &&
+            (lexer->lookahead == '@' || lexer->lookahead == 'a' || lexer->lookahead == 'c' || lexer->lookahead == 'f')) {
+            lexer->mark_end(lexer);
+            lexer->result_symbol = DEFAULT_DECLARATION_START;
+            scanner->default_declaration_pending = false;
+            return true;
+        }
+    }
+
     if (valid_symbols[POSTFIX_UPDATE_END]) {
         bool statement_end = false;
         bool ret = scan_expression_end(lexer, true, &statement_end, valid_symbols);
@@ -1176,4 +1199,78 @@ static bool is_reserved_word(const char *name) {
         if (strcmp(name, reserved[i]) == 0) return true;
     }
     return false;
+}
+
+static bool scan_export_default(Scanner *scanner, TSLexer *lexer) {
+    while (is_whitespace(lexer->lookahead)) {
+        skip(lexer);
+    }
+    for (const char *word = "default"; *word; word++) {
+        if (lexer->lookahead != *word) {
+            return false;
+        }
+        advance(lexer);
+    }
+    if (is_identifier_part(lexer->lookahead)) {
+        return false;
+    }
+    lexer->mark_end(lexer);
+    lexer->result_symbol = EXPORT_DEFAULT;
+    scanner->default_declaration_pending = false;
+    if (!scan_default_trivia(lexer, true)) return true;
+    if (lexer->lookahead == '@') {
+        scanner->default_declaration_pending = true;
+    } else {
+        char word[16] = {0};
+        if (!scan_identifier(lexer, word, sizeof(word), false)) return true;
+        if (strcmp(word, "function") == 0 || strcmp(word, "class") == 0) {
+            scanner->default_declaration_pending = true;
+        } else if (strcmp(word, "async") == 0 && scan_default_trivia(lexer, false)) {
+            memset(word, 0, sizeof(word));
+            scanner->default_declaration_pending =
+                scan_identifier(lexer, word, sizeof(word), false) && strcmp(word, "function") == 0;
+        }
+    }
+    return true;
+}
+
+static bool scan_default_trivia(TSLexer *lexer, bool allow_line_breaks) {
+    for (;;) {
+        while (is_whitespace(lexer->lookahead)) {
+            if (!allow_line_breaks && is_line_terminator(lexer->lookahead)) return false;
+            advance(lexer);
+        }
+        if (lexer->lookahead == '/') {
+            advance(lexer);
+            if (lexer->lookahead == '*') {
+                advance(lexer);
+                bool closed = false;
+                while (!lexer->eof(lexer)) {
+                    if (!allow_line_breaks && is_line_terminator(lexer->lookahead)) return false;
+                    if (lexer->lookahead == '*') {
+                        advance(lexer);
+                        if (lexer->lookahead == '/') {
+                            advance(lexer);
+                            closed = true;
+                            break;
+                        }
+                    } else {
+                        advance(lexer);
+                    }
+                }
+                if (!closed) return false;
+                continue;
+            }
+            if (lexer->lookahead != '/') return false;
+        } else if (lexer->lookahead == '<' || lexer->lookahead == '-') {
+            const char *opening = lexer->lookahead == '<' ? "<!--" : "-->";
+            for (; *opening; opening++) {
+                if (lexer->lookahead != *opening) return false;
+                advance(lexer);
+            }
+        } else {
+            return true;
+        }
+        while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) advance(lexer);
+    }
 }
