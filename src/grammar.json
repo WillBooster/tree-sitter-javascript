@@ -52,6 +52,27 @@
         ]
       }
     },
+    "_single_statement": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_single_statement_context"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_statement"
+        }
+      ]
+    },
     "hash_bang_line": {
       "type": "PATTERN",
       "value": "#![^\\n\\r\\u2028\\u2029]*"
@@ -1295,7 +1316,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "_statement"
+          "name": "_single_statement"
         }
       ]
     },
@@ -1322,7 +1343,7 @@
             "name": "consequence",
             "content": {
               "type": "SYMBOL",
-              "name": "_statement"
+              "name": "_single_statement"
             }
           },
           {
@@ -1413,7 +1434,7 @@
           "name": "body",
           "content": {
             "type": "SYMBOL",
-            "name": "_statement"
+            "name": "_single_statement"
           }
         }
       ]
@@ -1707,7 +1728,7 @@
           "name": "body",
           "content": {
             "type": "SYMBOL",
-            "name": "_statement"
+            "name": "_single_statement"
           }
         }
       ]
@@ -1949,7 +1970,7 @@
           "name": "body",
           "content": {
             "type": "SYMBOL",
-            "name": "_statement"
+            "name": "_single_statement"
           }
         }
       ]
@@ -1969,7 +1990,7 @@
             "name": "body",
             "content": {
               "type": "SYMBOL",
-              "name": "_statement"
+              "name": "_single_statement"
             }
           },
           {
@@ -2068,7 +2089,7 @@
           "name": "body",
           "content": {
             "type": "SYMBOL",
-            "name": "_statement"
+            "name": "_single_statement"
           }
         }
       ]
@@ -2275,7 +2296,7 @@
           "name": "body",
           "content": {
             "type": "SYMBOL",
-            "name": "_statement"
+            "name": "_single_statement"
           }
         }
       ]
@@ -8173,6 +8194,10 @@
     {
       "type": "SYMBOL",
       "name": "_let"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_single_statement_context"
     }
   ],
   "inline": [

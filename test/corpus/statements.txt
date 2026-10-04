@@ -1872,3 +1872,96 @@ endName;
     (html_comment)
     (variable_declarator
       (identifier))))
+
+================================================================================
+Contextual let in single-statement bodies
+================================================================================
+
+if (x) let
+first;
+if (x) {} else let
+second;
+while (x) let
+third;
+for (;;) let
+fourth;
+for (x of xs) let
+fifth;
+with (obj) let
+sixth;
+label: let
+seventh;
+if (x) { let
+inside; }
+switch (x) { case 1: let
+inCase; }
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    (parenthesized_expression
+      (identifier))
+    (expression_statement
+      (identifier)))
+  (expression_statement
+    (identifier))
+  (if_statement
+    (parenthesized_expression
+      (identifier))
+    (statement_block)
+    (else_clause
+      (expression_statement
+        (identifier))))
+  (expression_statement
+    (identifier))
+  (while_statement
+    (parenthesized_expression
+      (identifier))
+    (expression_statement
+      (identifier)))
+  (expression_statement
+    (identifier))
+  (for_statement
+    (empty_statement)
+    (empty_statement)
+    (expression_statement
+      (identifier)))
+  (expression_statement
+    (identifier))
+  (for_in_statement
+    (identifier)
+    (identifier)
+    (expression_statement
+      (identifier)))
+  (expression_statement
+    (identifier))
+  (with_statement
+    (parenthesized_expression
+      (identifier))
+    (expression_statement
+      (identifier)))
+  (expression_statement
+    (identifier))
+  (labeled_statement
+    (statement_identifier)
+    (expression_statement
+      (identifier)))
+  (expression_statement
+    (identifier))
+  (if_statement
+    (parenthesized_expression
+      (identifier))
+    (statement_block
+      (lexical_declaration
+        (variable_declarator
+          (identifier)))))
+  (switch_statement
+    (parenthesized_expression
+      (identifier))
+    (switch_body
+      (switch_case
+        (number)
+        (lexical_declaration
+          (variable_declarator
+            (identifier)))))))

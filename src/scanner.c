@@ -31,6 +31,7 @@ enum TokenType {
     POSTFIX_UPDATE_END,
     AWAIT_KEYWORD,
     LET,
+    SINGLE_STATEMENT_CONTEXT,
 };
 
 static bool scan_let(TSLexer *lexer);
@@ -981,7 +982,7 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         return scan_ternary_qmark(lexer);
     }
 
-    if (valid_symbols[LET] && lexer->lookahead == 'l') {
+    if (valid_symbols[LET] && !valid_symbols[SINGLE_STATEMENT_CONTEXT] && lexer->lookahead == 'l') {
         lexer->result_symbol = LET;
         return scan_let(lexer);
     }
