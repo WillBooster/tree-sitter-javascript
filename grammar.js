@@ -106,6 +106,7 @@ module.exports = grammar({
     $._plain_resource_for_of_context,
     $._export_default,
     $._default_declaration_start,
+    $._regex_flags_start,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -1078,8 +1079,10 @@ module.exports = grammar({
       seq(
         '/',
         field('pattern', $.regex_pattern),
-        token.immediate(prec(1, '/')),
-        optional(field('flags', $.regex_flags))
+        choice(
+          seq($._regex_flags_start, token.immediate(prec(1, '/')), field('flags', $.regex_flags)),
+          token.immediate(prec(1, '/'))
+        )
       ),
 
     regex_pattern: () =>

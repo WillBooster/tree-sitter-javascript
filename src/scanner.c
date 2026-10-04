@@ -37,6 +37,7 @@ enum TokenType {
     PLAIN_RESOURCE_FOR_OF_CONTEXT,
     EXPORT_DEFAULT,
     DEFAULT_DECLARATION_START,
+    REGEX_FLAGS_START,
 };
 
 static bool scan_let(TSLexer *lexer);
@@ -969,6 +970,15 @@ static bool scan_await_keyword(TSLexer *lexer) {
 
 bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer, const bool *valid_symbols) {
     Scanner *scanner = (Scanner *)payload;
+
+    if (valid_symbols[REGEX_FLAGS_START] && !valid_symbols[AUTOMATIC_SEMICOLON]) {
+        if (lexer->lookahead != '/') return false;
+        lexer->mark_end(lexer);
+        advance(lexer);
+        if (lexer->lookahead < 'a' || lexer->lookahead > 'z') return false;
+        lexer->result_symbol = REGEX_FLAGS_START;
+        return true;
+    }
 
     if (valid_symbols[TEMPLATE_CHARS]) {
         if (valid_symbols[AUTOMATIC_SEMICOLON]) {

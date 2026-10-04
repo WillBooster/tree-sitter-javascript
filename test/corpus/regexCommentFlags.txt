@@ -1,0 +1,30 @@
+==================
+Comments end regular expression flags
+==================
+/[/]//*c*/instanceof value;
+/x/g/*c*/instanceof value;
+/x///c
+instanceof value;
+
+---
+
+(program
+  (expression_statement
+    (binary_expression
+      (regex
+        (regex_pattern))
+      (comment)
+      (identifier)))
+  (expression_statement
+    (binary_expression
+      (regex
+        (regex_pattern)
+        (regex_flags))
+      (comment)
+      (identifier)))
+  (expression_statement
+    (binary_expression
+      (regex
+        (regex_pattern))
+      (comment)
+      (identifier))))
