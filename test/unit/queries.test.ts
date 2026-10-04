@@ -372,6 +372,8 @@ test('retains resource initializer errors while editing ordinary and classic for
               })
             );
             const incremental = parser.parse(next, tree)!;
+            tree.delete();
+            tree = incremental;
             const fresh = parser.parse(next)!;
             try {
               expect(incremental.rootNode.toString(), next).toBe(fresh.rootNode.toString());
@@ -383,9 +385,7 @@ test('retains resource initializer errors while editing ordinary and classic for
               }
             } finally {
               fresh.delete();
-              tree.delete();
             }
-            tree = incremental;
             previous = next;
           }
         } finally {
