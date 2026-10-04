@@ -87,6 +87,19 @@
 (new_expression
   constructor: (_) @name) @reference.class
 
+(
+  [
+    (jsx_opening_element name: (identifier) @name)
+    (jsx_self_closing_element name: (identifier) @name)
+  ] @reference.call
+  (#not-match? @name "^[a-z]|-")
+)
+
+[
+  (jsx_opening_element name: (member_expression property: (property_identifier) @name))
+  (jsx_self_closing_element name: (member_expression property: (property_identifier) @name))
+] @reference.call
+
 (export_statement value: (assignment_expression left: (identifier) @name right: ([
  (number)
  (string)
