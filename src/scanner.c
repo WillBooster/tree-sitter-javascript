@@ -2,6 +2,7 @@
 #include "tree_sitter/parser.h"
 
 #include <stdio.h>
+#include <string.h>
 
 enum TokenType {
     AUTOMATIC_SEMICOLON,
@@ -20,7 +21,10 @@ enum TokenType {
     LINE_BREAK_AFTER_MODIFIER,
     LINE_BREAK_BEFORE_ATTRIBUTES,
     STATEMENT_BOUNDARY,
+    LET,
 };
+
+static bool scan_let(TSLexer *lexer);
 
 typedef struct {
     // Set by ARROW_FUNCTION_BLOCK_END, and cleared by the AUTOMATIC_SEMICOLON or ARROW_FUNCTION_BLOCK_CONTINUATION that
@@ -608,10 +612,78 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         return scan_ternary_qmark(lexer);
     }
 
+    while (is_whitespace(lexer->lookahead)) skip(lexer);
+    if (valid_symbols[LET] && lexer->lookahead == 'l') {
+        lexer->result_symbol = LET;
+        return scan_let(lexer);
+    }
+
     if (valid_symbols[HTML_COMMENT] && !valid_symbols[LOGICAL_OR] && !valid_symbols[ESCAPE_SEQUENCE] &&
         !valid_symbols[REGEX_PATTERN]) {
         return scan_html_comment(lexer);
     }
 
     return false;
+}
+
+static bool scan_let(TSLexer *lexer) {
+    while (is_whitespace(lexer->lookahead)) skip(lexer);
+    for (const char *word = "let"; *word; word++) {
+        if (lexer->lookahead != *word) return false;
+        advance(lexer);
+    }
+    if (is_identifier_part(lexer->lookahead)) return false;
+    lexer->mark_end(lexer);
+    bool line_start = false;
+    for (;;) {
+        while (is_whitespace(lexer->lookahead)) {
+            line_start |= is_line_terminator(lexer->lookahead);
+            advance(lexer);
+        }
+        if (lexer->lookahead == '<' || (line_start && lexer->lookahead == '-')) {
+            const char *prefix = lexer->lookahead == '<' ? "<!--" : "-->";
+            for (; *prefix; prefix++) {
+                if (lexer->lookahead != *prefix) return false;
+                advance(lexer);
+            }
+            while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) advance(lexer);
+            continue;
+        }
+        if (lexer->lookahead != '/') break;
+        advance(lexer);
+        if (lexer->lookahead == '/') {
+            while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) advance(lexer);
+        } else if (lexer->lookahead == '*') {
+            advance(lexer);
+            bool star = false;
+            while (!lexer->eof(lexer)) {
+                if (star && lexer->lookahead == '/') break;
+                star = lexer->lookahead == '*';
+                line_start |= is_line_terminator(lexer->lookahead);
+                advance(lexer);
+            }
+            if (lexer->eof(lexer)) return false;
+            advance(lexer);
+        } else {
+            return false;
+        }
+    }
+    if (lexer->lookahead == '[' || lexer->lookahead == '{') return true;
+    if (!is_identifier_part(lexer->lookahead) || is_ascii_digit(lexer->lookahead)) return false;
+    char name[16] = {0};
+    unsigned length = 0;
+    while (is_identifier_part(lexer->lookahead)) {
+        if (length == sizeof(name) - 1) return true;
+        name[length++] = lexer->lookahead < 0x80 ? (char)lexer->lookahead : '?';
+        advance(lexer);
+    }
+    static const char *const reserved[] = {
+        "break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else",
+        "export", "extends", "false", "finally", "for", "function", "if", "import", "in", "instanceof", "new",
+        "null", "return", "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with"
+    };
+    for (unsigned i = 0; i < sizeof(reserved) / sizeof(reserved[0]); i++) {
+        if (strcmp(name, reserved[i]) == 0) return false;
+    }
+    return true;
 }

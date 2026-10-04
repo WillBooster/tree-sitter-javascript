@@ -84,6 +84,7 @@ module.exports = grammar({
     $._line_break_before_attributes,
 
     $._statement_boundary,
+    $._let,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -308,8 +309,10 @@ module.exports = grammar({
 
     variable_declaration: ($) => seq('var', commaSep1($.variable_declarator), $._semicolon),
 
+    _let: () => token(prec(-1, /let/)),
+
     lexical_declaration: ($) =>
-      seq(field('kind', choice('let', 'const')), commaSep1($.variable_declarator), $._semicolon),
+      seq(field('kind', choice('let', alias($._let, 'let'), 'const')), commaSep1($.variable_declarator), $._semicolon),
 
     using_declaration: ($) =>
       seq(

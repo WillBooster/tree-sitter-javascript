@@ -1752,3 +1752,123 @@ obj.export;
     (member_expression
       (identifier)
       (property_identifier))))
+
+================================================================================
+Let declarations across line breaks and contextual identifier expressions
+================================================================================
+
+let
+plain;
+let
+initialized = 1;
+let
+{ item } = object;
+let
+[first] = items;
+let /* between */
+commented;
+let // between
+lineCommented;
+let
+className;
+let
+非常に長い識別子;
+let
+\u0065scaped;
+let + 5;
+let.foo;
+let(foo);
+let
+++x;
+let
+class C {}
+let
+function f() {}
+let
+instanceof Object;
+
+let
+<!-- comment
+htmlName;
+let
+--> comment
+endName;
+
+--------------------------------------------------------------------------------
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (number)))
+  (lexical_declaration
+    (variable_declarator
+      (object_pattern
+        (shorthand_property_identifier_pattern))
+      (identifier)))
+  (lexical_declaration
+    (variable_declarator
+      (array_pattern
+        (identifier))
+      (identifier)))
+  (lexical_declaration
+    (comment)
+    (variable_declarator
+      (identifier)))
+  (lexical_declaration
+    (comment)
+    (variable_declarator
+      (identifier)))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)))
+  (expression_statement
+    (binary_expression
+      (identifier)
+      (number)))
+  (expression_statement
+    (member_expression
+      (identifier)
+      (property_identifier)))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (identifier))))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (update_expression
+      (identifier)))
+  (expression_statement
+    (identifier))
+  (class_declaration
+    (identifier)
+    (class_body))
+  (expression_statement
+    (identifier))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block))
+  (expression_statement
+    (binary_expression
+      (identifier)
+      (identifier)))
+  (lexical_declaration
+    (html_comment)
+    (variable_declarator
+      (identifier)))
+  (lexical_declaration
+    (html_comment)
+    (variable_declarator
+      (identifier))))

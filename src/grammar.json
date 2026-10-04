@@ -1025,6 +1025,17 @@
         }
       ]
     },
+    "_let": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": -1,
+        "content": {
+          "type": "PATTERN",
+          "value": "let"
+        }
+      }
+    },
     "lexical_declaration": {
       "type": "SEQ",
       "members": [
@@ -1036,6 +1047,15 @@
             "members": [
               {
                 "type": "STRING",
+                "value": "let"
+              },
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_let"
+                },
+                "named": false,
                 "value": "let"
               },
               {
@@ -7994,6 +8014,10 @@
     {
       "type": "SYMBOL",
       "name": "_statement_boundary"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_let"
     }
   ],
   "inline": [
