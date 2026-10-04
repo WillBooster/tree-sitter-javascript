@@ -548,3 +548,60 @@ test('retains resource for-of fields while rejecting for-in edits', async () => 
     parser.delete();
   }
 });
+
+test('preserves ordinary using statement boundaries and expression captures', async () => {
+  const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
+  const parser = new Parser();
+  parser.setLanguage(language);
+  const query = new Query(language, '(expression_statement (expression) @value)');
+  const source = `function f() {
+    using ? a : b;
+    using /*
+    ternary */ ? a : b;
+    using
+    (a);
+    using
+    [a] = 1;
+    using /*
+    comment */ + 1;
+    using
+    instanceof X;
+    using
+    in x;
+    using
+    \`t\`;
+    { using }
+  }`;
+  const tree = parser.parse(source)!;
+  try {
+    expect(tree.rootNode.hasError).toBe(false);
+    expect(query.captures(tree.rootNode).map(({ node }) => node.type)).toEqual([
+      'ternary_expression',
+      'ternary_expression',
+      'call_expression',
+      'assignment_expression',
+      'binary_expression',
+      'binary_expression',
+      'binary_expression',
+      'call_expression',
+      'identifier',
+    ]);
+    expect(tree.rootNode.descendantsOfType('comment')).toHaveLength(2);
+    expect(tree.rootNode.descendantsOfType('statement_block')).toHaveLength(2);
+    for (const input of ['using', 'function f(){using}', 'function f(){{using}}']) {
+      const bare = parser.parse(input)!;
+      try {
+        expect(bare.rootNode.hasError).toBe(false);
+        expect(query.captures(bare.rootNode).map(({ node }) => [node.type, node.text])).toEqual([
+          ['identifier', 'using'],
+        ]);
+      } finally {
+        bare.delete();
+      }
+    }
+  } finally {
+    tree.delete();
+    query.delete();
+    parser.delete();
+  }
+});

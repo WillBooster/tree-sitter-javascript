@@ -757,6 +757,7 @@ static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statem
     lexer->mark_end(lexer);
     lexer->result_symbol = after_postfix ? POSTFIX_UPDATE_END : AWAIT_OPERAND_END;
     bool saw_newline = false;
+    bool scanned_comments = false;
     for (;;) {
         while (is_whitespace(lexer->lookahead)) {
             saw_newline |= is_line_terminator(lexer->lookahead);
@@ -767,10 +768,12 @@ static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statem
         }
         skip(lexer);
         if (lexer->lookahead == '/') {
+            scanned_comments = true;
             while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) {
                 skip(lexer);
             }
         } else if (lexer->lookahead == '*') {
+            scanned_comments = true;
             skip(lexer);
             while (!lexer->eof(lexer)) {
                 saw_newline |= is_line_terminator(lexer->lookahead);
@@ -801,11 +804,16 @@ static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statem
             return infix_operator && valid_symbols[AWAIT_OPERAND_END];
         }
         if (!valid_symbols[AWAIT_OPERAND_END]) {
-            if (saw_newline && valid_symbols[AUTOMATIC_SEMICOLON]) {
+            bool scanned_content = false;
+            bool ret = valid_symbols[AUTOMATIC_SEMICOLON] &&
+                (saw_newline ? scan_after_line_break(lexer, false, LINE_BREAK_BY_NEXT_TOKEN, &scanned_content, false) :
+                 lexer->eof(lexer) || lexer->lookahead == '}' || lexer->is_at_included_range_start(lexer));
+            if (ret) {
                 lexer->result_symbol = valid_symbols[STATEMENT_BOUNDARY] ? STATEMENT_BOUNDARY : AUTOMATIC_SEMICOLON;
-                return true;
+            } else if (!scanned_comments && !scanned_content && valid_symbols[TERNARY_QMARK] && lexer->lookahead == '?') {
+                return scan_ternary_qmark(lexer);
             }
-            return false;
+            return ret;
         }
     }
     if (after_postfix && lexer->lookahead != '(' && lexer->lookahead != '[' && lexer->lookahead != '`') {
