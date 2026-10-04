@@ -807,6 +807,71 @@ class Bar {
             (number)))))))
 
 ============================================
+Await Class Property Fields
+============================================
+
+class Foo {
+  await = 1;
+  await;
+  static await = 2;
+  other = 3;
+  await() {}
+  get await() { return 4; }
+}
+
+const Bar = class {
+  await /* field */ = 5;
+};
+
+export default class extends Foo {
+  static await;
+}
+
+---
+
+(program
+  (class_declaration
+    (identifier)
+    (class_body
+      (field_definition
+        (property_identifier)
+        (number))
+      (field_definition
+        (property_identifier))
+      (field_definition
+        (property_identifier)
+        (number))
+      (field_definition
+        (property_identifier)
+        (number))
+      (method_definition
+        (property_identifier)
+        (formal_parameters)
+        (statement_block))
+      (method_definition
+        (property_identifier)
+        (formal_parameters)
+        (statement_block
+          (return_statement
+            (number))))))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (class
+        (class_body
+          (field_definition
+            (property_identifier)
+            (comment)
+            (number))))))
+  (export_statement
+    (class
+      (class_heritage
+        (identifier))
+      (class_body
+        (field_definition
+          (property_identifier))))))
+
+============================================
 Private Class Property Fields
 ============================================
 
@@ -2734,3 +2799,1216 @@ new <></>;
         (jsx_closing_element))
       (optional_chain)
       (arguments))))
+
+====================
+Await across line breaks
+====================
+
+await
+.5;
+await
+value;
+x = await
+value;
+await
+{};
+await /* split
+*/ value;
+await // split
+value;
+await
+++value;
+await
+[1];
+await
+/r/g;
+await
+/return/;
+await
+/in/;
+await
+function f() {};
+async function f() {
+  return await
+  value;
+}
+async function conditional() {
+  await
+  value ? yes : no;
+}
+await
+import value from "module";
+await
+import("module");
+await
+import.meta;
+function script() {
+  await
+  using resource = acquire();
+  await
+  using[0];
+  await
+  using in object;
+  await
+  using instanceof Constructor;
+  await
+  { return 1; }
+  await /* split
+  */ { return 1; }
+  await
+  /* between */ { value(); }
+  await
+  label: while (true) { break label; }
+  await
+  thisIsAnEspeciallyLongLabel /* comment */: while (true) { break thisIsAnEspeciallyLongLabel; }
+  await
+  日本語: while (true) { break 日本語; }
+  await
+  .member;
+  await
+  in value;
+  await
+  instanceof Constructor;
+  await;
+  await
+  return;
+  await.member;
+  await = value;
+}
+
+---
+
+(program
+  (expression_statement
+    (await_expression
+      (number)))
+  (expression_statement
+    (await_expression
+      (identifier)))
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (await_expression
+        (identifier))))
+  (expression_statement
+    (await_expression
+      (object)))
+  (expression_statement
+    (await_expression
+      (comment)
+      (identifier)))
+  (expression_statement
+    (await_expression
+      (comment)
+      (identifier)))
+  (expression_statement
+    (await_expression
+      (update_expression
+        (identifier))))
+  (expression_statement
+    (await_expression
+      (array
+        (number))))
+  (expression_statement
+    (await_expression
+      (regex
+        (regex_pattern)
+        (regex_flags))))
+  (expression_statement
+    (await_expression
+      (regex
+        (regex_pattern))))
+  (expression_statement
+    (await_expression
+      (regex
+        (regex_pattern))))
+  (expression_statement
+    (await_expression
+      (function_expression
+        (identifier)
+        (formal_parameters)
+        (statement_block))))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (return_statement
+        (await_expression
+          (identifier)))))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (ternary_expression
+          (await_expression
+            (identifier))
+          (identifier)
+          (identifier)))))
+  (expression_statement
+    (identifier))
+  (import_statement
+    (import_clause
+      (identifier))
+    (string
+      (string_fragment)))
+  (expression_statement
+    (await_expression
+      (call_expression
+        (import)
+        (arguments
+          (string
+            (string_fragment))))))
+  (expression_statement
+    (await_expression
+      (meta_property)))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (identifier))
+      (using_declaration
+        (variable_declarator
+          (identifier)
+          (call_expression
+            (identifier)
+            (arguments))))
+      (expression_statement
+        (await_expression
+          (subscript_expression
+            (identifier)
+            (number))))
+      (expression_statement
+        (binary_expression
+          (await_expression
+            (identifier))
+          (identifier)))
+      (expression_statement
+        (binary_expression
+          (await_expression
+            (identifier))
+          (identifier)))
+      (expression_statement
+        (identifier))
+      (statement_block
+        (return_statement
+          (number)))
+      (expression_statement
+        (identifier))
+      (comment)
+      (statement_block
+        (return_statement
+          (number)))
+      (expression_statement
+        (identifier))
+      (comment)
+      (statement_block
+        (expression_statement
+          (call_expression
+            (identifier)
+            (arguments))))
+      (expression_statement
+        (identifier))
+      (labeled_statement
+        (statement_identifier)
+        (while_statement
+          (parenthesized_expression
+            (true))
+          (statement_block
+            (break_statement
+              (statement_identifier)))))
+      (expression_statement
+        (identifier))
+      (labeled_statement
+        (statement_identifier)
+        (comment)
+        (while_statement
+          (parenthesized_expression
+            (true))
+          (statement_block
+            (break_statement
+              (statement_identifier)))))
+      (expression_statement
+        (identifier))
+      (labeled_statement
+        (statement_identifier)
+        (while_statement
+          (parenthesized_expression
+            (true))
+          (statement_block
+            (break_statement
+              (statement_identifier)))))
+      (expression_statement
+        (member_expression
+          (identifier)
+          (property_identifier)))
+      (expression_statement
+        (binary_expression
+          (identifier)
+          (identifier)))
+      (expression_statement
+        (binary_expression
+          (identifier)
+          (identifier)))
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (identifier))
+      (return_statement)
+      (expression_statement
+        (member_expression
+          (identifier)
+          (property_identifier)))
+      (expression_statement
+        (assignment_expression
+          (identifier)
+          (identifier))))))
+
+====================
+Await identifiers before blocks in assignment and return statements
+====================
+
+function script() {
+  x = await
+  { foo(); }
+  return await
+  { foo(); }
+}
+async function asyncOperand() {
+  x = await
+  { foo: 1 };
+  return await
+  { foo: 1 };
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (assignment_expression
+          (identifier)
+          (identifier)))
+      (statement_block
+        (expression_statement
+          (call_expression
+            (identifier)
+            (arguments))))
+      (return_statement
+        (identifier))
+      (statement_block
+        (expression_statement
+          (call_expression
+            (identifier)
+            (arguments))))))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (assignment_expression
+          (identifier)
+          (await_expression
+            (object
+              (pair
+                (property_identifier)
+                (number))))))
+      (return_statement
+        (await_expression
+          (object
+            (pair
+              (property_identifier)
+              (number))))))))
+
+====================
+Await identifiers before yield statements
+====================
+
+function* generator() {
+  await
+  yield value;
+  await
+  yield /* inline */ "value";
+  await
+  yield * values;
+  await
+  yield /pattern/;
+}
+async function asyncOperand() {
+  await
+  yield;
+  await
+  yield + value;
+}
+
+---
+
+(program
+  (generator_function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (yield_expression
+          (identifier)))
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (yield_expression
+          (comment)
+          (string
+            (string_fragment))))
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (yield_expression
+          (identifier)))
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (yield_expression
+          (regex
+            (regex_pattern))))))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (await_expression
+          (identifier)))
+      (expression_statement
+        (binary_expression
+          (await_expression
+            (identifier))
+          (identifier))))))
+
+====================
+Await identifiers before arrows and escaped labels
+====================
+
+await
+x => 1;
+await
+async x => 1;
+x = await
+y => 1;
+function script() {
+  await
+  \u{61}: while (true) { break a; }
+}
+
+---
+
+(program
+  (expression_statement (identifier))
+  (expression_statement (arrow_function (identifier) (number)))
+  (expression_statement (identifier))
+  (expression_statement (arrow_function (identifier) (number)))
+  (expression_statement (assignment_expression (identifier) (identifier)))
+  (expression_statement (arrow_function (identifier) (number)))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement (identifier))
+      (labeled_statement
+        (statement_identifier)
+        (while_statement
+          (parenthesized_expression (true))
+          (statement_block (break_statement (statement_identifier))))))))
+
+====================
+Await identifiers before async arrows with parenthesized parameters
+====================
+
+await
+async () => 1;
+await
+async (x) => 1;
+await
+async (x = ({text: ")"})) => {};
+await
+async (x);
+
+---
+
+(program
+  (expression_statement (identifier))
+  (expression_statement (arrow_function (formal_parameters) (number)))
+  (expression_statement (identifier))
+  (expression_statement (arrow_function (formal_parameters (identifier)) (number)))
+  (expression_statement (identifier))
+  (expression_statement
+    (arrow_function
+      (formal_parameters
+        (assignment_pattern
+          (identifier)
+          (parenthesized_expression
+            (object (pair (property_identifier) (string (string_fragment)))))))
+      (statement_block)))
+  (expression_statement
+    (await_expression (call_expression (identifier) (arguments (identifier))))))
+
+====================
+Await identifiers before following assignments
+====================
+
+await
+x = 1;
+await
+x += 1;
+await
+foo.bar = 1;
+await
+foo[index] ||= 1;
+await
+foo().bar = 1;
+await
+x == 1;
+await
+foo.bar;
+
+---
+
+(program
+  (expression_statement (identifier))
+  (expression_statement (assignment_expression (identifier) (number)))
+  (expression_statement (identifier))
+  (expression_statement (augmented_assignment_expression (identifier) (number)))
+  (expression_statement (identifier))
+  (expression_statement (assignment_expression (member_expression (identifier) (property_identifier)) (number)))
+  (expression_statement (identifier))
+  (expression_statement (augmented_assignment_expression (subscript_expression (identifier) (identifier)) (number)))
+  (expression_statement (identifier))
+  (expression_statement (assignment_expression (member_expression (call_expression (identifier) (arguments)) (property_identifier)) (number)))
+  (expression_statement (binary_expression (await_expression (identifier)) (number)))
+  (expression_statement (await_expression (member_expression (identifier) (property_identifier)))))
+
+====================
+Await identifiers before yield operand starts
+====================
+
+function* generator() {
+  await
+  yield(x);
+  await
+  yield[0];
+  await
+  yield .5;
+  await
+  yield ++x;
+  await
+  yield --x;
+  await
+  yield `template`;
+}
+
+---
+
+(program
+  (generator_function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement (identifier))
+      (expression_statement (yield_expression (parenthesized_expression (identifier))))
+      (expression_statement (identifier))
+      (expression_statement (yield_expression (array (number))))
+      (expression_statement (identifier))
+      (expression_statement (yield_expression (number)))
+      (expression_statement (identifier))
+      (expression_statement (yield_expression (update_expression (identifier))))
+      (expression_statement (identifier))
+      (expression_statement (yield_expression (update_expression (identifier))))
+      (expression_statement (identifier))
+      (expression_statement (yield_expression (template_string (string_fragment)))))))
+
+====================
+Await operands using yield identifiers and postfix syntax
+====================
+
+async function asyncOperand() {
+  await yield(x);
+  await yield.foo;
+  await yield[0];
+  await yield`tag`;
+  return await
+  yield in object;
+  return await
+  yield instanceof Constructor;
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement (await_expression (call_expression (identifier) (arguments (identifier)))))
+      (expression_statement (await_expression (member_expression (identifier) (property_identifier))))
+      (expression_statement (await_expression (subscript_expression (identifier) (number))))
+      (expression_statement (await_expression (call_expression (identifier) (template_string (string_fragment)))))
+      (return_statement (binary_expression (await_expression (identifier)) (identifier)))
+      (return_statement (binary_expression (await_expression (identifier)) (identifier))))))
+
+====================
+Await yield identifier postfix continuations across line breaks
+====================
+
+async function asyncOperand() {
+  await yield
+  (x);
+  await yield
+  [0];
+  await yield
+  `tag`;
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement (await_expression (call_expression (identifier) (arguments (identifier)))))
+      (expression_statement (await_expression (subscript_expression (identifier) (number))))
+      (expression_statement (await_expression (call_expression (identifier) (template_string (string_fragment))))))))
+
+====================
+A call through an optional member chain is not an assignment target
+:error
+====================
+
+foo?.bar() = 1;
+
+---
+
+====================
+A call through an optional call chain is not an assignment target
+:error
+====================
+
+foo?.()() = 1;
+
+---
+
+====================
+A call through an optional index chain is not an assignment target
+:error
+====================
+
+foo?.[0]() = 1;
+
+---
+
+====================
+A call through an optional chain followed by members is not an assignment target
+:error
+====================
+
+foo?.bar.baz() = 1;
+
+---
+
+====================
+A call through an optional chain followed by indexes is not an assignment target
+:error
+====================
+
+foo?.bar[0]() = 1;
+
+---
+
+====================
+A call through an optional constructor chain is not an assignment target
+:error
+====================
+
+new foo?.bar()() = 1;
+
+---
+
+====================
+A constructor call is not an assignment target
+:error
+====================
+
+new Foo() = 1;
+
+---
+
+====================
+Completed await yield operands before literal and unary statements
+====================
+
+async function f() {
+  await yield
+  "s";
+  await yield
+  1;
+  await yield
+  .5;
+  await yield
+  !x;
+  await yield
+  ~x;
+  await await x
+  "s";
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement (await_expression (identifier)))
+      (expression_statement (string (string_fragment)))
+      (expression_statement (await_expression (identifier)))
+      (expression_statement (number))
+      (expression_statement (await_expression (identifier)))
+      (expression_statement (number))
+      (expression_statement (await_expression (identifier)))
+      (expression_statement (unary_expression (identifier)))
+      (expression_statement (await_expression (identifier)))
+      (expression_statement (unary_expression (identifier)))
+      (expression_statement (await_expression (await_expression (identifier))))
+      (expression_statement (string (string_fragment))))))
+
+====================
+A call is not a logical and assignment target
+:error
+====================
+
+foo() &&= 1;
+
+---
+
+====================
+A call is not a logical or assignment target
+:error
+====================
+
+foo() ||= 1;
+
+---
+
+====================
+A call is not a nullish assignment target
+:error
+====================
+
+foo() ??= 1;
+
+---
+
+====================
+Await call bodies in block-contained async arrows
+====================
+
+function f() {
+  x = async () => await g(a);
+  return async () => await g.h(a);
+}
+{ async () => await g(a); }
+f(async () => await g(a));
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (assignment_expression
+          (identifier)
+          (arrow_function
+            (formal_parameters)
+            (await_expression (call_expression (identifier) (arguments (identifier)))))))
+      (return_statement
+        (arrow_function
+          (formal_parameters)
+          (await_expression
+            (call_expression (member_expression (identifier) (property_identifier)) (arguments (identifier))))))))
+  (statement_block
+    (expression_statement
+      (arrow_function
+        (formal_parameters)
+        (await_expression (call_expression (identifier) (arguments (identifier)))))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (arrow_function
+          (formal_parameters)
+          (await_expression (call_expression (identifier) (arguments (identifier)))))))))
+
+====================
+Parenthesized arrows remain postfix and constructor targets
+====================
+
+(async () => await g(a))(b);
+(async () => await g(a)).field;
+new (async () => await g(a))(b);
+
+---
+
+(program
+  (expression_statement
+    (call_expression
+      (parenthesized_expression
+        (arrow_function (formal_parameters) (await_expression (call_expression (identifier) (arguments (identifier))))))
+      (arguments (identifier))))
+  (expression_statement
+    (member_expression
+      (parenthesized_expression
+        (arrow_function (formal_parameters) (await_expression (call_expression (identifier) (arguments (identifier))))))
+      (property_identifier)))
+  (expression_statement
+    (new_expression
+      (parenthesized_expression
+        (arrow_function (formal_parameters) (await_expression (call_expression (identifier) (arguments (identifier))))))
+      (arguments (identifier)))))
+
+====================
+Await yield postfix updates without prefix operands
+====================
+
+async function f(){return await
+yield++;}
+async function g(){return await /* comment */ yield--;}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (return_statement
+        (await_expression (update_expression (identifier))))))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (return_statement
+        (await_expression (comment) (update_expression (identifier)))))))
+
+====================
+Nested await operands across multiple line breaks
+====================
+
+async function f() {
+  const x = await
+    await
+    foo();
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (lexical_declaration
+        (variable_declarator
+          (identifier)
+          (await_expression
+            (await_expression
+              (call_expression
+                (identifier)
+                (arguments)))))))))
+
+====================
+Curried block arrows before explicit and automatic statement ends
+====================
+
+const curry = a => b => {
+  return a + b
+}
+(function () {})()
+x => y => {};
+(1);
+x => y => {}
+/re/;
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (arrow_function
+        (identifier)
+        (arrow_function
+          (identifier)
+          (statement_block
+            (return_statement
+              (binary_expression
+                (identifier)
+                (identifier))))))))
+  (expression_statement
+    (call_expression
+      (parenthesized_expression
+        (function_expression
+          (formal_parameters)
+          (statement_block)))
+      (arguments)))
+  (expression_statement
+    (arrow_function
+      (identifier)
+      (arrow_function
+        (identifier)
+        (statement_block))))
+  (expression_statement
+    (parenthesized_expression
+      (number)))
+  (expression_statement
+    (arrow_function
+      (identifier)
+      (arrow_function
+        (identifier)
+        (statement_block))))
+  (expression_statement
+    (regex
+      (regex_pattern))))
+
+====================
+Curried block arrows before enclosing sequence and argument continuations
+====================
+
+x => y => z => {}
+, 2;
+useEffect(() => () => { cleanup(); }, [dep]);
+f(a => b => {}, (1));
+f(a => b => {}, `t`);
+f(a => b => {}, +1);
+export const m = options => next => async args => { return next(args); };
+export const following = { value: 1 };
+f(x => c ? 1 : () => {}, [1]);
+f(x => y = () => {}, [1]);
+
+---
+
+(program
+  (expression_statement
+    (sequence_expression
+      (arrow_function
+        (identifier)
+        (arrow_function
+          (identifier)
+          (arrow_function
+            (identifier)
+            (statement_block))))
+      (number)))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (arrow_function
+          (formal_parameters)
+          (arrow_function
+            (formal_parameters)
+            (statement_block
+              (expression_statement
+                (call_expression
+                  (identifier)
+                  (arguments))))))
+        (array
+          (identifier)))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (arrow_function
+          (identifier)
+          (arrow_function
+            (identifier)
+            (statement_block)))
+        (parenthesized_expression
+          (number)))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (arrow_function
+          (identifier)
+          (arrow_function
+            (identifier)
+            (statement_block)))
+        (template_string
+          (string_fragment)))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (arrow_function
+          (identifier)
+          (arrow_function
+            (identifier)
+            (statement_block)))
+        (unary_expression
+          (number)))))
+  (export_statement
+    (lexical_declaration
+      (variable_declarator
+        (identifier)
+        (arrow_function
+          (identifier)
+          (arrow_function
+            (identifier)
+            (arrow_function
+              (identifier)
+              (statement_block
+                (return_statement
+                  (call_expression
+                    (identifier)
+                    (arguments
+                      (identifier)))))))))))
+  (export_statement
+    (lexical_declaration
+      (variable_declarator
+        (identifier)
+        (object
+          (pair
+            (property_identifier)
+            (number))))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (arrow_function
+          (identifier)
+          (ternary_expression
+            (identifier)
+            (number)
+            (arrow_function
+              (formal_parameters)
+              (statement_block))))
+        (array
+          (number)))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (arguments
+        (arrow_function
+          (identifier)
+          (assignment_expression
+            (identifier)
+            (arrow_function
+              (formal_parameters)
+              (statement_block))))
+        (array
+          (number))))))
+
+====================
+Postfix update arrow bodies before newline suffix statements
+====================
+
+let a = 1;
+const f = x => a++
+`c`;
+x++
+(y);
+x--
+[y];
+++x
+(y);
+--x
+[y];
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (number)))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (arrow_function
+        (identifier)
+        (update_expression
+          (identifier)))))
+  (expression_statement
+    (template_string
+      (string_fragment)))
+  (expression_statement
+    (update_expression
+      (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (expression_statement
+    (update_expression
+      (identifier)))
+  (expression_statement
+    (array
+      (identifier)))
+  (expression_statement
+    (update_expression
+      (call_expression
+        (identifier)
+        (arguments
+          (identifier)))))
+  (expression_statement
+    (update_expression
+      (subscript_expression
+        (identifier)
+        (identifier)))))
+
+====================
+Awaited postfix updates before comments and newline suffix statements
+====================
+
+async function f() {
+  await await x++ /*
+  comment */ `c`;
+  return await x--
+  // comment
+  (y);
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (await_expression
+          (await_expression
+            (update_expression
+              (identifier)))))
+      (comment)
+      (expression_statement
+        (template_string
+          (string_fragment)))
+      (return_statement
+        (await_expression
+          (update_expression
+            (identifier))))
+      (comment)
+      (expression_statement
+        (parenthesized_expression
+          (identifier))))))
+
+====================
+Contextual let identifiers as await operands
+====================
+
+async function f() {
+  await
+  let.foo;
+  await
+  let(x);
+  await
+  let[0];
+  return await
+  let;
+}
+function g() {
+  await
+  let x = 1;
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (await_expression
+          (member_expression
+            (identifier)
+            (property_identifier))))
+      (expression_statement
+        (await_expression
+          (call_expression
+            (identifier)
+            (arguments
+              (identifier)))))
+      (expression_statement
+        (await_expression
+          (subscript_expression
+            (identifier)
+            (number))))
+      (return_statement
+        (await_expression
+          (identifier)))))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (identifier))
+      (lexical_declaration
+        (variable_declarator
+          (identifier)
+          (number))))))
+
+
+====================
+Await yield identifiers before member assignments
+====================
+
+await
+yield.p = 1;
+function f() {
+  await
+  yield.p += 1;
+  await
+  yield.p(1).q = 1;
+}
+
+---
+
+(program
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (assignment_expression
+      (member_expression
+        (yield_expression)
+        (property_identifier))
+      (number)))
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (augmented_assignment_expression
+          (member_expression
+            (yield_expression)
+            (property_identifier))
+          (number)))
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (assignment_expression
+          (member_expression
+            (call_expression
+              (member_expression
+                (yield_expression)
+                (property_identifier))
+              (arguments
+                (number)))
+            (property_identifier))
+          (number))))))
