@@ -354,10 +354,10 @@ test('retains resource initializer errors while editing ordinary and classic for
         `function f(){for(using ${name}; keepGoing();){}}`,
       ]) {
         let tree = parser.parse(declaration)!;
-        expect(tree.rootNode.hasError, declaration).toBe(true);
-        const index = declaration.indexOf('using ') + 'using '.length + name.length;
-        let previous = declaration;
         try {
+          expect(tree.rootNode.hasError, declaration).toBe(true);
+          const index = declaration.indexOf('using ') + 'using '.length + name.length;
+          let previous = declaration;
           for (const initializer of ['=getResource()', '']) {
             const end = previous.indexOf(';', index);
             const next = previous.slice(0, index) + initializer + previous.slice(end);
