@@ -807,7 +807,10 @@ module.exports = grammar({
         seq(
           optional('async'),
           choice(
-            field('parameter', choice(alias($._reserved_identifier, $.identifier), $.identifier)),
+            field(
+              'parameter',
+              choice(alias($._reserved_identifier, $.identifier), alias($.undefined, $.identifier), $.identifier)
+            ),
             $._call_signature
           ),
           '=>',
@@ -913,7 +916,7 @@ module.exports = grammar({
         $.member_expression,
         $.subscript_expression,
         alias($._reserved_identifier, $.identifier),
-        $.identifier,
+        $._identifier,
         $.parenthesized_expression
       ),
 

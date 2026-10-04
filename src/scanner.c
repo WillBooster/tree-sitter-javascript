@@ -147,6 +147,7 @@ typedef enum {
     // Like ACCEPT, but the line break is inside the block comment that the lexer stopped after, so it will not be seen
     // again once tree-sitter has consumed that comment.
     ACCEPT_IN_BLOCK_COMMENT,
+    ACCEPT_IN_BLOCK_COMMENT_BEFORE_SLASH,
 } WhitespaceResult;
 
 /**
@@ -178,7 +179,7 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
                             lexer->advance(lexer, skip_contents);
                             *scanned_content = true;
 
-                            if (lexer->lookahead != '/' && !consume) {
+                            if (!consume && lexer->lookahead != '/') {
                                 return saw_block_newline ? ACCEPT_IN_BLOCK_COMMENT : NO_NEWLINE;
                             }
 
@@ -192,7 +193,7 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
                     }
                 }
             } else {
-                return REJECT;
+                return !consume && saw_block_newline ? ACCEPT_IN_BLOCK_COMMENT_BEFORE_SLASH : REJECT;
             }
         } else {
             return ACCEPT;
@@ -233,7 +234,7 @@ typedef enum {
     LINE_BREAK_AFTER_AWAIT_KEYWORD,
 } LineBreakRule;
 
-static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule, bool *scanned_content);
+static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule, bool *scanned_content, bool before_slash);
 static bool scan_identifier(TSLexer *lexer, char *word, unsigned capacity, bool skip_contents);
 static bool follows_yield_operand(TSLexer *lexer);
 static bool scan_resource_binding(TSLexer *lexer, bool plain_for_of, bool *infix_operator);
@@ -257,6 +258,9 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
             if (result == REJECT) {
                 return false;
             }
+            if (result == ACCEPT_IN_BLOCK_COMMENT_BEFORE_SLASH) {
+                return scan_after_line_break(lexer, after_block_arrow, rule, scanned_content, true);
+            }
 
             if (after_block_arrow && lexer->eof(lexer)) {
                 return true;
@@ -267,7 +271,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
             }
             if (result == ACCEPT || result == ACCEPT_IN_BLOCK_COMMENT) {
                 if (after_block_arrow || rule != LINE_BREAK_BY_NEXT_TOKEN) {
-                    return scan_after_line_break(lexer, after_block_arrow, rule, scanned_content);
+                    return scan_after_line_break(lexer, after_block_arrow, rule, scanned_content, false);
                 }
                 if (comment_condition && lexer->lookahead != ',' && lexer->lookahead != '=') {
                     return true;
@@ -290,24 +294,24 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
 
         if (!is_whitespace(lexer->lookahead)) {
             // Otherwise tree-sitter consumes the comments and calls the scanner again after them.
-            return line_break_in_block_comment && scan_after_line_break(lexer, false, rule, scanned_content);
+            return line_break_in_block_comment && scan_after_line_break(lexer, false, rule, scanned_content, false);
         }
 
         skip(lexer);
     }
 
     skip(lexer);
-    return scan_after_line_break(lexer, after_block_arrow, rule, scanned_content);
+    return scan_after_line_break(lexer, after_block_arrow, rule, scanned_content, false);
 }
 
 static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule,
-                                  bool *scanned_content) {
+                                  bool *scanned_content, bool before_slash) {
     if (after_block_arrow) {
-        return ends_statement_after_block_arrow(lexer, scanned_content);
+        return before_slash || ends_statement_after_block_arrow(lexer, scanned_content);
     }
 
     // REJECT means a `/` that starts no comment.
-    bool before_slash = scan_whitespace_and_comments(lexer, scanned_content, true, true) == REJECT;
+    before_slash = before_slash || scan_whitespace_and_comments(lexer, scanned_content, true, true) == REJECT;
     // A `;` at the start of the next line ends the statement itself.
     if (!before_slash && lexer->lookahead == ';') {
         return false;
