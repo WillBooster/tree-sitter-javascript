@@ -795,8 +795,12 @@ static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statem
         case '?':
             skip(lexer);
             return lexer->lookahead != '.';
+        case 'i': {
+            char word[16] = {0};
+            bool ascii_word = scan_identifier(lexer, word, sizeof(word), true);
+            return saw_newline || (ascii_word && (strcmp(word, "in") == 0 || strcmp(word, "instanceof") == 0));
+        }
         case '!':
-        case 'i':
         case '=':
         case '*':
         case '%':
