@@ -759,22 +759,17 @@ static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statem
             }
         } else if (lexer->lookahead == '*') {
             skip(lexer);
-            bool closed = false;
             while (!lexer->eof(lexer)) {
                 saw_newline |= is_line_terminator(lexer->lookahead);
                 if (lexer->lookahead == '*') {
                     skip(lexer);
                     if (lexer->lookahead == '/') {
                         skip(lexer);
-                        closed = true;
                         break;
                     }
                 } else {
                     skip(lexer);
                 }
-            }
-            if (!closed) {
-                return false;
             }
         } else {
             return true;
