@@ -54,6 +54,7 @@ test('preserves statement boundaries before regex literals adjacent to newline-b
 test('updates return and regex roles when comment newlines are inserted and removed', () => {
   const parser = new Parser();
   parser.setLanguage(language);
+  const query = new Query(language, '(expression_statement (call_expression) @regex.statement)');
   const prefix = 'function f(){return';
   const suffix = '/b/.test(x);}';
   let comment = '/* same line */';
@@ -76,6 +77,21 @@ test('updates return and regex roles when comment newlines are inserted and remo
       const fresh = parser.parse(next)!;
       try {
         expect(snapshot(incremental.rootNode), next).toEqual(snapshot(fresh.rootNode));
+        if (replacement === '/* unfinished') {
+          expect(incremental.rootNode.hasError, next).toBe(true);
+        } else {
+          expect(incremental.rootNode.hasError, next).toBe(false);
+          const returned = incremental.rootNode.descendantsOfType('return_statement')[0];
+          expect(returned, next).toBeDefined();
+          expect(
+            returned!.namedChildren.filter((node) => node.type !== 'comment').map((node) => node.text),
+            next
+          ).toEqual(replacement.includes('\n') ? [] : ['/b/.test(x)']);
+          expect(
+            query.captures(incremental.rootNode).map(({ node }) => node.text),
+            next
+          ).toEqual(replacement.includes('\n') ? ['/b/.test(x)'] : []);
+        }
       } finally {
         fresh.delete();
         tree.delete();
@@ -86,6 +102,7 @@ test('updates return and regex roles when comment newlines are inserted and remo
     }
   } finally {
     tree.delete();
+    query.delete();
     parser.delete();
   }
 });
