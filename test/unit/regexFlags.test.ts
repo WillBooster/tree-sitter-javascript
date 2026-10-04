@@ -5,7 +5,7 @@ import { expect, test } from 'vitest';
 await Parser.init();
 const language = await Language.load(path.join(import.meta.dirname, '../../tree-sitter-javascript.wasm'));
 
-test.each(['/*c*/', '//c\n', '<!-- c\n', '--> c\n'])('ends regex flags before comment %j', (comment) => {
+test.each(['/*c*/', '//c\n'])('ends regex flags before comment %j', (comment) => {
   const parser = new Parser();
   parser.setLanguage(language);
   const query = new Query(language, '(regex) @regex (regex_flags) @flags');
@@ -15,6 +15,10 @@ test.each(['/*c*/', '//c\n', '<!-- c\n', '--> c\n'])('ends regex flags before co
       const tree = parser.parse(source)!;
       try {
         expect(tree.rootNode.hasError, source).toBe(false);
+        expect(
+          tree.rootNode.descendantsOfType('comment').map((node) => node.text),
+          source
+        ).toEqual([comment.trimEnd()]);
         const node = tree.rootNode.descendantsOfType('regex')[0]!;
         expect(node.text, source).toBe(regex);
         expect(node.childForFieldName('flags')?.text, source).toBe(

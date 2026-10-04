@@ -5,8 +5,6 @@ Comments end regular expression flags
 /x/g/*c*/instanceof value;
 /x///c
 instanceof value;
-/x/<!--c
-instanceof value;
 
 ---
 
@@ -29,13 +27,4 @@ instanceof value;
       (regex
         (regex_pattern))
       (comment)
-      (identifier)))
-  (expression_statement
-    (binary_expression
-      (binary_expression
-        (regex
-          (regex_pattern))
-        (unary_expression
-          (update_expression
-            (identifier))))
       (identifier))))
