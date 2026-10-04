@@ -4093,6 +4093,15 @@
                       "value": "identifier"
                     },
                     {
+                      "type": "ALIAS",
+                      "content": {
+                        "type": "SYMBOL",
+                        "name": "undefined"
+                      },
+                      "named": true,
+                      "value": "identifier"
+                    },
+                    {
                       "type": "SYMBOL",
                       "name": "identifier"
                     }
@@ -4655,7 +4664,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "identifier"
+          "name": "_identifier"
         },
         {
           "type": "SYMBOL",

@@ -497,6 +497,10 @@
           {
             "type": "subscript_expression",
             "named": true
+          },
+          {
+            "type": "undefined",
+            "named": true
           }
         ]
       },
