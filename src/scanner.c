@@ -32,9 +32,13 @@ enum TokenType {
     AWAIT_KEYWORD,
     LET,
     SINGLE_STATEMENT_CONTEXT,
+    RESOURCE_BINDING_START,
+    RESOURCE_BINDING_CONTINUATION,
+    PLAIN_RESOURCE_FOR_OF_CONTEXT,
 };
 
 static bool scan_let(TSLexer *lexer);
+static bool is_reserved_word(const char *name);
 
 typedef struct {
     // A reused block arrow or postfix update can bypass the boundary state; serialize the pending semicolon.
@@ -232,6 +236,7 @@ typedef enum {
 static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule, bool *scanned_content);
 static bool scan_identifier(TSLexer *lexer, char *word, unsigned capacity, bool skip_contents);
 static bool follows_yield_operand(TSLexer *lexer);
+static bool scan_resource_binding(TSLexer *lexer, bool plain_for_of, bool *infix_operator);
 
 /**
  * @param after_block_arrow Whether an arrow function's block body has just ended.
@@ -744,7 +749,7 @@ static bool scan_jsx_text(TSLexer *lexer) {
 
 // Canonical expression paths preserve public supertype queries. Keep postfix suffixes in the await operand while
 // letting infix operators continue the enclosing expression.
-static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statement_end) {
+static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statement_end, const bool *valid_symbols) {
     lexer->mark_end(lexer);
     lexer->result_symbol = after_postfix ? POSTFIX_UPDATE_END : AWAIT_OPERAND_END;
     bool saw_newline = false;
@@ -776,7 +781,27 @@ static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statem
                 }
             }
         } else {
-            return true;
+            return valid_symbols[AWAIT_OPERAND_END] || after_postfix;
+        }
+    }
+    if (valid_symbols[RESOURCE_BINDING_START] || valid_symbols[RESOURCE_BINDING_CONTINUATION] ||
+        valid_symbols[PLAIN_RESOURCE_FOR_OF_CONTEXT]) {
+        bool first_binding = valid_symbols[RESOURCE_BINDING_START] || valid_symbols[PLAIN_RESOURCE_FOR_OF_CONTEXT];
+        if (!(saw_newline && first_binding) && is_identifier_part(lexer->lookahead) && !is_ascii_digit(lexer->lookahead)) {
+            bool infix_operator = false;
+            bool binding = scan_resource_binding(lexer, valid_symbols[PLAIN_RESOURCE_FOR_OF_CONTEXT], &infix_operator);
+            if (binding) {
+                lexer->result_symbol = valid_symbols[RESOURCE_BINDING_START] ? RESOURCE_BINDING_START : RESOURCE_BINDING_CONTINUATION;
+                return true;
+            }
+            return infix_operator && valid_symbols[AWAIT_OPERAND_END];
+        }
+        if (!valid_symbols[AWAIT_OPERAND_END]) {
+            if (saw_newline && valid_symbols[AUTOMATIC_SEMICOLON]) {
+                lexer->result_symbol = valid_symbols[STATEMENT_BOUNDARY] ? STATEMENT_BOUNDARY : AUTOMATIC_SEMICOLON;
+                return true;
+            }
+            return false;
         }
     }
     if (after_postfix && lexer->lookahead != '(' && lexer->lookahead != '[' && lexer->lookahead != '`') {
@@ -829,6 +854,52 @@ static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statem
         default:
             return lexer->eof(lexer) || saw_newline;
     }
+}
+
+static bool scan_resource_binding(TSLexer *lexer, bool plain_for_of, bool *infix_operator) {
+    char word[16] = {0};
+    unsigned length = 0;
+    bool ascii_word = true;
+    bool escaped = false;
+    while (is_identifier_part(lexer->lookahead)) {
+        uint32_t character = (uint32_t)lexer->lookahead;
+        if (character == '\\') {
+            escaped = true;
+            advance(lexer);
+            if (lexer->lookahead != 'u') return false;
+            advance(lexer);
+            bool braced = lexer->lookahead == '{';
+            if (braced) advance(lexer);
+            character = 0;
+            unsigned digits = 0;
+            while (is_hex_digit(lexer->lookahead) && (braced || digits < 4)) {
+                unsigned digit = is_ascii_digit(lexer->lookahead) ? lexer->lookahead - '0' :
+                    (lexer->lookahead >= 'a' ? lexer->lookahead - 'a' : lexer->lookahead - 'A') + 10;
+                character = character > 0x7F ? 0x80 : character * 16 + digit;
+                advance(lexer);
+                digits++;
+            }
+            if (braced) {
+                if (digits == 0 || lexer->lookahead != '}') return false;
+                advance(lexer);
+            } else if (digits != 4) {
+                return false;
+            }
+        } else {
+            advance(lexer);
+        }
+        if (character > 0x7F || length == sizeof(word) - 1) {
+            ascii_word = false;
+        } else {
+            word[length++] = (char)character;
+        }
+    }
+    *infix_operator = !escaped && ascii_word && (strcmp(word, "in") == 0 || strcmp(word, "instanceof") == 0);
+    if (ascii_word && plain_for_of && strcmp(word, "of") == 0) {
+        bool scanned_content = false;
+        return scan_whitespace_and_comments(lexer, &scanned_content, true, false) != REJECT && lexer->lookahead == '=';
+    }
+    return !ascii_word || !is_reserved_word(word);
 }
 
 static bool scan_await_yield_identifier(TSLexer *lexer) {
@@ -891,7 +962,7 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
 
     if (valid_symbols[POSTFIX_UPDATE_END]) {
         bool statement_end = false;
-        bool ret = scan_expression_end(lexer, true, &statement_end);
+        bool ret = scan_expression_end(lexer, true, &statement_end, valid_symbols);
         scanner->automatic_semicolon_pending |= statement_end;
         return ret;
     }
@@ -920,12 +991,14 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         return scan_await_yield_identifier(lexer);
     }
 
-    if (valid_symbols[AWAIT_OPERAND_END] && !valid_symbols[LINE_BREAK_AFTER_AWAIT]) {
+    if ((valid_symbols[AWAIT_OPERAND_END] && !valid_symbols[LINE_BREAK_AFTER_AWAIT]) ||
+        valid_symbols[RESOURCE_BINDING_START] || valid_symbols[RESOURCE_BINDING_CONTINUATION] ||
+        valid_symbols[PLAIN_RESOURCE_FOR_OF_CONTEXT]) {
         if (valid_symbols[COMPLETED_ARROW_FUNCTION]) {
             return false;
         }
         bool statement_end = false;
-        bool ret = scan_expression_end(lexer, false, &statement_end);
+        bool ret = scan_expression_end(lexer, false, &statement_end, valid_symbols);
         scanner->automatic_semicolon_pending |= statement_end;
         return ret;
     }
@@ -1052,13 +1125,17 @@ static bool scan_let(TSLexer *lexer) {
         name[length++] = lexer->lookahead < 0x80 ? (char)lexer->lookahead : '?';
         advance(lexer);
     }
+    return !is_reserved_word(name);
+}
+
+static bool is_reserved_word(const char *name) {
     static const char *const reserved[] = {
         "break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else",
         "export", "extends", "false", "finally", "for", "function", "if", "import", "in", "instanceof", "new",
         "null", "return", "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with"
     };
     for (unsigned i = 0; i < sizeof(reserved) / sizeof(reserved[0]); i++) {
-        if (strcmp(name, reserved[i]) == 0) return false;
+        if (strcmp(name, reserved[i]) == 0) return true;
     }
-    return true;
+    return false;
 }

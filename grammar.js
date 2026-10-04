@@ -101,6 +101,9 @@ module.exports = grammar({
     $._await_keyword,
     $._let,
     $._single_statement_context,
+    $._resource_binding_start,
+    $._resource_binding_continuation,
+    $._plain_resource_for_of_context,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -335,7 +338,9 @@ module.exports = grammar({
     using_declaration: ($) =>
       seq(
         field('kind', choice('using', seq(alias($._await_keyword, 'await'), 'using'))),
-        commaSep1(alias($._using_declarator, $.variable_declarator)),
+        $._resource_binding_start,
+        alias($._using_declarator, $.variable_declarator),
+        repeat(seq(',', $._resource_binding_continuation, alias($._using_declarator, $.variable_declarator))),
         $._semicolon
       ),
 
@@ -403,7 +408,9 @@ module.exports = grammar({
     _for_using_declaration: ($) =>
       seq(
         field('kind', choice('using', seq(alias($._await_keyword, 'await'), 'using'))),
-        commaSep1(alias($._using_declarator, $.variable_declarator)),
+        $._resource_binding_start,
+        alias($._using_declarator, $.variable_declarator),
+        repeat(seq(',', $._resource_binding_continuation, alias($._using_declarator, $.variable_declarator))),
         ';'
       ),
 
@@ -414,22 +421,30 @@ module.exports = grammar({
       seq(
         '(',
         choice(
-          field('left', choice($._lhs_expression, $.parenthesized_expression)),
           seq(
-            field('kind', 'var'),
-            field('left', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern)),
-            optional($._initializer)
+            choice(
+              field('left', choice($._lhs_expression, $.parenthesized_expression)),
+              seq(
+                field('kind', 'var'),
+                field('left', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern)),
+                optional($._initializer)
+              ),
+              seq(
+                field('kind', choice('let', 'const')),
+                field('left', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern))
+              )
+            ),
+            field('operator', choice('in', 'of'))
           ),
           seq(
-            field('kind', choice('let', 'const')),
-            field('left', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern))
-          ),
-          seq(
-            field('kind', choice('using', seq(alias($._await_keyword, 'await'), 'using'))),
-            field('left', choice($.identifier, alias('of', $.identifier)))
+            choice(
+              seq(field('kind', 'using'), choice($._resource_binding_start, $._plain_resource_for_of_context)),
+              seq(field('kind', seq(alias($._await_keyword, 'await'), 'using')), $._resource_binding_start)
+            ),
+            field('left', choice($.identifier, alias('of', $.identifier))),
+            field('operator', 'of')
           )
         ),
-        field('operator', choice('in', 'of')),
         field('right', $._expressions),
         ')'
       ),
