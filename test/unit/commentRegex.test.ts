@@ -90,6 +90,56 @@ test('updates return and regex roles when comment newlines are inserted and remo
   }
 });
 
+test('preserves declaration continuations when edits reuse bindings before newline comments', () => {
+  const parser = new Parser();
+  parser.setLanguage(language);
+  try {
+    for (const newline of ['\n', '\r', '\r\n', '\u2028', '\u2029']) {
+      for (const trailing of ['/* second */', '/* second *//* third */', '// second\n']) {
+        for (const continuation of [',b=1;', '=1;']) {
+          let source = `let a/*${newline}comment*/${trailing}${continuation}`;
+          let tree = parser.parse(source)!;
+          try {
+            for (const digit of ['2', '1']) {
+              const index = source.lastIndexOf('=') + 1;
+              const next = source.slice(0, index) + digit + source.slice(index + 1);
+              tree.edit(
+                new Edit({
+                  startIndex: index,
+                  oldEndIndex: index + 1,
+                  newEndIndex: index + 1,
+                  startPosition: position(source, index),
+                  oldEndPosition: position(source, index + 1),
+                  newEndPosition: position(next, index + 1),
+                })
+              );
+              const incremental = parser.parse(next, tree)!;
+              const fresh = parser.parse(next)!;
+              try {
+                expect(incremental.rootNode.hasError, next).toBe(false);
+                expect(snapshot(incremental.rootNode), next).toEqual(snapshot(fresh.rootNode));
+                expect(
+                  incremental.rootNode.namedChildren.map((node) => node.type),
+                  next
+                ).toEqual(['lexical_declaration']);
+              } finally {
+                fresh.delete();
+                tree.delete();
+              }
+              tree = incremental;
+              source = next;
+            }
+          } finally {
+            tree.delete();
+          }
+        }
+      }
+    }
+  } finally {
+    parser.delete();
+  }
+});
+
 function position(source: string, index: number): { row: number; column: number } {
   const preceding = source.slice(0, index);
   return { row: preceding.split('\n').length - 1, column: index - preceding.lastIndexOf('\n') - 1 };
