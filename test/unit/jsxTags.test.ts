@@ -46,6 +46,16 @@ test('JSX tags reference component uses once and contain their names', async () 
       ['$Button', '<$Button />'],
       ['Ω', '<Ω />'],
     ]);
+    for (const source of [
+      String.raw`const view = <\u0061 />;`,
+      String.raw`const A = () => null; const view = <\u0041 />;`,
+      String.raw`const UI = { Button: () => null }; const view = <UI.\u0042utton />;`,
+    ]) {
+      tree.delete();
+      tree = undefined;
+      tree = parser.parse(source)!;
+      expect(query.captures(tree.rootNode).filter(({ name }) => name === 'reference.call')).toEqual([]);
+    }
   } finally {
     tree?.delete();
     query?.delete();
