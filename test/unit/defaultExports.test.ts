@@ -18,6 +18,8 @@ test('retains default declaration queries and independent following statements',
       'async function() {}',
       'async /* comment */ function*() {}',
       'class {}',
+      '@dec class {}',
+      '@factory(() => class {}) class {}',
       'class extends Base {}',
     ]) {
       for (const following of ['(x);', '[x];', '`tag`;']) {

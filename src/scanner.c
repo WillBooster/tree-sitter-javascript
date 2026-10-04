@@ -1207,7 +1207,9 @@ static bool scan_export_default(Scanner *scanner, TSLexer *lexer) {
     if (scan_whitespace_and_comments(lexer, &content, true, true) == REJECT) {
         return true;
     }
-    if (lexer->lookahead == 'f') {
+    if (lexer->lookahead == '@') {
+        scanner->default_declaration_pending = true;
+    } else if (lexer->lookahead == 'f') {
         scanner->default_declaration_pending = scan_word(lexer, "function");
     } else if (lexer->lookahead == 'c') {
         scanner->default_declaration_pending = scan_word(lexer, "class");
