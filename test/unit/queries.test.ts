@@ -114,14 +114,11 @@ test('captures canonical expression supertypes in await operands and callees', a
         expect(captured, operand.text).toContain(operand.id);
       }
     }
-    for (const query of [callees, primaryCallees]) {
-      const captured = new Set(query.captures(tree.rootNode).map(({ node }) => node.id));
-      for (const call of tree.rootNode.descendantsOfType('call_expression')) {
-        if (call.childForFieldName('arguments')!.type === 'arguments') {
-          const callee = call.childForFieldName('function')!;
-          expect(captured, callee.text).toContain(callee.id);
-        }
-      }
+    expect(callees.captures(tree.rootNode).map(({ node }) => node.text)).toEqual(['g', 'yield', 'g']);
+    const capturedCallees = new Set(primaryCallees.captures(tree.rootNode).map(({ node }) => node.id));
+    for (const call of tree.rootNode.descendantsOfType('call_expression')) {
+      const callee = call.childForFieldName('function')!;
+      expect(capturedCallees, callee.text).toContain(callee.id);
     }
   } finally {
     operands.delete();
