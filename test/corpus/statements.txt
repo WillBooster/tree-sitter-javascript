@@ -293,7 +293,7 @@ export { "string import" as "string export" } from 'foo';
         key: (property_identifier)
         value: (array))))
   (export_statement
-    value: (function_expression
+    declaration: (function_declaration
       parameters: (formal_parameters)
       body: (statement_block)))
   (export_statement

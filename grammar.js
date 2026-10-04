@@ -104,6 +104,8 @@ module.exports = grammar({
     $._resource_binding_start,
     $._resource_binding_continuation,
     $._plain_resource_for_of_context,
+    $._export_default,
+    $._default_declaration_start,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -222,7 +224,10 @@ module.exports = grammar({
           'export',
           choice(
             field('declaration', $.declaration),
-            seq('default', choice(field('declaration', $.declaration), seq(field('value', $.expression), $._semicolon)))
+            seq(
+              alias($._export_default, 'default'),
+              choice(field('declaration', $.declaration), seq(field('value', $.expression), $._semicolon))
+            )
           )
         )
       ),
@@ -742,9 +747,15 @@ module.exports = grammar({
       prec(
         'declaration',
         seq(
-          repeat(field('decorator', $.decorator)),
-          'class',
-          field('name', $.identifier),
+          choice(
+            seq(
+              $._default_declaration_start,
+              repeat(field('decorator', $.decorator)),
+              'class',
+              field('name', optional($.identifier))
+            ),
+            seq(repeat(field('decorator', $.decorator)), 'class', field('name', $.identifier))
+          ),
           optional($.class_heritage),
           field('body', $.class_body)
         )
@@ -768,9 +779,10 @@ module.exports = grammar({
       prec.right(
         'declaration',
         seq(
-          optional('async'),
-          'function',
-          field('name', $.identifier),
+          choice(
+            seq($._default_declaration_start, optional('async'), 'function', field('name', optional($.identifier))),
+            seq(optional('async'), 'function', field('name', $.identifier))
+          ),
           $._call_signature,
           field('body', $.statement_block)
         )
@@ -793,10 +805,16 @@ module.exports = grammar({
       prec.right(
         'declaration',
         seq(
-          optional('async'),
-          'function',
-          '*',
-          field('name', $.identifier),
+          choice(
+            seq(
+              $._default_declaration_start,
+              optional('async'),
+              'function',
+              '*',
+              field('name', optional($.identifier))
+            ),
+            seq(optional('async'), 'function', '*', field('name', $.identifier))
+          ),
           $._call_signature,
           field('body', $.statement_block)
         )
