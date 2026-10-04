@@ -427,6 +427,9 @@ test('retains resource binding errors across escaped-name edits', async () => {
             String.raw`i\u006estanceof`,
             String.raw`\u0069n`,
             String.raw`i\u{6e}`,
+            'enum',
+            String.raw`\u0065num`,
+            String.raw`\u{65}num`,
             name,
           ]) {
             const nextSource = sourceFor(nextName);

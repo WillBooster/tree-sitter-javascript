@@ -908,7 +908,7 @@ static bool scan_resource_binding(TSLexer *lexer, bool plain_for_of, bool *infix
         bool scanned_content = false;
         return scan_whitespace_and_comments(lexer, &scanned_content, true, false) != REJECT && lexer->lookahead == '=';
     }
-    return !ascii_word || !is_reserved_word(word);
+    return !ascii_word || (strcmp(word, "enum") != 0 && !is_reserved_word(word));
 }
 
 static bool scan_await_yield_identifier(TSLexer *lexer) {
