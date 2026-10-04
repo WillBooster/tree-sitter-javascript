@@ -82,7 +82,7 @@
 (call_expression
   function: (member_expression
     property: (property_identifier) @name)
-  arguments: (_) @reference.call)
+  arguments: (_)) @reference.call
 
 (new_expression
   constructor: (_) @name) @reference.class
