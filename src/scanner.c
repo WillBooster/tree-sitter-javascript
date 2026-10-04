@@ -35,6 +35,8 @@ enum TokenType {
     RESOURCE_BINDING_START,
     RESOURCE_BINDING_CONTINUATION,
     PLAIN_RESOURCE_FOR_OF_CONTEXT,
+    EXPORT_DEFAULT,
+    DEFAULT_DECLARATION_START,
 };
 
 static bool scan_let(TSLexer *lexer);
@@ -44,7 +46,10 @@ typedef struct {
     // A reused block arrow or postfix update can bypass the boundary state; serialize the pending semicolon.
     // Nested await end tokens must not clear it before the enclosing statement consumes it.
     bool automatic_semicolon_pending;
+    bool default_declaration_pending;
 } Scanner;
+
+static bool scan_export_default(Scanner *scanner, TSLexer *lexer);
 
 void *tree_sitter_javascript_external_scanner_create() { return ts_calloc(1, sizeof(Scanner)); }
 
@@ -53,12 +58,14 @@ void tree_sitter_javascript_external_scanner_destroy(void *payload) { ts_free(pa
 unsigned tree_sitter_javascript_external_scanner_serialize(void *payload, char *buffer) {
     Scanner *scanner = (Scanner *)payload;
     buffer[0] = (char)scanner->automatic_semicolon_pending;
-    return 1;
+    buffer[1] = (char)scanner->default_declaration_pending;
+    return 2;
 }
 
 void tree_sitter_javascript_external_scanner_deserialize(void *payload, const char *buffer, unsigned length) {
     Scanner *scanner = (Scanner *)payload;
     scanner->automatic_semicolon_pending = length > 0 && buffer[0];
+    scanner->default_declaration_pending = length > 1 && buffer[1];
 }
 
 static inline void advance(TSLexer *lexer) { lexer->advance(lexer, false); }
@@ -969,6 +976,18 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         return scan_template_chars(lexer);
     }
 
+    if (valid_symbols[EXPORT_DEFAULT]) {
+        return scan_export_default(scanner, lexer);
+    }
+    if (valid_symbols[DEFAULT_DECLARATION_START] && scanner->default_declaration_pending) {
+        while (is_whitespace(lexer->lookahead)) skip(lexer);
+        if (lexer->lookahead == '/') return false;
+        lexer->mark_end(lexer);
+        lexer->result_symbol = DEFAULT_DECLARATION_START;
+        scanner->default_declaration_pending = false;
+        return true;
+    }
+
     if (valid_symbols[POSTFIX_UPDATE_END]) {
         bool statement_end = false;
         bool ret = scan_expression_end(lexer, true, &statement_end, valid_symbols);
@@ -1167,3 +1186,59 @@ static bool is_reserved_word(const char *name) {
     }
     return false;
 }
+
+static bool scan_export_default(Scanner *scanner, TSLexer *lexer) {
+    while (is_whitespace(lexer->lookahead)) {
+        skip(lexer);
+    }
+    for (const char *word = "default"; *word; word++) {
+        if (lexer->lookahead != *word) {
+            return false;
+        }
+        advance(lexer);
+    }
+    if (is_identifier_part(lexer->lookahead)) {
+        return false;
+    }
+    lexer->mark_end(lexer);
+    lexer->result_symbol = EXPORT_DEFAULT;
+    bool content = false;
+    scanner->default_declaration_pending = false;
+    if (scan_whitespace_and_comments(lexer, &content, true, true) == REJECT) {
+        return true;
+    }
+    if (lexer->lookahead == 'f') {
+        scanner->default_declaration_pending = scan_word(lexer, "function");
+    } else if (lexer->lookahead == 'c') {
+        scanner->default_declaration_pending = scan_word(lexer, "class");
+    } else if (lexer->lookahead == 'a' && scan_word(lexer, "async")) {
+        for (;;) {
+            while (is_whitespace(lexer->lookahead)) {
+                if (is_line_terminator(lexer->lookahead)) return true;
+                skip(lexer);
+            }
+            if (lexer->lookahead != '/') break;
+            skip(lexer);
+            if (lexer->lookahead != '*') return true;
+            skip(lexer);
+            bool closed = false;
+            while (!lexer->eof(lexer)) {
+                if (is_line_terminator(lexer->lookahead)) return true;
+                if (lexer->lookahead == '*') {
+                    skip(lexer);
+                    if (lexer->lookahead == '/') {
+                        skip(lexer);
+                        closed = true;
+                        break;
+                    }
+                } else {
+                    skip(lexer);
+                }
+            }
+            if (!closed) return true;
+        }
+        scanner->default_declaration_pending = scan_word(lexer, "function");
+    }
+    return true;
+}
+
