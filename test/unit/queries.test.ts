@@ -64,3 +64,170 @@ for (const [packageKind, listFiles] of Object.entries(listPublishedFiles)) {
     }
   );
 }
+
+// Identical printed trees can lose supertype membership when a filtered hidden rule replaces the public expression
+// rules. Check captures through the shipped parser, including the contextual yield-identifier operand paths.
+test('captures canonical expression supertypes in await operands and callees', async () => {
+  const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
+  const parser = new Parser();
+  parser.setLanguage(language);
+  const tree = parser.parse(`async function f() {
+    await g(x);
+    await yield(x);
+    await yield.foo;
+    await yield[index];
+    await yield\`tag\`;
+    await yield;
+    await
+    yield in values;
+    await /* comment */ yield.foo;
+    await
+    /* comment */
+    yield.foo;
+    const h = async () => await g(x);
+  }`)!;
+  const operands = new Query(language, '(await_expression (expression) @operand)');
+  const primaryOperands = new Query(language, '(await_expression (primary_expression) @operand)');
+  const callees = new Query(language, '(call_expression function: (expression) @callee)');
+  const primaryCallees = new Query(language, '(call_expression function: (primary_expression) @callee)');
+  try {
+    expect(tree.rootNode.hasError).toBe(false);
+    expect(tree.rootNode.descendantsOfType('comment')).toHaveLength(2);
+    const awaitNodes = tree.rootNode.descendantsOfType('await_expression');
+    expect(awaitNodes.map((node) => node.namedChildren.find((child) => child.type !== 'comment')!.type)).toEqual([
+      'call_expression',
+      'call_expression',
+      'member_expression',
+      'subscript_expression',
+      'call_expression',
+      'identifier',
+      'identifier',
+      'member_expression',
+      'member_expression',
+      'call_expression',
+    ]);
+    expect(tree.rootNode.descendantsOfType('yield_expression')).toHaveLength(0);
+    for (const query of [operands, primaryOperands]) {
+      const captured = new Set(query.captures(tree.rootNode).map(({ node }) => node.id));
+      for (const awaitNode of tree.rootNode.descendantsOfType('await_expression')) {
+        const operand = awaitNode.namedChildren.find((node) => node.type !== 'comment')!;
+        expect(captured, operand.text).toContain(operand.id);
+      }
+    }
+    expect(callees.captures(tree.rootNode).map(({ node }) => node.text)).toEqual(['g', 'yield', 'g']);
+    const capturedCallees = new Set(primaryCallees.captures(tree.rootNode).map(({ node }) => node.id));
+    for (const call of tree.rootNode.descendantsOfType('call_expression')) {
+      const callee = call.childForFieldName('function')!;
+      expect(capturedCallees, callee.text).toContain(callee.id);
+    }
+  } finally {
+    operands.delete();
+    primaryOperands.delete();
+    callees.delete();
+    primaryCallees.delete();
+    tree.delete();
+    parser.delete();
+  }
+});
+
+test('preserves comments and expression captures in ternary arrow bodies', async () => {
+  const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
+  const parser = new Parser();
+  parser.setLanguage(language);
+  const query = new Query(language, '(arrow_function body: (expression) @body)');
+  try {
+    for (const comment of ['/* comment */', '/*\ncomment */', '// comment\n']) {
+      const source = `const f = x => a ${comment} ? b : c;`;
+      const tree = parser.parse(source)!;
+      try {
+        expect(tree.rootNode.hasError, source).toBe(false);
+        expect(tree.rootNode.descendantsOfType('comment').map((node) => node.text)).toEqual([comment.trim()]);
+        const body = tree.rootNode.descendantsOfType('arrow_function')[0]!.childForFieldName('body')!;
+        expect(body.type).toBe('ternary_expression');
+        expect(body.text).toBe(`a ${comment} ? b : c`);
+        expect(query.captures(tree.rootNode).map(({ node }) => node.id)).toContain(body.id);
+      } finally {
+        tree.delete();
+      }
+    }
+  } finally {
+    query.delete();
+    parser.delete();
+  }
+});
+
+test('retains canonical callees in recovered legacy call assignments', async () => {
+  const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
+  const parser = new Parser();
+  parser.setLanguage(language);
+  const queries = [
+    new Query(language, '(call_expression function: (expression) @callee)'),
+    new Query(language, '(call_expression function: (primary_expression) @callee)'),
+  ];
+  try {
+    for (const [source, expectedCallees] of [
+      ['foo().bar() = 1;', ['foo().bar', 'foo']],
+      ['foo().bar() += 1;', ['foo().bar', 'foo']],
+      ['new (foo?.bar)()() = 1;', ['new (foo?.bar)()']],
+    ] as const) {
+      const tree = parser.parse(source)!;
+      try {
+        const calls = tree.rootNode.descendantsOfType('call_expression');
+        expect(
+          calls.map((call) => call.childForFieldName('function')!.text),
+          source
+        ).toEqual(expectedCallees);
+        for (const query of queries) {
+          const captured = new Set(query.captures(tree.rootNode).map(({ node }) => node.id));
+          for (const call of calls) {
+            const callee = call.childForFieldName('function')!;
+            expect(captured, `${source}: ${callee.text}`).toContain(callee.id);
+          }
+        }
+      } finally {
+        tree.delete();
+      }
+    }
+  } finally {
+    for (const query of queries) query.delete();
+    parser.delete();
+  }
+});
+
+test('preserves consuming await keyword ranges across operand lookahead', async () => {
+  const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
+  const parser = new Parser();
+  parser.setLanguage(language);
+  const query = new Query(language, '"await" @keyword');
+  try {
+    const sources = [
+      ['async function f(){return /*before*/ await /*\n*/ let.foo;}', 1],
+      ['async function f(){await await //after\nlet[0];}', 2],
+      ['async function f(){for await(const x of xs){} await using resource=foo();}', 2],
+      ['function f(){const await=1;return await;}', 0],
+    ] as const;
+    for (const [source, count] of sources) {
+      const tree = parser.parse(source)!;
+      try {
+        expect(tree.rootNode.hasError, source).toBe(false);
+        const keywords = query.captures(tree.rootNode);
+        expect(keywords, source).toHaveLength(count);
+        for (const { node } of keywords) {
+          expect(node.text, source).toBe('await');
+          expect(node.endIndex - node.startIndex, source).toBe(5);
+        }
+        for (const node of tree.rootNode.descendantsOfType('await_expression')) {
+          expect(node.text, source).toMatch(/^await\b/);
+        }
+        expect(tree.rootNode.descendantsOfType('comment'), source).toHaveLength(
+          source.match(/\/\*|\/\//g)?.length ?? 0
+        );
+      } finally {
+        tree.delete();
+      }
+    }
+  } finally {
+    query.delete();
+    parser.delete();
+  }
+});
