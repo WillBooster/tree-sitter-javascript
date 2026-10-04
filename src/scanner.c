@@ -960,6 +960,10 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         if (!ret && !scanned_content && valid_symbols[AWAIT_KEYWORD] && lexer->lookahead == 'a') {
             return scan_await_keyword(lexer);
         }
+        if (!ret && !scanned_content && valid_symbols[LET] && !valid_symbols[SINGLE_STATEMENT_CONTEXT] && lexer->lookahead == 'l') {
+            lexer->result_symbol = LET;
+            return scan_let(lexer);
+        }
         return ret;
     }
 

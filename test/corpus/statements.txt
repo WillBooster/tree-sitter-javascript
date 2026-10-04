@@ -1965,3 +1965,38 @@ inCase; }
         (lexical_declaration
           (variable_declarator
             (identifier)))))))
+
+================================================================================
+Contextual let after declarations with optional semicolons
+================================================================================
+
+function f() {} let
+x;
+class C {} let
+y;
+do {} while (false) let
+z;
+
+--------------------------------------------------------------------------------
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)))
+  (class_declaration
+    (identifier)
+    (class_body))
+  (lexical_declaration
+    (variable_declarator
+      (identifier)))
+  (do_statement
+    (statement_block)
+    (parenthesized_expression
+      (false)))
+  (lexical_declaration
+    (variable_declarator
+      (identifier))))
