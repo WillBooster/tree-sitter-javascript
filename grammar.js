@@ -99,6 +99,8 @@ module.exports = grammar({
     // Emitted zero-width after a postfix update; carries the pending statement boundary across reuse.
     $._postfix_update_end,
     $._await_keyword,
+    $._let,
+    $._single_statement_context,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -189,6 +191,8 @@ module.exports = grammar({
     program: ($) => seq(optional($.hash_bang_line), repeat($._statement)),
 
     _statement: ($) => prec.right(seq($.statement, optional($._statement_boundary))),
+
+    _single_statement: ($) => seq(optional($._single_statement_context), $._statement),
 
     hash_bang_line: () => /#![^\n\r\u2028\u2029]*/,
 
@@ -323,8 +327,10 @@ module.exports = grammar({
 
     variable_declaration: ($) => seq('var', commaSep1($.variable_declarator), $._semicolon),
 
+    _let: () => token(prec(-1, /let/)),
+
     lexical_declaration: ($) =>
-      seq(field('kind', choice('let', 'const')), commaSep1($.variable_declarator), $._semicolon),
+      seq(field('kind', choice('let', alias($._let, 'let'), 'const')), commaSep1($.variable_declarator), $._semicolon),
 
     using_declaration: ($) =>
       seq(
@@ -344,14 +350,14 @@ module.exports = grammar({
 
     statement_block: ($) => prec.right(seq('{', repeat($._statement), '}')),
 
-    else_clause: ($) => seq('else', $._statement),
+    else_clause: ($) => seq('else', $._single_statement),
 
     if_statement: ($) =>
       prec.right(
         seq(
           'if',
           field('condition', $.parenthesized_expression),
-          field('consequence', $._statement),
+          field('consequence', $._single_statement),
           optional(field('alternative', $.else_clause))
         )
       ),
@@ -366,7 +372,7 @@ module.exports = grammar({
         $._for_condition,
         field('increment', optional($._expressions)),
         ')',
-        field('body', $._statement)
+        field('body', $._single_statement)
       ),
 
     // Extracted into rules because tree-sitter expands a `choice` written inline in the `seq` above into one production
@@ -403,7 +409,7 @@ module.exports = grammar({
       ),
 
     for_in_statement: ($) =>
-      seq('for', optional(alias($._await_keyword, 'await')), $._for_header, field('body', $._statement)),
+      seq('for', optional(alias($._await_keyword, 'await')), $._for_header, field('body', $._single_statement)),
 
     _for_header: ($) =>
       seq(
@@ -429,13 +435,14 @@ module.exports = grammar({
         ')'
       ),
 
-    while_statement: ($) => seq('while', field('condition', $.parenthesized_expression), field('body', $._statement)),
+    while_statement: ($) =>
+      seq('while', field('condition', $.parenthesized_expression), field('body', $._single_statement)),
 
     do_statement: ($) =>
       prec.right(
         seq(
           'do',
-          field('body', $._statement),
+          field('body', $._single_statement),
           'while',
           field('condition', $.parenthesized_expression),
           optional($._semicolon)
@@ -450,7 +457,7 @@ module.exports = grammar({
         optional(field('finalizer', $.finally_clause))
       ),
 
-    with_statement: ($) => seq('with', field('object', $.parenthesized_expression), field('body', $._statement)),
+    with_statement: ($) => seq('with', field('object', $.parenthesized_expression), field('body', $._single_statement)),
 
     break_statement: ($) =>
       seq(
@@ -479,7 +486,7 @@ module.exports = grammar({
       seq(
         field('label', alias(choice($.identifier, $._reserved_identifier), $.statement_identifier)),
         ':',
-        field('body', $._statement)
+        field('body', $._single_statement)
       ),
 
     //
