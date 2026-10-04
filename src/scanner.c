@@ -170,7 +170,7 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
                             lexer->advance(lexer, skip_contents);
                             *scanned_content = true;
 
-                            if (lexer->lookahead != '/' && !consume) {
+                            if (!consume && (saw_block_newline || lexer->lookahead != '/')) {
                                 return saw_block_newline ? ACCEPT_IN_BLOCK_COMMENT : NO_NEWLINE;
                             }
 
