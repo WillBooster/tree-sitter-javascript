@@ -2000,3 +2000,84 @@ z;
   (lexical_declaration
     (variable_declarator
       (identifier))))
+
+==================
+Ordinary using identifier continuations
+==================
+
+function ordinary() {
+  using ? a : b;
+  using /*
+  ternary */ ? a : b;
+  using
+  (a);
+  using
+  [a] = 1;
+  using /*
+  comment */ + 1;
+  using
+  instanceof X;
+  using
+  in x;
+  using
+  `t`;
+  using // statement comment
+  next;
+  { using }
+}
+
+---
+
+(program
+  (function_declaration
+    (identifier)
+    (formal_parameters)
+    (statement_block
+      (expression_statement
+        (ternary_expression
+          (identifier)
+          (identifier)
+          (identifier)))
+      (expression_statement
+        (ternary_expression
+          (identifier)
+          (comment)
+          (identifier)
+          (identifier)))
+      (expression_statement
+        (call_expression
+          (identifier)
+          (arguments
+            (identifier))))
+      (expression_statement
+        (assignment_expression
+          (subscript_expression
+            (identifier)
+            (identifier))
+          (number)))
+      (expression_statement
+        (binary_expression
+          (identifier)
+          (comment)
+          (number)))
+      (expression_statement
+        (binary_expression
+          (identifier)
+          (identifier)))
+      (expression_statement
+        (binary_expression
+          (identifier)
+          (identifier)))
+      (expression_statement
+        (call_expression
+          (identifier)
+          (template_string
+            (string_fragment))))
+      (expression_statement
+        (identifier)
+        (comment))
+      (expression_statement
+        (identifier))
+      (statement_block
+        (expression_statement
+          (identifier))))))
