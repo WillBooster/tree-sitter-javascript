@@ -87,3 +87,48 @@ test('preserves default declaration context through incremental prefix edits', (
     parser.delete();
   }
 });
+
+test('preserves default keyword ranges and comment extras around declarations', () => {
+  const parser = new Parser();
+  parser.setLanguage(language);
+  const query = new Query(language, '"default" @keyword (export_statement declaration: (declaration) @declaration)');
+  try {
+    for (const before of ['', '/* before */ ', '<!-- before\n', '--> before\n']) {
+      for (const after of ['', '/* after */ ', '<!-- after\n', '--> after\n']) {
+        for (const value of ['1;', 'function() {}\n(x);', 'class {}\n[x];']) {
+          const source = `export ${before}default ${after}${value}`;
+          const tree = parser.parse(source)!;
+          try {
+            expect(tree.rootNode.hasError, source).toBe(false);
+            const captures = query.captures(tree.rootNode);
+            expect(
+              captures
+                .filter(({ name }) => name === 'keyword')
+                .map(({ node }) => [node.text, node.startIndex, node.endIndex])
+            ).toEqual([['default', source.indexOf('default'), source.indexOf('default') + 7]]);
+            expect(captures.filter(({ name }) => name === 'declaration')).toHaveLength(value === '1;' ? 0 : 1);
+            expect(tree.rootNode.lastNamedChild?.text).toBe(
+              value === '1;' ? source : value.endsWith('(x);') ? '(x);' : '[x];'
+            );
+          } finally {
+            tree.delete();
+          }
+        }
+      }
+    }
+    const tree = parser.parse('export default <!-- c --> function() {}\n(x);')!;
+    try {
+      expect(tree.rootNode.hasError).toBe(false);
+      expect(tree.rootNode.descendantsOfType('html_comment').map((node) => node.text)).toEqual([
+        '<!-- c --> function() {}',
+      ]);
+      expect(tree.rootNode.descendantsOfType('function_declaration')).toHaveLength(0);
+      expect(tree.rootNode.firstNamedChild?.childForFieldName('value')?.type).toBe('parenthesized_expression');
+    } finally {
+      tree.delete();
+    }
+  } finally {
+    query.delete();
+    parser.delete();
+  }
+});

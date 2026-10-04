@@ -50,6 +50,7 @@ typedef struct {
 } Scanner;
 
 static bool scan_export_default(Scanner *scanner, TSLexer *lexer);
+static bool scan_default_trivia(TSLexer *lexer, bool allow_line_breaks);
 
 void *tree_sitter_javascript_external_scanner_create() { return ts_calloc(1, sizeof(Scanner)); }
 
@@ -976,16 +977,19 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         return scan_template_chars(lexer);
     }
 
-    if (valid_symbols[EXPORT_DEFAULT]) {
-        return scan_export_default(scanner, lexer);
-    }
-    if (valid_symbols[DEFAULT_DECLARATION_START] && scanner->default_declaration_pending) {
+    if (valid_symbols[EXPORT_DEFAULT] ||
+        (valid_symbols[DEFAULT_DECLARATION_START] && scanner->default_declaration_pending)) {
         while (is_whitespace(lexer->lookahead)) skip(lexer);
-        if (lexer->lookahead == '/') return false;
-        lexer->mark_end(lexer);
-        lexer->result_symbol = DEFAULT_DECLARATION_START;
-        scanner->default_declaration_pending = false;
-        return true;
+        if (valid_symbols[EXPORT_DEFAULT] && lexer->lookahead == 'd') {
+            return scan_export_default(scanner, lexer);
+        }
+        if (valid_symbols[DEFAULT_DECLARATION_START] && scanner->default_declaration_pending &&
+            (lexer->lookahead == '@' || lexer->lookahead == 'a' || lexer->lookahead == 'c' || lexer->lookahead == 'f')) {
+            lexer->mark_end(lexer);
+            lexer->result_symbol = DEFAULT_DECLARATION_START;
+            scanner->default_declaration_pending = false;
+            return true;
+        }
     }
 
     if (valid_symbols[POSTFIX_UPDATE_END]) {
@@ -1202,45 +1206,61 @@ static bool scan_export_default(Scanner *scanner, TSLexer *lexer) {
     }
     lexer->mark_end(lexer);
     lexer->result_symbol = EXPORT_DEFAULT;
-    bool content = false;
     scanner->default_declaration_pending = false;
-    if (scan_whitespace_and_comments(lexer, &content, true, true) == REJECT) {
-        return true;
-    }
+    if (!scan_default_trivia(lexer, true)) return true;
     if (lexer->lookahead == '@') {
         scanner->default_declaration_pending = true;
-    } else if (lexer->lookahead == 'f') {
-        scanner->default_declaration_pending = scan_word(lexer, "function");
-    } else if (lexer->lookahead == 'c') {
-        scanner->default_declaration_pending = scan_word(lexer, "class");
-    } else if (lexer->lookahead == 'a' && scan_word(lexer, "async")) {
-        for (;;) {
-            while (is_whitespace(lexer->lookahead)) {
-                if (is_line_terminator(lexer->lookahead)) return true;
-                skip(lexer);
-            }
-            if (lexer->lookahead != '/') break;
-            skip(lexer);
-            if (lexer->lookahead != '*') return true;
-            skip(lexer);
-            bool closed = false;
-            while (!lexer->eof(lexer)) {
-                if (is_line_terminator(lexer->lookahead)) return true;
-                if (lexer->lookahead == '*') {
-                    skip(lexer);
-                    if (lexer->lookahead == '/') {
-                        skip(lexer);
-                        closed = true;
-                        break;
-                    }
-                } else {
-                    skip(lexer);
-                }
-            }
-            if (!closed) return true;
+    } else {
+        char word[16] = {0};
+        if (!scan_identifier(lexer, word, sizeof(word), false)) return true;
+        if (strcmp(word, "function") == 0 || strcmp(word, "class") == 0) {
+            scanner->default_declaration_pending = true;
+        } else if (strcmp(word, "async") == 0 && scan_default_trivia(lexer, false)) {
+            memset(word, 0, sizeof(word));
+            scanner->default_declaration_pending =
+                scan_identifier(lexer, word, sizeof(word), false) && strcmp(word, "function") == 0;
         }
-        scanner->default_declaration_pending = scan_word(lexer, "function");
     }
     return true;
 }
 
+static bool scan_default_trivia(TSLexer *lexer, bool allow_line_breaks) {
+    for (;;) {
+        while (is_whitespace(lexer->lookahead)) {
+            if (!allow_line_breaks && is_line_terminator(lexer->lookahead)) return false;
+            advance(lexer);
+        }
+        if (lexer->lookahead == '/') {
+            advance(lexer);
+            if (lexer->lookahead == '*') {
+                advance(lexer);
+                bool closed = false;
+                while (!lexer->eof(lexer)) {
+                    if (!allow_line_breaks && is_line_terminator(lexer->lookahead)) return false;
+                    if (lexer->lookahead == '*') {
+                        advance(lexer);
+                        if (lexer->lookahead == '/') {
+                            advance(lexer);
+                            closed = true;
+                            break;
+                        }
+                    } else {
+                        advance(lexer);
+                    }
+                }
+                if (!closed) return false;
+                continue;
+            }
+            if (lexer->lookahead != '/') return false;
+        } else if (lexer->lookahead == '<' || lexer->lookahead == '-') {
+            const char *opening = lexer->lookahead == '<' ? "<!--" : "-->";
+            for (; *opening; opening++) {
+                if (lexer->lookahead != *opening) return false;
+                advance(lexer);
+            }
+        } else {
+            return true;
+        }
+        while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) advance(lexer);
+    }
+}
