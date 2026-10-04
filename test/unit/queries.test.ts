@@ -340,3 +340,60 @@ test('restores awaited resource bindings across identifier and operator edits', 
     parser.delete();
   }
 });
+
+test('retains resource initializer errors while editing ordinary and classic for declarations', async () => {
+  const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
+  const parser = new Parser();
+  parser.setLanguage(language);
+  try {
+    for (const name of ['i', 'install', 'inside', 'instanceofX', 'resource']) {
+      for (const declaration of [
+        `async function f(){await using ${name};}`,
+        `async function f(){for(await using ${name}; keepGoing();){}}`,
+        `function f(){using ${name};}`,
+        `function f(){for(using ${name}; keepGoing();){}}`,
+      ]) {
+        let tree = parser.parse(declaration)!;
+        expect(tree.rootNode.hasError, declaration).toBe(true);
+        const index = declaration.indexOf('using ') + 'using '.length + name.length;
+        let previous = declaration;
+        try {
+          for (const initializer of ['=getResource()', '']) {
+            const end = previous.indexOf(';', index);
+            const next = previous.slice(0, index) + initializer + previous.slice(end);
+            tree.edit(
+              new Edit({
+                startIndex: index,
+                oldEndIndex: end,
+                newEndIndex: index + initializer.length,
+                startPosition: { row: 0, column: index },
+                oldEndPosition: { row: 0, column: end },
+                newEndPosition: { row: 0, column: index + initializer.length },
+              })
+            );
+            const incremental = parser.parse(next, tree)!;
+            const fresh = parser.parse(next)!;
+            try {
+              expect(incremental.rootNode.toString(), next).toBe(fresh.rootNode.toString());
+              expect(incremental.rootNode.hasError, next).toBe(initializer === '');
+              if (initializer) {
+                expect(
+                  incremental.rootNode.descendantsOfType('variable_declarator')[0]?.childForFieldName('value')?.text
+                ).toBe('getResource()');
+              }
+            } finally {
+              fresh.delete();
+              tree.delete();
+            }
+            tree = incremental;
+            previous = next;
+          }
+        } finally {
+          tree.delete();
+        }
+      }
+    }
+  } finally {
+    parser.delete();
+  }
+});

@@ -339,8 +339,7 @@ module.exports = grammar({
         $._semicolon
       ),
 
-    _using_declarator: ($) =>
-      seq(field('name', choice($.identifier, alias('of', $.identifier))), optional($._initializer)),
+    _using_declarator: ($) => seq(field('name', choice($.identifier, alias('of', $.identifier))), $._initializer),
 
     variable_declarator: ($) =>
       seq(
