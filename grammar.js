@@ -504,7 +504,7 @@ module.exports = grammar({
 
     labeled_statement: ($) =>
       seq(
-        field('label', alias(choice($.identifier, $._reserved_identifier), $.statement_identifier)),
+        field('label', alias(choice($.identifier, $.undefined, $._reserved_identifier), $.statement_identifier)),
         ':',
         field('body', $._single_statement)
       ),

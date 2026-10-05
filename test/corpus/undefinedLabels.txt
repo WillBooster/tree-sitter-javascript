@@ -1,0 +1,118 @@
+============================================
+Undefined labels, jumps and expression controls
+============================================
+
+'use strict';
+function countIterations() {
+  let count = 0;
+  undefined: for (let i = 0; i < 4; i++) {
+    if (i === 0) continue undefined;
+    count++;
+    if (i === 2) break undefined;
+  }
+  return count;
+}
+function exitBlock() {
+  undefined /* label */:
+  { break undefined; }
+  return undefined;
+}
+function escapedLabel() {
+  undef\u0069ned: while (true) { break undef\u0069ned; }
+}
+if (countIterations() !== 2 || exitBlock() !== undefined) throw new Error('label execution');
+escapedLabel();
+
+---
+
+(program
+  (expression_statement
+    (string
+      (string_fragment)))
+  (function_declaration name:
+    (identifier) parameters:
+    (formal_parameters) body:
+    (statement_block
+      (lexical_declaration
+        (variable_declarator name:
+          (identifier) value:
+          (number)))
+      (labeled_statement label:
+        (statement_identifier) body:
+        (for_statement initializer:
+          (lexical_declaration
+            (variable_declarator name:
+              (identifier) value:
+              (number))) condition:
+          (binary_expression left:
+            (identifier) right:
+            (number)) increment:
+          (update_expression argument:
+            (identifier)) body:
+          (statement_block
+            (if_statement condition:
+              (parenthesized_expression
+                (binary_expression left:
+                  (identifier) right:
+                  (number))) consequence:
+              (continue_statement label:
+                (statement_identifier)))
+            (expression_statement
+              (update_expression argument:
+                (identifier)))
+            (if_statement condition:
+              (parenthesized_expression
+                (binary_expression left:
+                  (identifier) right:
+                  (number))) consequence:
+              (break_statement label:
+                (statement_identifier))))))
+      (return_statement
+        (identifier))))
+  (function_declaration name:
+    (identifier) parameters:
+    (formal_parameters) body:
+    (statement_block
+      (labeled_statement label:
+        (statement_identifier)
+        (comment) body:
+        (statement_block
+          (break_statement label:
+            (statement_identifier))))
+      (return_statement
+        (undefined))))
+  (function_declaration name:
+    (identifier) parameters:
+    (formal_parameters) body:
+    (statement_block
+      (labeled_statement label:
+        (statement_identifier) body:
+        (while_statement condition:
+          (parenthesized_expression
+            (true)) body:
+          (statement_block
+            (break_statement label:
+              (statement_identifier)))))))
+  (if_statement condition:
+    (parenthesized_expression
+      (binary_expression left:
+        (binary_expression left:
+          (call_expression function:
+            (identifier) arguments:
+            (arguments)) right:
+          (number)) right:
+        (binary_expression left:
+          (call_expression function:
+            (identifier) arguments:
+            (arguments)) right:
+          (undefined)))) consequence:
+    (throw_statement
+      (new_expression constructor:
+        (identifier) arguments:
+        (arguments
+          (string
+            (string_fragment))))))
+  (expression_statement
+    (call_expression function:
+      (identifier) arguments:
+      (arguments))))

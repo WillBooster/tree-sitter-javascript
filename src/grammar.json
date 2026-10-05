@@ -2331,6 +2331,10 @@
                 },
                 {
                   "type": "SYMBOL",
+                  "name": "undefined"
+                },
+                {
+                  "type": "SYMBOL",
                   "name": "_reserved_identifier"
                 }
               ]
