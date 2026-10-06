@@ -984,13 +984,14 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
     if (valid_symbols[ARGUMENTLESS_NEW_END] && !(valid_symbols[TEMPLATE_CHARS] && valid_symbols[AUTOMATIC_SEMICOLON])) {
         lexer->mark_end(lexer);
         bool scanned_content = false;
-        scan_whitespace_and_comments(lexer, &scanned_content, true, false);
-        if (lexer->lookahead == '(' || lexer->lookahead == '[' || lexer->lookahead == '.' || lexer->lookahead == '`') return false;
-        if (lexer->lookahead == '?') {
-            advance(lexer);
-            if (lexer->lookahead == '.') {
+        if (scan_whitespace_and_comments(lexer, &scanned_content, true, false) != REJECT) {
+            if (lexer->lookahead == '(' || lexer->lookahead == '[' || lexer->lookahead == '.' || lexer->lookahead == '`') return false;
+            if (lexer->lookahead == '?') {
                 advance(lexer);
-                if (!is_ascii_digit(lexer->lookahead)) return false;
+                if (lexer->lookahead == '.') {
+                    advance(lexer);
+                    if (!is_ascii_digit(lexer->lookahead)) return false;
+                }
             }
         }
         lexer->result_symbol = ARGUMENTLESS_NEW_END;

@@ -33,6 +33,10 @@ test('rejects unparenthesized optional and arrow constructors while preserving c
       'new class{}',
       'new yield.C()',
       'new A?.1 : B',
+      'new A /(B)',
+      'new A /[B]',
+      'new A /`tag`',
+      'new A /.1',
     ]) {
       const source = `function f(){ return ${expression}; } const sentinel = 1;`;
       const tree = parser.parse(source)!;
