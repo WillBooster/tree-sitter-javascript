@@ -881,6 +881,7 @@ module.exports = grammar({
           'unary_void',
           seq(
             alias($._await_keyword, 'await'),
+            // Independent optional prefixes duplicate parser states; the yield start/context pair stays one alternative.
             optional(
               choice(
                 $._await_identifier_line_break,
