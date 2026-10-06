@@ -6,7 +6,7 @@ test('distinguishes import attributes from following with statements', async () 
   const parser = new Parser().setLanguage(await Language.load('tree-sitter-javascript.wasm'));
   try {
     for (const declaration of ['import { A }', 'import A', 'export { A }', 'export *', 'export * as ns']) {
-      for (const trivia of [' ', '\n', ' /* c */ ', ' // c\n']) {
+      for (const trivia of [' ', '\n', ' /* c */ ', ' // c\n', ' <!-- c\n', ' --> c\n', ' /* a */ <!-- b\n // c\n']) {
         const prefix = `${declaration} from "m"\n`;
         for (const [suffix, attribute] of [
           ['(x) { use(x); }', false],
@@ -16,7 +16,9 @@ test('distinguishes import attributes from following with statements', async () 
           const tree = parser.parse(source)!;
           try {
             expect(tree.rootNode.hasError, source).toBe(false);
-            const statements = tree.rootNode.namedChildren.filter((node) => node.type !== 'comment');
+            const statements = tree.rootNode.namedChildren.filter(
+              (node) => node.type !== 'comment' && node.type !== 'html_comment'
+            );
             expect(statements[0]?.descendantsOfType('import_attribute')).toHaveLength(attribute ? 1 : 0);
             expect(statements[attribute ? 1 : 2]?.text).toBe('const after = 1;');
             if (!attribute) expect(statements[1]?.type).toBe('with_statement');
