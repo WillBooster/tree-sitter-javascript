@@ -874,11 +874,6 @@ module.exports = grammar({
         )
       ),
 
-    // As in ECMAScript, a member access or index extends the nearest `new` with arguments, while an argument list fills
-    // the nearest `new` that still lacks one: `new new A().b` constructs `new A().b`, `new new A().b(2)` constructs
-    // `new A().b` with `2`, and `new new A()(2)` constructs `new A()`. The 'member' and 'new' precedences make the parser
-    // shift a `.`, `[`, or argument list after a constructor rather than end a `new` without arguments, so that form
-    // never takes one. Both forms are primary expressions, so a nested `new` matches the constructor field's type.
     new_expression: ($) =>
       prec(
         'new',
