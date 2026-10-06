@@ -38,6 +38,7 @@ enum TokenType {
     EXPORT_DEFAULT,
     DEFAULT_DECLARATION_START,
     REGEX_FLAGS_START,
+    ARGUMENTLESS_NEW_END,
 };
 
 static bool scan_let(TSLexer *lexer);
@@ -977,6 +978,22 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         advance(lexer);
         if (lexer->lookahead < 'a' || lexer->lookahead > 'z') return false;
         lexer->result_symbol = REGEX_FLAGS_START;
+        return true;
+    }
+
+    if (valid_symbols[ARGUMENTLESS_NEW_END] && !(valid_symbols[TEMPLATE_CHARS] && valid_symbols[AUTOMATIC_SEMICOLON])) {
+        lexer->mark_end(lexer);
+        bool scanned_content = false;
+        scan_whitespace_and_comments(lexer, &scanned_content, true, false);
+        if (lexer->lookahead == '(' || lexer->lookahead == '[' || lexer->lookahead == '.' || lexer->lookahead == '`') return false;
+        if (lexer->lookahead == '?') {
+            advance(lexer);
+            if (lexer->lookahead == '.') {
+                advance(lexer);
+                if (!is_ascii_digit(lexer->lookahead)) return false;
+            }
+        }
+        lexer->result_symbol = ARGUMENTLESS_NEW_END;
         return true;
     }
 
