@@ -38,6 +38,8 @@ enum TokenType {
     EXPORT_DEFAULT,
     DEFAULT_DECLARATION_START,
     REGEX_FLAGS_START,
+    ARGUMENTLESS_NEW_END,
+    CONSTRUCTOR_ASYNC_FUNCTION_START,
 };
 
 static bool scan_let(TSLexer *lexer);
@@ -939,20 +941,25 @@ static bool scan_await_yield_identifier(TSLexer *lexer) {
     return true;
 }
 
-static bool scan_await_keyword(TSLexer *lexer) {
+static bool scan_await_or_async_constructor(TSLexer *lexer, const bool *valid_symbols) {
     bool scanned_content = false;
     if (scan_whitespace_and_comments(lexer, &scanned_content, true, true) == REJECT || scanned_content) {
         return false;
     }
-    for (const char *word = "await"; *word; word++) {
-        if (lexer->lookahead != *word) {
-            return false;
+    lexer->mark_end(lexer);
+    char keyword[16] = {0};
+    if (!scan_identifier(lexer, keyword, sizeof(keyword), false)) return false;
+    if (strcmp(keyword, "async") == 0 && valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START]) {
+        if (!scan_default_trivia(lexer, false)) return false;
+        for (const char *word = "function"; *word; word++) {
+            if (lexer->lookahead != *word) return false;
+            advance(lexer);
         }
-        advance(lexer);
+        if (is_identifier_part(lexer->lookahead)) return false;
+        lexer->result_symbol = CONSTRUCTOR_ASYNC_FUNCTION_START;
+        return true;
     }
-    if (is_identifier_part(lexer->lookahead)) {
-        return false;
-    }
+    if (strcmp(keyword, "await") != 0 || !valid_symbols[AWAIT_KEYWORD]) return false;
     lexer->mark_end(lexer);
     // Record the operand decision on both keyword and identifier tokens so restored nodes cannot keep stale roles.
     // Advancing without skipping after mark_end preserves the consuming keyword's start across probed comments.
@@ -977,6 +984,23 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         advance(lexer);
         if (lexer->lookahead < 'a' || lexer->lookahead > 'z') return false;
         lexer->result_symbol = REGEX_FLAGS_START;
+        return true;
+    }
+
+    if (valid_symbols[ARGUMENTLESS_NEW_END] && !(valid_symbols[TEMPLATE_CHARS] && valid_symbols[AUTOMATIC_SEMICOLON])) {
+        lexer->mark_end(lexer);
+        bool scanned_content = false;
+        if (scan_whitespace_and_comments(lexer, &scanned_content, true, false) != REJECT) {
+            if (lexer->lookahead == '(' || lexer->lookahead == '[' || lexer->lookahead == '.' || lexer->lookahead == '`') return false;
+            if (lexer->lookahead == '?') {
+                advance(lexer);
+                if (lexer->lookahead == '.') {
+                    advance(lexer);
+                    if (!is_ascii_digit(lexer->lookahead)) return false;
+                }
+            }
+        }
+        lexer->result_symbol = ARGUMENTLESS_NEW_END;
         return true;
     }
 
@@ -1095,8 +1119,8 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         if (!ret && !scanned_content && valid_symbols[AWAIT_YIELD_IDENTIFIER] && valid_symbols[LINE_BREAK_AFTER_AWAIT] && lexer->lookahead == 'y') {
             return scan_await_yield_identifier(lexer);
         }
-        if (!ret && !scanned_content && valid_symbols[AWAIT_KEYWORD] && lexer->lookahead == 'a') {
-            return scan_await_keyword(lexer);
+        if (!ret && !scanned_content && (valid_symbols[AWAIT_KEYWORD] || valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START]) && lexer->lookahead == 'a') {
+            return scan_await_or_async_constructor(lexer, valid_symbols);
         }
         if (!ret && !scanned_content && valid_symbols[LET] && !valid_symbols[SINGLE_STATEMENT_CONTEXT] && lexer->lookahead == 'l') {
             lexer->result_symbol = LET;
@@ -1117,8 +1141,8 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
     while (is_whitespace(lexer->lookahead)) {
         skip(lexer);
     }
-    if (valid_symbols[AWAIT_KEYWORD] && lexer->lookahead == 'a') {
-        return scan_await_keyword(lexer);
+    if ((valid_symbols[AWAIT_KEYWORD] || valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START]) && lexer->lookahead == 'a') {
+        return scan_await_or_async_constructor(lexer, valid_symbols);
     }
     if (valid_symbols[TERNARY_QMARK] && lexer->lookahead == '?') {
         return scan_ternary_qmark(lexer);

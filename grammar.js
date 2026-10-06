@@ -107,6 +107,8 @@ module.exports = grammar({
     $._export_default,
     $._default_declaration_start,
     $._regex_flags_start,
+    $._argumentless_new_end,
+    $._constructor_async_function_start,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -116,7 +118,15 @@ module.exports = grammar({
     properties: () => [],
   },
 
-  supertypes: ($) => [$.statement, $.declaration, $.expression, $.primary_expression, $.pattern],
+  supertypes: ($) => [
+    $.statement,
+    $.declaration,
+    $.expression,
+    $.primary_expression,
+    $.pattern,
+    $._constructor,
+    $._constructor_chain_base,
+  ],
 
   inline: ($) => [
     $._call_signature,
@@ -864,15 +874,116 @@ module.exports = grammar({
         )
       ),
 
-    // As in ECMAScript, a member access or index extends the nearest `new` with arguments, while an argument list fills
-    // the nearest `new` that still lacks one: `new new A().b` constructs `new A().b`, `new new A().b(2)` constructs
-    // `new A().b` with `2`, and `new new A()(2)` constructs `new A()`. The 'member' and 'new' precedences make the parser
-    // shift a `.`, `[`, or argument list after a constructor rather than end a `new` without arguments, so that form
-    // never takes one. Both forms are primary expressions, so a nested `new` matches the constructor field's type.
     new_expression: ($) =>
-      prec('new', seq('new', field('constructor', $.primary_expression), field('arguments', $.arguments))),
+      prec(
+        'new',
+        seq('new', field('constructor', alias($._constructor, $.primary_expression)), field('arguments', $.arguments))
+      ),
 
-    _argumentless_new_expression: ($) => prec.right('new', seq('new', field('constructor', $.primary_expression))),
+    _constructor_function_expression: ($) =>
+      prec(
+        'literal',
+        seq(
+          optional($._constructor_async_function_start),
+          optional('async'),
+          'function',
+          field('name', optional($.identifier)),
+          $._call_signature,
+          field('body', $.statement_block)
+        )
+      ),
+
+    _constructor_generator_function: ($) =>
+      prec(
+        'literal',
+        seq(
+          optional($._constructor_async_function_start),
+          optional('async'),
+          'function',
+          '*',
+          field('name', optional($.identifier)),
+          $._call_signature,
+          field('body', $.statement_block)
+        )
+      ),
+
+    _constructor_atom: ($) =>
+      choice(
+        $._jsx_element,
+        $.parenthesized_expression,
+        $._identifier,
+        alias($._await_yield_identifier, $.identifier),
+        alias($._reserved_identifier, $.identifier),
+        $.this,
+        $.super,
+        $.number,
+        $.string,
+        $.template_string,
+        $.regex,
+        $.true,
+        $.false,
+        $.null,
+        $.object,
+        $.array,
+        alias($._constructor_function_expression, $.function_expression),
+        alias($._constructor_generator_function, $.generator_function),
+        $.class,
+        $.meta_property
+      ),
+
+    _constructor: ($) =>
+      choice(
+        $._constructor_atom,
+        $.new_expression,
+        alias($._argumentless_new_expression, $.new_expression),
+        alias($._constructor_member, $.member_expression),
+        alias($._constructor_subscript, $.subscript_expression),
+        alias($._constructor_tag, $.call_expression)
+      ),
+
+    _constructor_chain_base: ($) =>
+      choice(alias($._constructor, $.primary_expression), alias($._constructor_import, $.call_expression)),
+
+    _constructor_import: ($) => prec('call', seq(field('function', $.import), field('arguments', $.arguments))),
+
+    _constructor_member: ($) =>
+      prec(
+        'member',
+        seq(
+          field('object', alias($._constructor_chain_base, $.primary_expression)),
+          '.',
+          field(
+            'property',
+            choice($.private_property_identifier, reserved('properties', alias($.identifier, $.property_identifier)))
+          )
+        )
+      ),
+
+    _constructor_subscript: ($) =>
+      prec.right(
+        'member',
+        seq(
+          field('object', alias($._constructor_chain_base, $.primary_expression)),
+          '[',
+          field('index', $._expressions),
+          ']'
+        )
+      ),
+
+    _constructor_tag: ($) =>
+      prec(
+        'template_call',
+        seq(
+          field('function', alias($._constructor_chain_base, $.primary_expression)),
+          field('arguments', $.template_string)
+        )
+      ),
+
+    _argumentless_new_expression: ($) =>
+      prec.right(
+        'new',
+        seq('new', field('constructor', alias($._constructor, $.primary_expression)), $._argumentless_new_end)
+      ),
 
     await_expression: ($) =>
       prec.dynamic(
