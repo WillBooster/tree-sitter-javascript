@@ -30,6 +30,10 @@ test('rejects unparenthesized optional and arrow constructors while preserving c
       'new new A',
       'new f`tag`',
       'new function(){}',
+      'new async function(){}',
+      'new async function named(){}()',
+      'new async function*(){}.value',
+      'new async /* c */ function(){}[0]',
       'new class{}',
       'new yield.C()',
       'new A?.1 : B',
@@ -74,6 +78,9 @@ test('restores constructor ownership and captures across optional-chain, parenth
       ['new new A().b(2)', false],
       ['new yield.C()', false],
       ['new A?.1 : B', false],
+      ['new async function(){}', false],
+      ['new async /* c */ function(){}', false],
+      ['new async /* c\n */ function named(){}', false],
       ['new foo.bar()', false],
     ] as const) {
       const nextSource = `const value = ${expression}; const sentinel = 1;`;

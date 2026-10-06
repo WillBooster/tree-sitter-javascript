@@ -108,6 +108,7 @@ module.exports = grammar({
     $._default_declaration_start,
     $._regex_flags_start,
     $._argumentless_new_end,
+    $._constructor_async_function_start,
   ],
 
   extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -884,6 +885,33 @@ module.exports = grammar({
         seq('new', field('constructor', alias($._constructor, $.primary_expression)), field('arguments', $.arguments))
       ),
 
+    _constructor_function_expression: ($) =>
+      prec(
+        'literal',
+        seq(
+          optional($._constructor_async_function_start),
+          optional('async'),
+          'function',
+          field('name', optional($.identifier)),
+          $._call_signature,
+          field('body', $.statement_block)
+        )
+      ),
+
+    _constructor_generator_function: ($) =>
+      prec(
+        'literal',
+        seq(
+          optional($._constructor_async_function_start),
+          optional('async'),
+          'function',
+          '*',
+          field('name', optional($.identifier)),
+          $._call_signature,
+          field('body', $.statement_block)
+        )
+      ),
+
     _constructor_atom: ($) =>
       choice(
         $._jsx_element,
@@ -902,8 +930,8 @@ module.exports = grammar({
         $.null,
         $.object,
         $.array,
-        $.function_expression,
-        $.generator_function,
+        alias($._constructor_function_expression, $.function_expression),
+        alias($._constructor_generator_function, $.generator_function),
         $.class,
         $.meta_property
       ),
