@@ -1,9 +1,12 @@
+import path from 'node:path';
 import { Edit, Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 test('distinguishes import attributes from following with statements', async () => {
   await Parser.init();
-  const parser = new Parser().setLanguage(await Language.load('tree-sitter-javascript.wasm'));
+  const parser = new Parser().setLanguage(
+    await Language.load(path.join(import.meta.dirname, '../../tree-sitter-javascript.wasm'))
+  );
   try {
     for (const declaration of ['import { A }', 'import A', 'export { A }', 'export *', 'export * as ns']) {
       for (const trivia of [' ', '\n', ' /* c */ ', ' // c\n', ' <!-- c\n', ' --> c\n', ' /* a */ <!-- b\n // c\n']) {
