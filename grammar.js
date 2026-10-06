@@ -881,9 +881,13 @@ module.exports = grammar({
           'unary_void',
           seq(
             alias($._await_keyword, 'await'),
-            optional($._await_identifier_line_break),
-            optional(seq($._await_yield_identifier_start, optional($._await_yield_identifier_context))),
-            optional($._line_break_after_await),
+            optional(
+              choice(
+                $._await_identifier_line_break,
+                seq($._await_yield_identifier_start, optional($._await_yield_identifier_context)),
+                $._line_break_after_await
+              )
+            ),
             $.expression,
             $._await_operand_end
           )
