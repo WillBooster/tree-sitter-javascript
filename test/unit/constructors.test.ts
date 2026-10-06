@@ -112,9 +112,6 @@ test('restores constructor ownership and captures across optional-chain, parenth
         expect(captures(query, tree), nextSource).toEqual(captures(query, fresh));
         if (!hasError) {
           checkConstructors(tree, query, nextSource);
-          expect(tree.rootNode.descendantsOfType('variable_declarator').at(-1)?.childForFieldName('name')?.text).toBe(
-            'sentinel'
-          );
         }
       } finally {
         fresh?.delete();
@@ -140,6 +137,13 @@ function checkConstructors(tree: Tree, query: Query, source: string): void {
     const constructor = expression.childForFieldName('constructor')!;
     expect(captured, `${source}: ${constructor.text}`).toContain(constructor.id);
   }
+  const sentinel = tree.rootNode.descendantsOfType('variable_declarator').at(-1)!;
+  expect(sentinel.childForFieldName('name')?.text, source).toBe('sentinel');
+  expect(sentinel.parent?.type, source).toBe('lexical_declaration');
+  expect(sentinel.parent?.parent?.type, source).toBe('program');
+  expect(sentinel.text, source).toBe('sentinel = 1');
+  expect(sentinel.startIndex, source).toBe(source.indexOf('sentinel'));
+  expect(sentinel.endIndex, source).toBe(source.indexOf('sentinel') + 'sentinel = 1'.length);
 }
 
 function pointAt(source: string, index: number): Point {
