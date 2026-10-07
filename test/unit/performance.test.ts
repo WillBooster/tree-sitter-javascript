@@ -25,7 +25,7 @@ test('uses a Wasm build built from the current parser', () => {
     'generation inputs changed after src/parser.c was generated; run `bun run build/ci`'
   ).toBe(false);
   expect(
-    Math.max(mtime('src/parser.c'), mtime('src/scanner.c')) > mtime(WasmPath),
+    Math.max(mtime('src/parser.c'), mtime('src/scanner.c'), mtime('src/tree_sitter/parser.h')) > mtime(WasmPath),
     'src/ changed after the Wasm build was built; run `bun run build/ci`'
   ).toBe(false);
 });
