@@ -19,7 +19,7 @@ This fork fixes parsing bugs and raises conformance with [ECMAScript (ECMA-262)]
 
 The npm package ships `tree-sitter-javascript.wasm` for
 [@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter), which runs in Node.js, Bun,
-browsers, and Cloudflare Workers. Use runtime 1.2.2 or newer. In Node.js and Bun, load it from the package:
+browsers, and Cloudflare Workers. Use runtime 1.3.0 or newer. In Node.js and Bun, load it from the package:
 
 ```js
 import { fileURLToPath } from 'node:url';
@@ -62,13 +62,12 @@ The package also ships the node types in `src/node-types.json`, the highlight, i
 `require('@willbooster/tree-sitter-javascript/grammar')`). The crate ships `tree-sitter.json` and `queries/` too.
 
 In Rust, depend on the [crate](https://crates.io/crates/willbooster-tree-sitter-javascript) and on
-[willbooster-tree-sitter](https://crates.io/crates/willbooster-tree-sitter) 1.2.2 or newer. The canonical constructor
-supertype query requires this runtime version. This is the runtime this package is tested and fuzzed with:
+[willbooster-tree-sitter](https://crates.io/crates/willbooster-tree-sitter) 1.3.0 or newer for the compact ABI 16 parser. This is the runtime this package is tested and fuzzed with:
 
 ```toml
 [dependencies]
-tree-sitter = { package = "willbooster-tree-sitter", version = "1.2.2" }
-tree-sitter-javascript = { package = "willbooster-tree-sitter-javascript", version = "3" }
+tree-sitter = { package = "willbooster-tree-sitter", version = "1.3.0" }
+tree-sitter-javascript = { package = "willbooster-tree-sitter-javascript", version = "4" }
 ```
 
 ```rust
