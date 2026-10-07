@@ -18,7 +18,6 @@ function mtime(file: string): number {
 // The tests load the Wasm build as it is, so a check against a stale one would pass after a source edit that
 // brings the slowdown back.
 test('uses a Wasm build built from the current parser', () => {
-  // `bun run build-wasm` compiles src/ without regenerating it, so src/parser.c must also be newer than grammar.js.
   expect(
     mtime('grammar.js') > mtime('src/parser.c'),
     'grammar.js changed after src/parser.c was generated; run `bun run build/ci`'
