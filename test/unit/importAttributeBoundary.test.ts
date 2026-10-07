@@ -2,7 +2,7 @@ import path from 'node:path';
 import { Edit, Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
-test('distinguishes import attributes from following with statements', async () => {
+test('preserves import attributes and requires explicit separation before with statements', async () => {
   await Parser.init();
   const parser = new Parser().setLanguage(
     await Language.load(path.join(import.meta.dirname, '../../tree-sitter-javascript.wasm'))
@@ -10,12 +10,18 @@ test('distinguishes import attributes from following with statements', async () 
   try {
     for (const declaration of ['import { A }', 'import A', 'export { A }', 'export *', 'export * as ns']) {
       for (const trivia of [' ', '\n', ' /* c */ ', ' // c\n', ' <!-- c\n', ' --> c\n', ' /* a */ <!-- b\n // c\n']) {
-        const prefix = `${declaration} from "m"\n`;
+        const prefix = `${declaration} from "m"`;
+        const ambiguous = parser.parse(`${prefix}\nwith${trivia}(x) { use(x); }\nconst after = 1;`)!;
+        try {
+          expect(ambiguous.rootNode.hasError).toBe(true);
+        } finally {
+          ambiguous.delete();
+        }
         for (const [suffix, attribute] of [
           ['(x) { use(x); }', false],
           ['{ type: "json" };', true],
         ] as const) {
-          const source = `${prefix}with${trivia}${suffix}\nconst after = 1;`;
+          const source = `${prefix}${attribute ? '' : ';'}\nwith${trivia}${suffix}\nconst after = 1;`;
           const tree = parser.parse(source)!;
           try {
             expect(tree.rootNode.hasError, source).toBe(false);
@@ -27,7 +33,7 @@ test('distinguishes import attributes from following with statements', async () 
             if (!attribute) expect(statements[1]?.type).toBe('with_statement');
             const index = prefix.length;
             const end = source.indexOf('\nconst after');
-            const replacement = `with${trivia}${attribute ? '(x) { use(x); }' : '{ type: "json" };'}`;
+            const replacement = `${attribute ? ';' : ''}\nwith${trivia}${attribute ? '(x) { use(x); }' : '{ type: "json" };'}`;
             const updated = source.slice(0, index) + replacement + source.slice(end);
             tree.edit(
               new Edit({
