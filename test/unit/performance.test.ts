@@ -2,6 +2,8 @@ import { expect, test } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { generationInputMtime } from '../helpers/generationInputs.js';
+
 import { Language, Parser } from '@willbooster/web-tree-sitter';
 
 const Root = path.join(import.meta.dirname, '../..');
@@ -18,13 +20,12 @@ function mtime(file: string): number {
 // The tests load the Wasm build as it is, so a check against a stale one would pass after a source edit that
 // brings the slowdown back.
 test('uses a Wasm build built from the current parser', () => {
-  // `bun run build-wasm` compiles src/ without regenerating it, so src/parser.c must also be newer than grammar.js.
   expect(
-    mtime('grammar.js') > mtime('src/parser.c'),
-    'grammar.js changed after src/parser.c was generated; run `bun run build/ci`'
+    Math.max(generationInputMtime(Root), mtime('grammar.js')) > mtime('src/parser.c'),
+    'generation inputs changed after src/parser.c was generated; run `bun run build/ci`'
   ).toBe(false);
   expect(
-    Math.max(mtime('src/parser.c'), mtime('src/scanner.c')) > mtime(WasmPath),
+    Math.max(mtime('src/parser.c'), mtime('src/scanner.c'), mtime('src/tree_sitter/parser.h')) > mtime(WasmPath),
     'src/ changed after the Wasm build was built; run `bun run build/ci`'
   ).toBe(false);
 });
