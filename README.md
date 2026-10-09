@@ -20,7 +20,7 @@ This fork fixes parsing bugs and raises conformance with [ECMAScript (ECMA-262)]
 The npm package ships `tree-sitter-javascript.wasm` for
 [@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter), which runs in Node.js, Bun,
 browsers, and Cloudflare Workers. The compact ABI 16 parser requires runtime 1.3.0 or newer.
-Use runtime 1.4.3 or newer to retain keyword tokens during error recovery. In Node.js and Bun, load it from the package:
+Runtime 1.4.3 or newer is recommended for improved error recovery. In Node.js and Bun, load it from the package:
 
 ```js
 import { fileURLToPath } from 'node:url';
@@ -62,8 +62,8 @@ The package also ships the node types in `src/node-types.json`, the highlight, i
 `queries/` that `tree-sitter.json` lists, and `grammar.js` for grammars that extend this one (e.g.
 `require('@willbooster/tree-sitter-javascript/grammar')`). The crate ships `tree-sitter.json` and `queries/` too.
 
-In Rust, depend on the [crate](https://crates.io/crates/willbooster-tree-sitter-javascript) and on
-[willbooster-tree-sitter](https://crates.io/crates/willbooster-tree-sitter) 1.3.0 or newer for the compact ABI 16 parser:
+In Rust, depend on the [crate](https://crates.io/crates/willbooster-tree-sitter-javascript) and the recommended
+[willbooster-tree-sitter](https://crates.io/crates/willbooster-tree-sitter) runtime:
 
 ```toml
 [dependencies]
