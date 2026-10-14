@@ -1013,11 +1013,11 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         return scan_template_chars(lexer);
     }
 
-    if (valid_symbols[EXPORT_DEFAULT] || valid_symbols[EXPORT_DEFAULT_DECLARATION] ||
+    if (valid_symbols[EXPORT_DEFAULT] ||
         (valid_symbols[DEFAULT_DECLARATION_START] && scanner->default_declaration_pending)) {
         while (is_whitespace(lexer->lookahead)) skip(lexer);
-        if ((valid_symbols[EXPORT_DEFAULT] || valid_symbols[EXPORT_DEFAULT_DECLARATION]) && lexer->lookahead == 'd') {
-            return scan_export_default(scanner, lexer) && valid_symbols[lexer->result_symbol];
+        if (valid_symbols[EXPORT_DEFAULT] && lexer->lookahead == 'd') {
+            return scan_export_default(scanner, lexer);
         }
         if (valid_symbols[DEFAULT_DECLARATION_START] && scanner->default_declaration_pending &&
             (lexer->lookahead == '@' || lexer->lookahead == 'a' || lexer->lookahead == 'c' || lexer->lookahead == 'f')) {
