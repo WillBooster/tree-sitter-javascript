@@ -5,8 +5,11 @@
  * @license MIT
  */
 
-/// <reference types="tree-sitter-cli/dsl" />
 // @ts-check
+
+// The CLI injects the DSL before loading this CommonJS grammar.
+const { grammar, alias, choice, field, optional, prec, repeat, repeat1, seq, sym, token, reserved } =
+  /** @type {typeof globalThis & import('@willbooster/web-tree-sitter/dsl').DSL} */ (globalThis);
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Lexical_grammar#reserved_words
 const RESERVED_WORDS = [
@@ -56,62 +59,62 @@ const CONTEXTUAL_KEYWORDS = ['async', 'await', 'let', 'using'];
 module.exports = grammar({
   name: 'javascript',
 
-  externals: ($) => [
-    $._automatic_semicolon,
-    $._template_chars,
-    $._ternary_qmark,
-    $.html_comment,
+  externals: () => [
+    sym('_automatic_semicolon'),
+    sym('_template_chars'),
+    sym('_ternary_qmark'),
+    sym('html_comment'),
     '||',
     // We use escape sequence and regex pattern to tell the scanner if we're currently inside a string or template string, in which case
     // it should NOT parse html comments.
-    $.escape_sequence,
-    $.regex_pattern,
-    $.jsx_text,
+    sym('escape_sequence'),
+    sym('regex_pattern'),
+    sym('jsx_text'),
     // Zero-width tokens after an arrow function's block body that a line break (or `}` or the end of input) follows:
     // such a function cannot be called, indexed, or used as an operand, so the statement ends there if it can. The
     // scanner inserts the automatic semicolon right after _arrow_function_block_end, or else emits
     // _arrow_function_block_continuation, since the arrow function may be, e.g., an argument.
-    $._arrow_function_block_end,
-    $._arrow_function_block_continuation,
+    sym('_arrow_function_block_end'),
+    sym('_arrow_function_block_continuation'),
     // These never-emitted flags select LineBreakRule in src/scanner.c. Keep them alternatives to what follows:
     // leading optional flags duplicate parse states.
-    $._line_break_ends_statement,
-    $._line_break_after_binding,
-    $._line_break_after_field,
-    $._line_break_after_modifier,
-    $._line_break_before_attributes,
+    sym('_line_break_ends_statement'),
+    sym('_line_break_after_binding'),
+    sym('_line_break_after_field'),
+    sym('_line_break_after_modifier'),
+    sym('_line_break_before_attributes'),
     // Emitted outside statement nodes to preserve their body ranges before trailing comments.
-    $._statement_boundary,
+    sym('_statement_boundary'),
     // Await flags are optional exceptions: replacing a required operand with a flag makes its published child optional.
     // Never emitted: marks the direct await operand start for line-break and identifier lexing.
-    $._line_break_after_await,
+    sym('_line_break_after_await'),
     // Preserves operand and identifier-statement paths before a following brace or identifier-headed expression.
-    $._await_identifier_line_break,
+    sym('_await_identifier_line_break'),
     // Emitted zero-width boundaries retain canonical expression supertype paths for public queries.
-    $._await_operand_end,
+    sym('_await_operand_end'),
     // Never emitted: a completed direct arrow cannot serve as an await operand.
-    $._completed_arrow_function,
+    sym('_completed_arrow_function'),
     // Emitted identifier token at the direct await-operand start, preserving normal yield parsing elsewhere.
-    $._await_yield_identifier,
+    sym('_await_yield_identifier'),
     // Emitted zero-width decision preserves direct operands and identifier statements before yield.
-    $._await_yield_identifier_start,
-    $._await_yield_identifier_context,
+    sym('_await_yield_identifier_start'),
+    sym('_await_yield_identifier_context'),
     // Emitted zero-width after a postfix update; carries the pending statement boundary across reuse.
-    $._postfix_update_end,
-    $._await_keyword,
-    $._let,
-    $._single_statement_context,
-    $._resource_binding_start,
-    $._resource_binding_continuation,
-    $._plain_resource_for_of_context,
-    $._export_default,
-    $._default_declaration_start,
-    $._regex_flags_start,
-    $._argumentless_new_end,
-    $._constructor_async_function_start,
+    sym('_postfix_update_end'),
+    sym('_await_keyword'),
+    sym('_let'),
+    sym('_single_statement_context'),
+    sym('_resource_binding_start'),
+    sym('_resource_binding_continuation'),
+    sym('_plain_resource_for_of_context'),
+    sym('_export_default'),
+    sym('_default_declaration_start'),
+    sym('_regex_flags_start'),
+    sym('_argumentless_new_end'),
+    sym('_constructor_async_function_start'),
   ],
 
-  extras: ($) => [$.comment, $.html_comment, /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
+  extras: ($) => [$.comment, sym('html_comment'), /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
 
   reserved: {
     global: () => RESERVED_WORDS,
@@ -206,9 +209,9 @@ module.exports = grammar({
   rules: {
     program: ($) => seq(optional($.hash_bang_line), repeat($._statement)),
 
-    _statement: ($) => prec.right(seq($.statement, optional($._statement_boundary))),
+    _statement: ($) => prec.right(seq($.statement, optional(sym('_statement_boundary')))),
 
-    _single_statement: ($) => seq(optional($._single_statement_context), $._statement),
+    _single_statement: ($) => seq(optional(sym('_single_statement_context')), $._statement),
 
     hash_bang_line: () => /#![^\n\r\u2028\u2029]*/,
 
@@ -224,7 +227,7 @@ module.exports = grammar({
             seq(
               choice('*', $.namespace_export, $.export_clause),
               $._from_clause,
-              optional(choice($.import_attribute, $._line_break_before_attributes))
+              optional(choice($.import_attribute, sym('_line_break_before_attributes')))
             ),
             alias($._local_export_clause, $.export_clause)
           ),
@@ -236,7 +239,7 @@ module.exports = grammar({
           choice(
             field('declaration', $.declaration),
             seq(
-              alias($._export_default, 'default'),
+              alias(sym('_export_default'), 'default'),
               choice(field('declaration', $.declaration), seq(field('value', $.expression), $._semicolon))
             )
           )
@@ -264,7 +267,10 @@ module.exports = grammar({
         $.identifier,
         $.string,
         // `this`, `super`, `true`, `false`, and `null` are named rules, and a bare string would make them non-terminals.
-        alias(choice(...RESERVED_WORDS.map((word) => (NAMED_RESERVED_WORDS.has(word) ? $[word] : word))), $.identifier)
+        alias(
+          choice(...RESERVED_WORDS.map((word) => (NAMED_RESERVED_WORDS.has(word) ? sym(word) : word))),
+          $.identifier
+        )
       ),
 
     declaration: ($) =>
@@ -287,7 +293,7 @@ module.exports = grammar({
       seq(
         'import',
         choice(seq($.import_clause, $._from_clause), field('source', $.string)),
-        optional(choice($.import_attribute, $._line_break_before_attributes)),
+        optional(choice($.import_attribute, sym('_line_break_before_attributes'))),
         $._semicolon
       ),
 
@@ -353,10 +359,10 @@ module.exports = grammar({
 
     using_declaration: ($) =>
       seq(
-        field('kind', choice('using', seq(alias($._await_keyword, 'await'), 'using'))),
-        $._resource_binding_start,
+        field('kind', choice('using', seq(alias(sym('_await_keyword'), 'await'), 'using'))),
+        sym('_resource_binding_start'),
         alias($._using_declarator, $.variable_declarator),
-        repeat(seq(',', $._resource_binding_continuation, alias($._using_declarator, $.variable_declarator))),
+        repeat(seq(',', sym('_resource_binding_continuation'), alias($._using_declarator, $.variable_declarator))),
         $._semicolon
       ),
 
@@ -365,7 +371,7 @@ module.exports = grammar({
     variable_declarator: ($) =>
       seq(
         field('name', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern)),
-        optional(choice($._initializer, $._line_break_after_binding))
+        optional(choice($._initializer, sym('_line_break_after_binding')))
       ),
 
     statement_block: ($) => prec.right(seq('{', repeat($._statement), '}')),
@@ -423,15 +429,15 @@ module.exports = grammar({
 
     _for_using_declaration: ($) =>
       seq(
-        field('kind', choice('using', seq(alias($._await_keyword, 'await'), 'using'))),
-        $._resource_binding_start,
+        field('kind', choice('using', seq(alias(sym('_await_keyword'), 'await'), 'using'))),
+        sym('_resource_binding_start'),
         alias($._using_declarator, $.variable_declarator),
-        repeat(seq(',', $._resource_binding_continuation, alias($._using_declarator, $.variable_declarator))),
+        repeat(seq(',', sym('_resource_binding_continuation'), alias($._using_declarator, $.variable_declarator))),
         ';'
       ),
 
     for_in_statement: ($) =>
-      seq('for', optional(alias($._await_keyword, 'await')), $._for_header, field('body', $._single_statement)),
+      seq('for', optional(alias(sym('_await_keyword'), 'await')), $._for_header, field('body', $._single_statement)),
 
     _for_header: ($) =>
       seq(
@@ -454,8 +460,11 @@ module.exports = grammar({
           ),
           seq(
             choice(
-              seq(field('kind', 'using'), choice($._resource_binding_start, $._plain_resource_for_of_context)),
-              seq(field('kind', seq(alias($._await_keyword, 'await'), 'using')), $._resource_binding_start)
+              seq(
+                field('kind', 'using'),
+                choice(sym('_resource_binding_start'), sym('_plain_resource_for_of_context'))
+              ),
+              seq(field('kind', seq(alias(sym('_await_keyword'), 'await'), 'using')), sym('_resource_binding_start'))
             ),
             field('left', choice($.identifier, alias('of', $.identifier))),
             field('operator', 'of')
@@ -492,21 +501,21 @@ module.exports = grammar({
     break_statement: ($) =>
       seq(
         'break',
-        field('label', optional(alias($.identifier, $.statement_identifier))),
-        choice($._semicolon, $._line_break_ends_statement)
+        field('label', optional(alias($.identifier, sym('statement_identifier')))),
+        choice($._semicolon, sym('_line_break_ends_statement'))
       ),
 
     continue_statement: ($) =>
       seq(
         'continue',
-        field('label', optional(alias($.identifier, $.statement_identifier))),
-        choice($._semicolon, $._line_break_ends_statement)
+        field('label', optional(alias($.identifier, sym('statement_identifier')))),
+        choice($._semicolon, sym('_line_break_ends_statement'))
       ),
 
-    debugger_statement: ($) => seq('debugger', choice($._semicolon, $._line_break_ends_statement)),
+    debugger_statement: ($) => seq('debugger', choice($._semicolon, sym('_line_break_ends_statement'))),
 
     return_statement: ($) =>
-      seq('return', choice(seq(optional($._expressions), $._semicolon), $._line_break_ends_statement)),
+      seq('return', choice(seq(optional($._expressions), $._semicolon), sym('_line_break_ends_statement'))),
 
     throw_statement: ($) => seq('throw', $._expressions, $._semicolon),
 
@@ -514,7 +523,7 @@ module.exports = grammar({
 
     labeled_statement: ($) =>
       seq(
-        field('label', alias(choice($.identifier, $.undefined, $._reserved_identifier), $.statement_identifier)),
+        field('label', alias(choice($.identifier, $.undefined, $._reserved_identifier), sym('statement_identifier'))),
         ':',
         field('body', $._single_statement)
       ),
@@ -563,7 +572,7 @@ module.exports = grammar({
         $._jsx_element,
         $.parenthesized_expression,
         $._identifier,
-        alias($._await_yield_identifier, $.identifier),
+        alias(sym('_await_yield_identifier'), $.identifier),
         alias($._reserved_identifier, $.identifier),
         $.this,
         $.super,
@@ -589,7 +598,9 @@ module.exports = grammar({
       ),
 
     yield_expression: ($) =>
-      prec.right(seq('yield', choice(seq('*', $.expression), optional($.expression), $._line_break_ends_statement))),
+      prec.right(
+        seq('yield', choice(seq('*', $.expression), optional($.expression), sym('_line_break_ends_statement')))
+      ),
 
     object: ($) =>
       prec(
@@ -602,7 +613,7 @@ module.exports = grammar({
                 $.pair,
                 $.spread_element,
                 $.method_definition,
-                alias(choice($.identifier, $._reserved_identifier), $.shorthand_property_identifier)
+                alias(choice($.identifier, $._reserved_identifier), sym('shorthand_property_identifier'))
               )
             )
           ),
@@ -621,7 +632,7 @@ module.exports = grammar({
                 $.pair_pattern,
                 $.rest_pattern,
                 $.object_assignment_pattern,
-                alias(choice($.identifier, $._reserved_identifier), $.shorthand_property_identifier_pattern)
+                alias(choice($.identifier, $._reserved_identifier), sym('shorthand_property_identifier_pattern'))
               )
             )
           ),
@@ -636,7 +647,7 @@ module.exports = grammar({
         field(
           'left',
           choice(
-            alias(choice($._reserved_identifier, $.identifier), $.shorthand_property_identifier_pattern),
+            alias(choice($._reserved_identifier, $.identifier), sym('shorthand_property_identifier_pattern')),
             $._destructuring_pattern
           )
         ),
@@ -660,7 +671,7 @@ module.exports = grammar({
 
     jsx_expression: ($) => seq('{', optional(choice($.expression, $.sequence_expression, $.spread_element)), '}'),
 
-    _jsx_child: ($) => choice($.jsx_text, $.html_character_reference, $._jsx_element, $.jsx_expression),
+    _jsx_child: ($) => choice(sym('jsx_text'), $.html_character_reference, $._jsx_element, $.jsx_expression),
 
     jsx_opening_element: ($) =>
       prec.dynamic(
@@ -681,7 +692,7 @@ module.exports = grammar({
             choice(reserved('properties', $.identifier), alias($.nested_identifier, $.member_expression))
           ),
           '.',
-          field('property', alias(reserved('properties', $.identifier), $.property_identifier))
+          field('property', alias(reserved('properties', $.identifier), sym('property_identifier')))
         )
       ),
 
@@ -697,7 +708,7 @@ module.exports = grammar({
 
     _jsx_attribute: ($) => choice($.jsx_attribute, $.jsx_expression),
 
-    _jsx_attribute_name: ($) => choice(alias($._jsx_identifier, $.property_identifier), $.jsx_namespace_name),
+    _jsx_attribute_name: ($) => choice(alias($._jsx_identifier, sym('property_identifier')), $.jsx_namespace_name),
 
     jsx_attribute: ($) => seq($._jsx_attribute_name, optional(seq('=', $._jsx_attribute_value))),
 
@@ -707,9 +718,9 @@ module.exports = grammar({
           '"',
           repeat(
             choice(
-              alias($.unescaped_double_jsx_string_fragment, $.string_fragment),
+              alias($.unescaped_double_jsx_string_fragment, sym('string_fragment')),
               $.html_character_reference,
-              alias($._jsx_string_ampersand, $.string_fragment)
+              alias($._jsx_string_ampersand, sym('string_fragment'))
             )
           ),
           '"'
@@ -718,9 +729,9 @@ module.exports = grammar({
           "'",
           repeat(
             choice(
-              alias($.unescaped_single_jsx_string_fragment, $.string_fragment),
+              alias($.unescaped_single_jsx_string_fragment, sym('string_fragment')),
               $.html_character_reference,
-              alias($._jsx_string_ampersand, $.string_fragment)
+              alias($._jsx_string_ampersand, sym('string_fragment'))
             )
           ),
           "'"
@@ -760,7 +771,7 @@ module.exports = grammar({
         seq(
           choice(
             seq(
-              $._default_declaration_start,
+              sym('_default_declaration_start'),
               repeat(field('decorator', $.decorator)),
               'class',
               field('name', optional($.identifier))
@@ -791,7 +802,12 @@ module.exports = grammar({
         'declaration',
         seq(
           choice(
-            seq($._default_declaration_start, optional('async'), 'function', field('name', optional($.identifier))),
+            seq(
+              sym('_default_declaration_start'),
+              optional('async'),
+              'function',
+              field('name', optional($.identifier))
+            ),
             seq(optional('async'), 'function', field('name', $.identifier))
           ),
           $._call_signature,
@@ -818,7 +834,7 @@ module.exports = grammar({
         seq(
           choice(
             seq(
-              $._default_declaration_start,
+              sym('_default_declaration_start'),
               optional('async'),
               'function',
               '*',
@@ -847,10 +863,10 @@ module.exports = grammar({
             field('body', $.expression),
             seq(
               field('body', $.statement_block),
-              optional(seq($._arrow_function_block_end, optional($._arrow_function_block_continuation)))
+              optional(seq(sym('_arrow_function_block_end'), optional(sym('_arrow_function_block_continuation'))))
             )
           ),
-          optional($._completed_arrow_function)
+          optional(sym('_completed_arrow_function'))
         )
       ),
 
@@ -884,7 +900,7 @@ module.exports = grammar({
       prec(
         'literal',
         seq(
-          optional($._constructor_async_function_start),
+          optional(sym('_constructor_async_function_start')),
           optional('async'),
           'function',
           field('name', optional($.identifier)),
@@ -897,7 +913,7 @@ module.exports = grammar({
       prec(
         'literal',
         seq(
-          optional($._constructor_async_function_start),
+          optional(sym('_constructor_async_function_start')),
           optional('async'),
           'function',
           '*',
@@ -912,7 +928,7 @@ module.exports = grammar({
         $._jsx_element,
         $.parenthesized_expression,
         $._identifier,
-        alias($._await_yield_identifier, $.identifier),
+        alias(sym('_await_yield_identifier'), $.identifier),
         alias($._reserved_identifier, $.identifier),
         $.this,
         $.super,
@@ -954,7 +970,10 @@ module.exports = grammar({
           '.',
           field(
             'property',
-            choice($.private_property_identifier, reserved('properties', alias($.identifier, $.property_identifier)))
+            choice(
+              $.private_property_identifier,
+              reserved('properties', alias($.identifier, sym('property_identifier')))
+            )
           )
         )
       ),
@@ -982,7 +1001,7 @@ module.exports = grammar({
     _argumentless_new_expression: ($) =>
       prec.right(
         'new',
-        seq('new', field('constructor', alias($._constructor, $.primary_expression)), $._argumentless_new_end)
+        seq('new', field('constructor', alias($._constructor, $.primary_expression)), sym('_argumentless_new_end'))
       ),
 
     await_expression: ($) =>
@@ -991,17 +1010,17 @@ module.exports = grammar({
         prec.right(
           'unary_void',
           seq(
-            alias($._await_keyword, 'await'),
+            alias(sym('_await_keyword'), 'await'),
             // Independent optional prefixes duplicate parser states; the yield start/context pair stays one alternative.
             optional(
               choice(
-                $._await_identifier_line_break,
-                seq($._await_yield_identifier_start, optional($._await_yield_identifier_context)),
-                $._line_break_after_await
+                sym('_await_identifier_line_break'),
+                seq(sym('_await_yield_identifier_start'), optional(sym('_await_yield_identifier_context'))),
+                sym('_line_break_after_await')
               )
             ),
             $.expression,
-            $._await_operand_end
+            sym('_await_operand_end')
           )
         )
       ),
@@ -1014,7 +1033,10 @@ module.exports = grammar({
           choice('.', field('optional_chain', $.optional_chain)),
           field(
             'property',
-            choice($.private_property_identifier, reserved('properties', alias($.identifier, $.property_identifier)))
+            choice(
+              $.private_property_identifier,
+              reserved('properties', alias($.identifier, sym('property_identifier')))
+            )
           )
         )
       ),
@@ -1079,7 +1101,7 @@ module.exports = grammar({
         'ternary',
         seq(
           field('condition', $.expression),
-          alias($._ternary_qmark, '?'),
+          alias(sym('_ternary_qmark'), '?'),
           field('consequence', $.expression),
           ':',
           field('alternative', $.expression)
@@ -1088,7 +1110,7 @@ module.exports = grammar({
 
     binary_expression: ($) =>
       choice(
-        ...[
+        .../** @type {const} */ ([
           ['&&', 'logical_and'],
           ['||', 'logical_or'],
           ['>>', 'binary_shift'],
@@ -1114,7 +1136,7 @@ module.exports = grammar({
           ['??', 'ternary'],
           ['instanceof', 'binary_relation'],
           ['in', 'binary_relation'],
-        ].map(([operator, precedence, associativity]) =>
+        ]).map(([operator, precedence, associativity]) =>
           // oxlint-disable-next-line typescript/unbound-method -- prec.left and prec.right do not use `this`.
           (associativity === 'right' ? prec.right : prec.left)(
             precedence,
@@ -1136,7 +1158,7 @@ module.exports = grammar({
     update_expression: ($) =>
       prec.left(
         choice(
-          seq(field('argument', $.expression), field('operator', choice('++', '--')), $._postfix_update_end),
+          seq(field('argument', $.expression), field('operator', choice('++', '--')), sym('_postfix_update_end')),
           seq(field('operator', choice('++', '--')), field('argument', $.expression))
         )
       ),
@@ -1149,8 +1171,16 @@ module.exports = grammar({
 
     string: ($) =>
       choice(
-        seq('"', repeat(choice(alias($.unescaped_double_string_fragment, $.string_fragment), $.escape_sequence)), '"'),
-        seq("'", repeat(choice(alias($.unescaped_single_string_fragment, $.string_fragment), $.escape_sequence)), "'")
+        seq(
+          '"',
+          repeat(choice(alias($.unescaped_double_string_fragment, sym('string_fragment')), $.escape_sequence)),
+          '"'
+        ),
+        seq(
+          "'",
+          repeat(choice(alias($.unescaped_single_string_fragment, sym('string_fragment')), $.escape_sequence)),
+          "'"
+        )
       ),
 
     // Workaround to https://github.com/tree-sitter/tree-sitter/issues/1156
@@ -1175,7 +1205,7 @@ module.exports = grammar({
         '`',
         repeat(
           choice(
-            alias($._template_chars, $.string_fragment),
+            alias(sym('_template_chars'), sym('string_fragment')),
             $.escape_sequence,
             alias($._invalid_template_escape, $.escape_sequence),
             $.template_substitution
@@ -1196,7 +1226,7 @@ module.exports = grammar({
         '/',
         field('pattern', $.regex_pattern),
         choice(
-          seq($._regex_flags_start, token.immediate(prec(1, '/')), field('flags', $.regex_flags)),
+          seq(sym('_regex_flags_start'), token.immediate(prec(1, '/')), field('flags', $.regex_flags)),
           token.immediate(prec(1, '/'))
         )
       ),
@@ -1318,7 +1348,10 @@ module.exports = grammar({
           '.',
           field(
             'property',
-            choice(reserved('properties', alias($.identifier, $.property_identifier)), $.private_property_identifier)
+            choice(
+              reserved('properties', alias($.identifier, sym('property_identifier'))),
+              $.private_property_identifier
+            )
           )
         )
       ),
@@ -1356,24 +1389,24 @@ module.exports = grammar({
           seq(
             optional('static'),
             choice(
-              seq(field('property', $._field_name), optional(choice($._initializer, $._line_break_after_field))),
+              seq(field('property', $._field_name), optional(choice($._initializer, sym('_line_break_after_field')))),
               // A line break after `get` or `set` continues a getter or setter. Allowing both sentinels here tells
               // the scanner that a `*` on the next line cannot continue the member, unlike after `static`.
               seq(
-                field('property', alias(choice('get', 'set'), $.property_identifier)),
-                optional(choice($._initializer, $._line_break_after_modifier, $._line_break_after_field))
+                field('property', alias(choice('get', 'set'), sym('property_identifier'))),
+                optional(choice($._initializer, sym('_line_break_after_modifier'), sym('_line_break_after_field')))
               )
             )
           ),
           // A line break after a leading `static` continues a static member; after `static static`, it ends the field.
           seq(
-            field('property', alias('static', $.property_identifier)),
-            optional(choice($._initializer, $._line_break_after_modifier))
+            field('property', alias('static', sym('property_identifier'))),
+            optional(choice($._initializer, sym('_line_break_after_modifier')))
           ),
           seq(
             'static',
-            field('property', alias('static', $.property_identifier)),
-            optional(choice($._initializer, $._line_break_after_field))
+            field('property', alias('static', sym('property_identifier'))),
+            optional(choice($._initializer, sym('_line_break_after_field')))
           )
         )
       ),
@@ -1415,8 +1448,11 @@ module.exports = grammar({
         'properties',
         choice(
           alias(
-            choice($.identifier, ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? $._await_keyword : word))),
-            $.property_identifier
+            choice(
+              $.identifier,
+              ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? sym('_await_keyword') : word))
+            ),
+            sym('property_identifier')
           ),
           $.private_property_identifier,
           $.string,
@@ -1429,7 +1465,7 @@ module.exports = grammar({
       reserved(
         'properties',
         choice(
-          alias(choice($.identifier, $._reserved_identifier), $.property_identifier),
+          alias(choice($.identifier, $._reserved_identifier), sym('property_identifier')),
           $.private_property_identifier,
           $.string,
           $.number,
@@ -1439,20 +1475,28 @@ module.exports = grammar({
 
     computed_property_name: ($) => seq('[', $.expression, ']'),
 
-    _reserved_identifier: ($) =>
-      choice(...MEMBER_MODIFIERS, ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? $._await_keyword : word))),
+    _reserved_identifier: () =>
+      choice(
+        ...MEMBER_MODIFIERS,
+        ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? sym('_await_keyword') : word))
+      ),
 
-    _semicolon: ($) =>
-      choice($._automatic_semicolon, $._await_identifier_line_break, $._await_yield_identifier_start, ';'),
+    _semicolon: () =>
+      choice(
+        sym('_automatic_semicolon'),
+        sym('_await_identifier_line_break'),
+        sym('_await_yield_identifier_start'),
+        ';'
+      ),
   },
 });
 
 /**
  * Creates a rule to match one or more of the rules separated by a comma
  *
- * @param {Rule} rule
+ * @param {import('@willbooster/web-tree-sitter/dsl').RuleOrLiteral} rule
  *
- * @returns {SeqRule}
+ * @returns {import('@willbooster/web-tree-sitter/dsl').SeqRule}
  */
 function commaSep1(rule) {
   return seq(rule, repeat(seq(',', rule)));
@@ -1461,9 +1505,9 @@ function commaSep1(rule) {
 /**
  * Creates a rule to optionally match one or more of the rules separated by a comma
  *
- * @param {Rule} rule
+ * @param {import('@willbooster/web-tree-sitter/dsl').RuleOrLiteral} rule
  *
- * @returns {ChoiceRule}
+ * @returns {import('@willbooster/web-tree-sitter/dsl').ChoiceRule}
  */
 function commaSep(rule) {
   return optional(commaSep1(rule));
