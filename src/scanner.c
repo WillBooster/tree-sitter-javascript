@@ -36,6 +36,7 @@ enum TokenType {
     RESOURCE_BINDING_CONTINUATION,
     PLAIN_RESOURCE_FOR_OF_CONTEXT,
     EXPORT_DEFAULT,
+    EXPORT_DEFAULT_DECLARATION,
     DEFAULT_DECLARATION_START,
     REGEX_FLAGS_START,
     ARGUMENTLESS_NEW_END,
@@ -53,6 +54,7 @@ typedef struct {
 } Scanner;
 
 static bool scan_export_default(Scanner *scanner, TSLexer *lexer);
+static bool starts_default_declaration(TSLexer *lexer);
 static bool scan_default_trivia(TSLexer *lexer, bool allow_line_breaks);
 
 void *tree_sitter_javascript_external_scanner_create() { return ts_calloc(1, sizeof(Scanner)); }
@@ -1239,23 +1241,20 @@ static bool scan_export_default(Scanner *scanner, TSLexer *lexer) {
         return false;
     }
     lexer->mark_end(lexer);
-    lexer->result_symbol = EXPORT_DEFAULT;
-    scanner->default_declaration_pending = false;
-    if (!scan_default_trivia(lexer, true)) return true;
-    if (lexer->lookahead == '@') {
-        scanner->default_declaration_pending = true;
-    } else {
-        char word[16] = {0};
-        if (!scan_identifier(lexer, word, sizeof(word), false)) return true;
-        if (strcmp(word, "function") == 0 || strcmp(word, "class") == 0) {
-            scanner->default_declaration_pending = true;
-        } else if (strcmp(word, "async") == 0 && scan_default_trivia(lexer, false)) {
-            memset(word, 0, sizeof(word));
-            scanner->default_declaration_pending =
-                scan_identifier(lexer, word, sizeof(word), false) && strcmp(word, "function") == 0;
-        }
-    }
+    scanner->default_declaration_pending = starts_default_declaration(lexer);
+    lexer->result_symbol = scanner->default_declaration_pending ? EXPORT_DEFAULT_DECLARATION : EXPORT_DEFAULT;
     return true;
+}
+
+static bool starts_default_declaration(TSLexer *lexer) {
+    if (!scan_default_trivia(lexer, true)) return false;
+    if (lexer->lookahead == '@') return true;
+    char word[16] = {0};
+    if (!scan_identifier(lexer, word, sizeof(word), false)) return false;
+    if (strcmp(word, "function") == 0 || strcmp(word, "class") == 0) return true;
+    if (strcmp(word, "async") != 0 || !scan_default_trivia(lexer, false)) return false;
+    memset(word, 0, sizeof(word));
+    return scan_identifier(lexer, word, sizeof(word), false) && strcmp(word, "function") == 0;
 }
 
 static bool scan_default_trivia(TSLexer *lexer, bool allow_line_breaks) {
