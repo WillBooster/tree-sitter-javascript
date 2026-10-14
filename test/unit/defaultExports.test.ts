@@ -132,3 +132,46 @@ test('preserves default keyword ranges and comment extras around declarations', 
     parser.delete();
   }
 });
+
+test('rejects variable and resource declarations as default exports', () => {
+  const parser = new Parser().setLanguage(language);
+  try {
+    for (const declaration of [
+      'let value = 42;',
+      'const value = 42;',
+      'var value = 42;',
+      'using value = resource;',
+      'await using value = resource;',
+    ]) {
+      for (const trivia of [' ', ' /* comment */ ', '\n']) {
+        const tree = parser.parse(`export default${trivia}${declaration}`)!;
+        try {
+          expect(tree.rootNode.hasError, declaration).toBe(true);
+        } finally {
+          tree.delete();
+        }
+      }
+    }
+    for (const source of [
+      'export let value = 42;',
+      'export const value = 42;',
+      'export var value = 42;',
+      'export default using;',
+      'export default using = resource;',
+      'export default await resource;',
+      'export default async () => 42;',
+      'export default (class {});',
+    ]) {
+      const tree = parser.parse(source)!;
+      try {
+        expect(tree.rootNode.hasError, source).toBe(false);
+        expect(tree.rootNode.namedChildCount).toBe(1);
+        expect(tree.rootNode.firstNamedChild?.type).toBe('export_statement');
+      } finally {
+        tree.delete();
+      }
+    }
+  } finally {
+    parser.delete();
+  }
+});

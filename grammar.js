@@ -108,6 +108,7 @@ module.exports = grammar({
     sym('_resource_binding_continuation'),
     sym('_plain_resource_for_of_context'),
     sym('_export_default'),
+    sym('_export_default_declaration'),
     sym('_default_declaration_start'),
     sym('_regex_flags_start'),
     sym('_argumentless_new_end'),
@@ -238,10 +239,8 @@ module.exports = grammar({
           'export',
           choice(
             field('declaration', $.declaration),
-            seq(
-              alias(sym('_export_default'), 'default'),
-              choice(field('declaration', $.declaration), seq(field('value', $.expression), $._semicolon))
-            )
+            seq(alias(sym('_export_default_declaration'), 'default'), field('declaration', $.declaration)),
+            seq(alias(sym('_export_default'), 'default'), field('value', $.expression), $._semicolon)
           )
         )
       ),
