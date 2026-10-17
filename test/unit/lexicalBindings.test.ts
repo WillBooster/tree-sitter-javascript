@@ -9,7 +9,7 @@ const language = await Language.load(path.join(import.meta.dirname, '../../tree-
 test('rejects reserved direct lexical bindings in declarations and loop headers', () => {
   const parser = new Parser().setLanguage(language);
   try {
-    for (const kind of ['let', 'const']) {
+    for (const kind of ['let', 'const', 'using', 'await using']) {
       for (const name of [
         'let',
         String.raw`\u006cet`,
@@ -61,6 +61,11 @@ test('preserves contextual identifiers in values, var bindings, and lexical bind
       'for (var let of values) {}',
       'for (let value of let) {}',
       'const {let: value} = source;',
+      'using value = let;',
+      String.raw`using value = \u006cet;`,
+      'async function f(){ await using value = let; }',
+      'for (using value of let) {}',
+      'async function f(){ for (await using value of let) {} }',
     ]) {
       const tree = parser.parse(source)!;
       try {

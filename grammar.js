@@ -375,7 +375,8 @@ module.exports = grammar({
         $._semicolon
       ),
 
-    _using_declarator: ($) => seq(field('name', choice($.identifier, alias('of', $.identifier))), $._initializer),
+    _using_declarator: ($) =>
+      seq(field('name', choice(reserved('lexical', $.identifier), alias('of', $.identifier))), $._initializer),
 
     variable_declarator: ($) =>
       seq(
@@ -489,7 +490,7 @@ module.exports = grammar({
               ),
               seq(field('kind', seq(alias(sym('_await_keyword'), 'await'), 'using')), sym('_resource_binding_start'))
             ),
-            field('left', choice($.identifier, alias('of', $.identifier))),
+            field('left', choice(reserved('lexical', $.identifier), alias('of', $.identifier))),
             field('operator', 'of')
           )
         ),
