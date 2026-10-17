@@ -1474,6 +1474,7 @@ module.exports = grammar({
           alias(
             choice(
               $.identifier,
+              $._escaped_let,
               ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? sym('_await_keyword') : word))
             ),
             sym('property_identifier')
