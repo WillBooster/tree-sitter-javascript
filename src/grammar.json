@@ -1055,6 +1055,13 @@
         }
       ]
     },
+    "_escaped_let": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "(?:\\\\u(?:006[cC]|\\{0*6[cC]\\}))(?:e|\\\\u(?:0065|\\{0*65\\}))(?:t|\\\\u(?:0074|\\{0*74\\}))|l(?:\\\\u(?:0065|\\{0*65\\}))(?:t|\\\\u(?:0074|\\{0*74\\}))|le(?:\\\\u(?:0074|\\{0*74\\}))"
+      }
+    },
     "_let": {
       "type": "TOKEN",
       "content": {
@@ -8549,6 +8556,10 @@
           "value": "static"
         },
         {
+          "type": "SYMBOL",
+          "name": "_escaped_let"
+        },
+        {
           "type": "STRING",
           "value": "async"
         },
@@ -9329,6 +9340,10 @@
       {
         "type": "STRING",
         "value": "let"
+      },
+      {
+        "type": "SYMBOL",
+        "name": "_escaped_let"
       }
     ],
     "properties": []

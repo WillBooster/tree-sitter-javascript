@@ -119,7 +119,7 @@ module.exports = grammar({
 
   reserved: {
     global: () => RESERVED_WORDS,
-    lexical: () => [...RESERVED_WORDS, 'let'],
+    lexical: ($) => [...RESERVED_WORDS, 'let', $._escaped_let],
     properties: () => [],
   },
 
@@ -351,6 +351,11 @@ module.exports = grammar({
     expression_statement: ($) => seq($._expressions, $._semicolon),
 
     variable_declaration: ($) => seq('var', commaSep1($.variable_declarator), $._semicolon),
+
+    _escaped_let: () =>
+      token(
+        /(?:\\u(?:006[cC]|\{0*6[cC]\}))(?:e|\\u(?:0065|\{0*65\}))(?:t|\\u(?:0074|\{0*74\}))|l(?:\\u(?:0065|\{0*65\}))(?:t|\\u(?:0074|\{0*74\}))|le(?:\\u(?:0074|\{0*74\}))/
+      ),
 
     _let: () => token(prec(-1, /let/)),
 
@@ -1493,9 +1498,10 @@ module.exports = grammar({
 
     computed_property_name: ($) => seq('[', $.expression, ']'),
 
-    _reserved_identifier: () =>
+    _reserved_identifier: ($) =>
       choice(
         ...MEMBER_MODIFIERS,
+        $._escaped_let,
         ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? sym('_await_keyword') : word))
       ),
 

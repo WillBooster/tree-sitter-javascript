@@ -10,7 +10,18 @@ test('rejects reserved direct lexical bindings in declarations and loop headers'
   const parser = new Parser().setLanguage(language);
   try {
     for (const kind of ['let', 'const']) {
-      for (const name of ['let', 'const', 'class', 'if', 'true', 'in']) {
+      for (const name of [
+        'let',
+        String.raw`\u006cet`,
+        String.raw`l\u0065t`,
+        String.raw`le\u0074`,
+        String.raw`\u{6C}e\u{00074}`,
+        'const',
+        'class',
+        'if',
+        'true',
+        'in',
+      ]) {
         for (const source of [
           `${kind} ${name} = 1;`,
           `${kind} first = 1, ${name} = 2;`,
@@ -38,6 +49,10 @@ test('preserves contextual identifiers in values, var bindings, and lexical bind
   try {
     for (const source of [
       'var let = 1;',
+      String.raw`var \u006cet = 1;`,
+      String.raw`const \u006cetters = 1;`,
+      String.raw`let value = \u006cet;`,
+      'let;',
       'let value = let;',
       'const value = let;',
       'let async = 1, using = 2, of = 3;',
