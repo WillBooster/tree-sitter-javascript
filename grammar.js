@@ -119,6 +119,7 @@ module.exports = grammar({
 
   reserved: {
     global: () => RESERVED_WORDS,
+    lexical: ($) => [...RESERVED_WORDS, 'let', $._escaped_let],
     properties: () => [],
   },
 
@@ -351,10 +352,19 @@ module.exports = grammar({
 
     variable_declaration: ($) => seq('var', commaSep1($.variable_declarator), $._semicolon),
 
+    _escaped_let: () =>
+      token(
+        /(?:\\u(?:006[cC]|\{0*6[cC]\}))(?:e|\\u(?:0065|\{0*65\}))(?:t|\\u(?:0074|\{0*74\}))|l(?:\\u(?:0065|\{0*65\}))(?:t|\\u(?:0074|\{0*74\}))|le(?:\\u(?:0074|\{0*74\}))/
+      ),
+
     _let: () => token(prec(-1, /let/)),
 
     lexical_declaration: ($) =>
-      seq(field('kind', choice('let', alias($._let, 'let'), 'const')), commaSep1($.variable_declarator), $._semicolon),
+      seq(
+        field('kind', choice('let', alias($._let, 'let'), 'const')),
+        commaSep1(alias($._lexical_variable_declarator, $.variable_declarator)),
+        $._semicolon
+      ),
 
     using_declaration: ($) =>
       seq(
@@ -365,11 +375,18 @@ module.exports = grammar({
         $._semicolon
       ),
 
-    _using_declarator: ($) => seq(field('name', choice($.identifier, alias('of', $.identifier))), $._initializer),
+    _using_declarator: ($) =>
+      seq(field('name', choice(reserved('lexical', $.identifier), alias('of', $.identifier))), $._initializer),
 
     variable_declarator: ($) =>
       seq(
         field('name', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern)),
+        optional(choice($._initializer, sym('_line_break_after_binding')))
+      ),
+
+    _lexical_variable_declarator: ($) =>
+      seq(
+        field('name', choice(reserved('lexical', $.identifier), alias('of', $.identifier), $._destructuring_pattern)),
         optional(choice($._initializer, sym('_line_break_after_binding')))
       ),
 
@@ -422,7 +439,12 @@ module.exports = grammar({
     // ECMAScript inserts no semicolon inside a for header, so these declarations end only with `;`. Accepting an
     // automatic semicolon there made `for (let x\n of y)` ambiguous until `of`, and an incremental reparse could
     // reuse a declaration built when that ambiguity was resolved differently.
-    for_lexical_declaration: ($) => seq(field('kind', choice('let', 'const')), commaSep1($.variable_declarator), ';'),
+    for_lexical_declaration: ($) =>
+      seq(
+        field('kind', choice('let', 'const')),
+        commaSep1(alias($._lexical_variable_declarator, $.variable_declarator)),
+        ';'
+      ),
 
     for_variable_declaration: ($) => seq('var', commaSep1($.variable_declarator), ';'),
 
@@ -452,7 +474,10 @@ module.exports = grammar({
               ),
               seq(
                 field('kind', choice('let', 'const')),
-                field('left', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern))
+                field(
+                  'left',
+                  choice(reserved('lexical', $.identifier), alias('of', $.identifier), $._destructuring_pattern)
+                )
               )
             ),
             field('operator', choice('in', 'of'))
@@ -465,7 +490,7 @@ module.exports = grammar({
               ),
               seq(field('kind', seq(alias(sym('_await_keyword'), 'await'), 'using')), sym('_resource_binding_start'))
             ),
-            field('left', choice($.identifier, alias('of', $.identifier))),
+            field('left', choice(reserved('lexical', $.identifier), alias('of', $.identifier))),
             field('operator', 'of')
           )
         ),
@@ -1449,6 +1474,7 @@ module.exports = grammar({
           alias(
             choice(
               $.identifier,
+              $._escaped_let,
               ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? sym('_await_keyword') : word))
             ),
             sym('property_identifier')
@@ -1474,9 +1500,10 @@ module.exports = grammar({
 
     computed_property_name: ($) => seq('[', $.expression, ']'),
 
-    _reserved_identifier: () =>
+    _reserved_identifier: ($) =>
       choice(
         ...MEMBER_MODIFIERS,
+        $._escaped_let,
         ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? sym('_await_keyword') : word))
       ),
 
