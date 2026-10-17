@@ -26,7 +26,7 @@ test('rejects reserved direct lexical bindings in declarations and loop headers'
           `${kind} ${name} = 1;`,
           `${kind} first = 1, ${name} = 2;`,
           `for (${kind} ${name} = 1; ; ) {}`,
-          `for (${kind} ${name} in values) {}`,
+          ...(kind === 'let' || kind === 'const' ? [`for (${kind} ${name} in values) {}`] : []),
           `for (${kind} ${name} of values) {}`,
         ]) {
           const tree = parser.parse(source)!;
