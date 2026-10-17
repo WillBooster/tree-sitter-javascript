@@ -1146,16 +1146,6 @@
           }
         ]
       },
-      "decorator": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": "decorator",
-            "named": true
-          }
-        ]
-      },
       "source": {
         "multiple": false,
         "required": false,

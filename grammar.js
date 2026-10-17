@@ -126,6 +126,7 @@ module.exports = grammar({
   supertypes: ($) => [
     $.statement,
     $.declaration,
+    $._decorated_export_declaration,
     $.expression,
     $.primary_expression,
     $.pattern,
@@ -223,6 +224,7 @@ module.exports = grammar({
 
     export_statement: ($) =>
       choice(
+        field('declaration', alias($._decorated_export_declaration, $.declaration)),
         seq(
           'export',
           choice(
@@ -236,13 +238,29 @@ module.exports = grammar({
           $._semicolon
         ),
         seq(
-          repeat(field('decorator', $.decorator)),
           'export',
           choice(
             field('declaration', $.declaration),
             seq(alias(sym('_export_default_declaration'), 'default'), field('declaration', $.declaration)),
             seq(alias(sym('_export_default'), 'default'), field('value', $.expression), $._semicolon)
           )
+        )
+      ),
+
+    _decorated_export_declaration: ($) => alias($._decorated_export_class, $.class_declaration),
+
+    _decorated_export_class: ($) =>
+      prec(
+        'declaration',
+        seq(
+          repeat1(field('decorator', $.decorator)),
+          'export',
+          choice(
+            seq('class', field('name', $.identifier)),
+            seq('default', 'class', field('name', optional($.identifier)))
+          ),
+          optional($.class_heritage),
+          field('body', $.class_body)
         )
       ),
 

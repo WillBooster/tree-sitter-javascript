@@ -490,11 +490,11 @@ export class Foo {
 
 (program
   (export_statement
-    decorator: (decorator
-      (call_expression
-        function: (identifier)
-        arguments: (arguments)))
     declaration: (class_declaration
+      decorator: (decorator
+        (call_expression
+          function: (identifier)
+          arguments: (arguments)))
       name: (identifier)
       body: (class_body))))
 
