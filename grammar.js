@@ -119,6 +119,7 @@ module.exports = grammar({
 
   reserved: {
     global: () => RESERVED_WORDS,
+    lexical: () => [...RESERVED_WORDS, 'let'],
     properties: () => [],
   },
 
@@ -354,7 +355,11 @@ module.exports = grammar({
     _let: () => token(prec(-1, /let/)),
 
     lexical_declaration: ($) =>
-      seq(field('kind', choice('let', alias($._let, 'let'), 'const')), commaSep1($.variable_declarator), $._semicolon),
+      seq(
+        field('kind', choice('let', alias($._let, 'let'), 'const')),
+        commaSep1(alias($._lexical_variable_declarator, $.variable_declarator)),
+        $._semicolon
+      ),
 
     using_declaration: ($) =>
       seq(
@@ -370,6 +375,12 @@ module.exports = grammar({
     variable_declarator: ($) =>
       seq(
         field('name', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern)),
+        optional(choice($._initializer, sym('_line_break_after_binding')))
+      ),
+
+    _lexical_variable_declarator: ($) =>
+      seq(
+        field('name', choice(reserved('lexical', $.identifier), alias('of', $.identifier), $._destructuring_pattern)),
         optional(choice($._initializer, sym('_line_break_after_binding')))
       ),
 
@@ -422,7 +433,12 @@ module.exports = grammar({
     // ECMAScript inserts no semicolon inside a for header, so these declarations end only with `;`. Accepting an
     // automatic semicolon there made `for (let x\n of y)` ambiguous until `of`, and an incremental reparse could
     // reuse a declaration built when that ambiguity was resolved differently.
-    for_lexical_declaration: ($) => seq(field('kind', choice('let', 'const')), commaSep1($.variable_declarator), ';'),
+    for_lexical_declaration: ($) =>
+      seq(
+        field('kind', choice('let', 'const')),
+        commaSep1(alias($._lexical_variable_declarator, $.variable_declarator)),
+        ';'
+      ),
 
     for_variable_declaration: ($) => seq('var', commaSep1($.variable_declarator), ';'),
 
@@ -452,7 +468,10 @@ module.exports = grammar({
               ),
               seq(
                 field('kind', choice('let', 'const')),
-                field('left', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern))
+                field(
+                  'left',
+                  choice(reserved('lexical', $.identifier), alias('of', $.identifier), $._destructuring_pattern)
+                )
               )
             ),
             field('operator', choice('in', 'of'))
