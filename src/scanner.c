@@ -41,16 +41,24 @@ enum TokenType {
     REGEX_FLAGS_START,
     ARGUMENTLESS_NEW_END,
     CONSTRUCTOR_ASYNC_FUNCTION_START,
+    SYNC_FUNCTION_START,
+    ASYNC_FUNCTION_START,
+    FUNCTION_CONTEXT_END,
+    ARROW_CONTEXT_END,
+    AWAIT_IDENTIFIER,
 };
 
 static bool scan_let(TSLexer *lexer);
 static bool is_reserved_word(const char *name);
+static bool scan_expression_trivia(TSLexer *lexer, bool *saw_newline, bool *scanned_comment);
 
 typedef struct {
     // A reused block arrow or postfix update can bypass the boundary state; serialize the pending semicolon.
     // Nested await end tokens must not clear it before the enclosing statement consumes it.
     bool automatic_semicolon_pending;
     bool default_declaration_pending;
+    unsigned context_depth;
+    uint8_t async_context[TREE_SITTER_SERIALIZATION_BUFFER_SIZE - 4];
 } Scanner;
 
 static bool scan_export_default(Scanner *scanner, TSLexer *lexer);
@@ -65,13 +73,19 @@ unsigned tree_sitter_javascript_external_scanner_serialize(void *payload, char *
     Scanner *scanner = (Scanner *)payload;
     buffer[0] = (char)scanner->automatic_semicolon_pending;
     buffer[1] = (char)scanner->default_declaration_pending;
-    return 2;
+    buffer[2] = (char)(scanner->context_depth & 0xff);
+    buffer[3] = (char)(scanner->context_depth >> 8);
+    unsigned context_bytes = (scanner->context_depth + 7) / 8;
+    memcpy(buffer + 4, scanner->async_context, context_bytes);
+    return 4 + context_bytes;
 }
 
 void tree_sitter_javascript_external_scanner_deserialize(void *payload, const char *buffer, unsigned length) {
     Scanner *scanner = (Scanner *)payload;
     scanner->automatic_semicolon_pending = length > 0 && buffer[0];
     scanner->default_declaration_pending = length > 1 && buffer[1];
+    scanner->context_depth = length >= 4 ? (unsigned char)buffer[2] | ((unsigned char)buffer[3] << 8) : 0;
+    if (scanner->context_depth) memcpy(scanner->async_context, buffer + 4, (scanner->context_depth + 7) / 8);
 }
 
 static inline void advance(TSLexer *lexer) { lexer->advance(lexer, false); }
@@ -773,43 +787,19 @@ static bool scan_jsx_text(TSLexer *lexer) {
     }
 }
 
+static bool scan_infix_word(TSLexer *lexer, bool skip_characters) {
+    char word[16] = {0};
+    return scan_identifier(lexer, word, sizeof(word), skip_characters) &&
+        (strcmp(word, "in") == 0 || strcmp(word, "instanceof") == 0);
+}
+
 // Canonical expression paths preserve public supertype queries. Keep postfix suffixes in the await operand while
 // letting infix operators continue the enclosing expression.
 static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statement_end, const bool *valid_symbols) {
     lexer->mark_end(lexer);
     lexer->result_symbol = after_postfix ? POSTFIX_UPDATE_END : AWAIT_OPERAND_END;
     bool saw_newline = false;
-    for (;;) {
-        while (is_whitespace(lexer->lookahead)) {
-            saw_newline |= is_line_terminator(lexer->lookahead);
-            skip(lexer);
-        }
-        if (lexer->lookahead != '/') {
-            break;
-        }
-        skip(lexer);
-        if (lexer->lookahead == '/') {
-            while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) {
-                skip(lexer);
-            }
-        } else if (lexer->lookahead == '*') {
-            skip(lexer);
-            while (!lexer->eof(lexer)) {
-                saw_newline |= is_line_terminator(lexer->lookahead);
-                if (lexer->lookahead == '*') {
-                    skip(lexer);
-                    if (lexer->lookahead == '/') {
-                        skip(lexer);
-                        break;
-                    }
-                } else {
-                    skip(lexer);
-                }
-            }
-        } else {
-            return valid_symbols[AWAIT_OPERAND_END] || after_postfix;
-        }
-    }
+    if (!scan_expression_trivia(lexer, &saw_newline, NULL)) return valid_symbols[AWAIT_OPERAND_END] || after_postfix;
     if (valid_symbols[RESOURCE_BINDING_START] || valid_symbols[RESOURCE_BINDING_CONTINUATION] ||
         valid_symbols[PLAIN_RESOURCE_FOR_OF_CONTEXT]) {
         bool first_binding = valid_symbols[RESOURCE_BINDING_START] || valid_symbols[PLAIN_RESOURCE_FOR_OF_CONTEXT];
@@ -842,11 +832,8 @@ static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statem
         case '?':
             skip(lexer);
             return lexer->lookahead != '.';
-        case 'i': {
-            char word[16] = {0};
-            bool ascii_word = scan_identifier(lexer, word, sizeof(word), true);
-            return saw_newline || (ascii_word && (strcmp(word, "in") == 0 || strcmp(word, "instanceof") == 0));
-        }
+        case 'i':
+            return scan_infix_word(lexer, true) || saw_newline;
         case '!':
         case '=':
         case '*':
@@ -943,7 +930,18 @@ static bool scan_await_yield_identifier(TSLexer *lexer) {
     return true;
 }
 
-static bool scan_await_or_async_constructor(TSLexer *lexer, const bool *valid_symbols) {
+static bool in_async_function(const Scanner *scanner) {
+    unsigned index = scanner->context_depth - 1;
+    return scanner->context_depth && (scanner->async_context[index / 8] & (1u << (index % 8)));
+}
+
+static void leave_function(Scanner *scanner) {
+    if (!scanner->context_depth) return;
+    unsigned index = --scanner->context_depth;
+    scanner->async_context[index / 8] &= ~(1u << (index % 8));
+}
+
+static bool scan_await_or_async_constructor(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     bool scanned_content = false;
     if (scan_whitespace_and_comments(lexer, &scanned_content, true, true) == REJECT || scanned_content) {
         return false;
@@ -961,7 +959,9 @@ static bool scan_await_or_async_constructor(TSLexer *lexer, const bool *valid_sy
         lexer->result_symbol = CONSTRUCTOR_ASYNC_FUNCTION_START;
         return true;
     }
-    if (strcmp(keyword, "await") != 0 || !valid_symbols[AWAIT_KEYWORD]) return false;
+    if (strcmp(keyword, "await") != 0) return false;
+    bool identifier = scanner->context_depth && !in_async_function(scanner);
+    if (identifier ? !valid_symbols[AWAIT_IDENTIFIER] : !valid_symbols[AWAIT_KEYWORD]) return false;
     lexer->mark_end(lexer);
     // Record the operand decision on both keyword and identifier tokens so restored nodes cannot keep stale roles.
     // Advancing without skipping after mark_end preserves the consuming keyword's start across probed comments.
@@ -973,12 +973,124 @@ static bool scan_await_or_async_constructor(TSLexer *lexer, const bool *valid_sy
         char word[16] = {0};
         scan_identifier(lexer, word, sizeof(word), false);
     }
-    lexer->result_symbol = AWAIT_KEYWORD;
+    lexer->result_symbol = identifier ? AWAIT_IDENTIFIER : AWAIT_KEYWORD;
     return true;
+}
+
+static bool scan_arrow_context_end(TSLexer *lexer, bool *can_scan_ternary) {
+    lexer->mark_end(lexer);
+    bool saw_newline = false;
+    bool scanned_comment = false;
+    if (!scan_expression_trivia(lexer, &saw_newline, &scanned_comment)) return false;
+    *can_scan_ternary = !scanned_comment && lexer->lookahead == '?';
+    switch (lexer->lookahead) {
+        case '(': case '[': case '`': case '?': case '=': case '*': case '%':
+        case '<': case '>': case '^': case '|': case '&': return false;
+        case '!': advance(lexer); return lexer->lookahead != '=';
+        case '.': advance(lexer); return saw_newline && is_ascii_digit(lexer->lookahead);
+        case '+': case '-': {
+            int32_t sign = lexer->lookahead;
+            advance(lexer);
+            return saw_newline && lexer->lookahead == sign;
+        }
+        case 'i':
+            return !scan_infix_word(lexer, false);
+        case ';': case ',': case ':': case ')': case ']': case '}': return true;
+        default: return lexer->eof(lexer) || saw_newline;
+    }
+}
+
+static bool scan_expression_trivia(TSLexer *lexer, bool *saw_newline, bool *scanned_comment) {
+    for (;;) {
+        while (is_whitespace(lexer->lookahead)) {
+            *saw_newline |= is_line_terminator(lexer->lookahead);
+            skip(lexer);
+        }
+        if (lexer->lookahead != '/') {
+            break;
+        }
+        if (scanned_comment) *scanned_comment = true;
+        skip(lexer);
+        if (lexer->lookahead == '/') {
+            while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) {
+                skip(lexer);
+            }
+        } else if (lexer->lookahead == '*') {
+            skip(lexer);
+            while (!lexer->eof(lexer)) {
+                *saw_newline |= is_line_terminator(lexer->lookahead);
+                if (lexer->lookahead == '*') {
+                    skip(lexer);
+                    if (lexer->lookahead == '/') {
+                        skip(lexer);
+                        break;
+                    }
+                } else {
+                    skip(lexer);
+                }
+            }
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool scan_function_context(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
+    if (valid_symbols[SYNC_FUNCTION_START] || valid_symbols[ASYNC_FUNCTION_START]) {
+        if (scanner->context_depth == sizeof(scanner->async_context) * 8) return false;
+        unsigned index = scanner->context_depth++;
+        if (valid_symbols[ASYNC_FUNCTION_START]) scanner->async_context[index / 8] |= 1u << (index % 8);
+        else scanner->async_context[index / 8] &= ~(1u << (index % 8));
+        lexer->mark_end(lexer);
+        lexer->result_symbol = valid_symbols[ASYNC_FUNCTION_START] ? ASYNC_FUNCTION_START : SYNC_FUNCTION_START;
+        return true;
+    }
+    if (valid_symbols[FUNCTION_CONTEXT_END]) {
+        lexer->mark_end(lexer);
+        if (scanner->automatic_semicolon_pending && valid_symbols[ARROW_FUNCTION_BLOCK_CONTINUATION]) {
+            bool saw_newline = false;
+            scan_expression_trivia(lexer, &saw_newline, NULL);
+            if (lexer->lookahead == ':' || lexer->lookahead == '}' || lexer->lookahead == ')' || lexer->lookahead == ']') {
+                scanner->automatic_semicolon_pending = false;
+                lexer->result_symbol = ARROW_FUNCTION_BLOCK_CONTINUATION;
+                return true;
+            }
+        }
+        if (valid_symbols[ARROW_FUNCTION_BLOCK_END]) {
+            bool scanned_content = false;
+            if (scan_automatic_semicolon(lexer, !valid_symbols[LOGICAL_OR], true, LINE_BREAK_BY_NEXT_TOKEN, &scanned_content, NULL)) {
+                scanner->automatic_semicolon_pending = true;
+                lexer->result_symbol = ARROW_FUNCTION_BLOCK_END;
+                return true;
+            }
+        }
+        leave_function(scanner);
+        lexer->result_symbol = FUNCTION_CONTEXT_END;
+        return true;
+    }
+    return false;
 }
 
 bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer, const bool *valid_symbols) {
     Scanner *scanner = (Scanner *)payload;
+
+    if (!(valid_symbols[TEMPLATE_CHARS] && valid_symbols[AUTOMATIC_SEMICOLON])) {
+        if (valid_symbols[SYNC_FUNCTION_START] || valid_symbols[ASYNC_FUNCTION_START] || valid_symbols[FUNCTION_CONTEXT_END]) {
+            return scan_function_context(scanner, lexer, valid_symbols);
+        }
+        if (valid_symbols[ARROW_CONTEXT_END] &&
+            !(valid_symbols[LINE_BREAK_AFTER_AWAIT] && scanner->context_depth && in_async_function(scanner))) {
+            lexer->mark_end(lexer);
+            bool can_scan_ternary = false;
+            if (!scanner->automatic_semicolon_pending && !scan_arrow_context_end(lexer, &can_scan_ternary)) {
+                return valid_symbols[TERNARY_QMARK] && can_scan_ternary && scan_ternary_qmark(lexer);
+            }
+            leave_function(scanner);
+            lexer->result_symbol = ARROW_CONTEXT_END;
+            return true;
+        }
+    }
 
     if (valid_symbols[REGEX_FLAGS_START] && !valid_symbols[AUTOMATIC_SEMICOLON]) {
         if (lexer->lookahead != '/') return false;
@@ -1042,11 +1154,9 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         return true;
     }
 
-    if (scanner->automatic_semicolon_pending &&
-        (valid_symbols[AUTOMATIC_SEMICOLON] || valid_symbols[ARROW_FUNCTION_BLOCK_CONTINUATION])) {
+    if (scanner->automatic_semicolon_pending && valid_symbols[AUTOMATIC_SEMICOLON]) {
         scanner->automatic_semicolon_pending = false;
-        lexer->result_symbol =
-            valid_symbols[AUTOMATIC_SEMICOLON] ? AUTOMATIC_SEMICOLON : ARROW_FUNCTION_BLOCK_CONTINUATION;
+        lexer->result_symbol = AUTOMATIC_SEMICOLON;
         lexer->mark_end(lexer);
         return true;
     }
@@ -1090,8 +1200,7 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         return ret;
     }
 
-    if (valid_symbols[AUTOMATIC_SEMICOLON] || valid_symbols[ARROW_FUNCTION_BLOCK_END]) {
-        bool after_block_arrow = valid_symbols[ARROW_FUNCTION_BLOCK_END];
+    if (valid_symbols[AUTOMATIC_SEMICOLON]) {
         bool scanned_content = false;
         LineBreakRule rule = LINE_BREAK_BY_NEXT_TOKEN;
         if (valid_symbols[LINE_BREAK_AFTER_AWAIT]) {
@@ -1107,12 +1216,8 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         } else if (valid_symbols[LINE_BREAK_BEFORE_ATTRIBUTES]) {
             rule = LINE_BREAK_BEFORE_IMPORT_ATTRIBUTES;
         }
-        bool ret = scan_automatic_semicolon(lexer, !valid_symbols[LOGICAL_OR], after_block_arrow, rule, &scanned_content, NULL);
-        if (ret && after_block_arrow) {
-            lexer->result_symbol = ARROW_FUNCTION_BLOCK_END;
-            scanner->automatic_semicolon_pending = true;
-        }
-        if (ret && !after_block_arrow && valid_symbols[STATEMENT_BOUNDARY] && lexer->result_symbol == AUTOMATIC_SEMICOLON) {
+        bool ret = scan_automatic_semicolon(lexer, !valid_symbols[LOGICAL_OR], false, rule, &scanned_content, NULL);
+        if (ret && valid_symbols[STATEMENT_BOUNDARY] && lexer->result_symbol == AUTOMATIC_SEMICOLON) {
             lexer->result_symbol = STATEMENT_BOUNDARY;
         }
         if (!ret && !scanned_content && valid_symbols[TERNARY_QMARK] && lexer->lookahead == '?') {
@@ -1121,8 +1226,8 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         if (!ret && !scanned_content && valid_symbols[AWAIT_YIELD_IDENTIFIER] && valid_symbols[LINE_BREAK_AFTER_AWAIT] && lexer->lookahead == 'y') {
             return scan_await_yield_identifier(lexer);
         }
-        if (!ret && !scanned_content && (valid_symbols[AWAIT_KEYWORD] || valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START]) && lexer->lookahead == 'a') {
-            return scan_await_or_async_constructor(lexer, valid_symbols);
+        if (!ret && !scanned_content && (valid_symbols[AWAIT_KEYWORD] || valid_symbols[AWAIT_IDENTIFIER] || valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START]) && lexer->lookahead == 'a') {
+            return scan_await_or_async_constructor(scanner, lexer, valid_symbols);
         }
         if (!ret && !scanned_content && valid_symbols[LET] && !valid_symbols[SINGLE_STATEMENT_CONTEXT] && lexer->lookahead == 'l') {
             lexer->result_symbol = LET;
@@ -1143,8 +1248,8 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
     while (is_whitespace(lexer->lookahead)) {
         skip(lexer);
     }
-    if ((valid_symbols[AWAIT_KEYWORD] || valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START]) && lexer->lookahead == 'a') {
-        return scan_await_or_async_constructor(lexer, valid_symbols);
+    if ((valid_symbols[AWAIT_KEYWORD] || valid_symbols[AWAIT_IDENTIFIER] || valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START]) && lexer->lookahead == 'a') {
+        return scan_await_or_async_constructor(scanner, lexer, valid_symbols);
     }
     if (valid_symbols[TERNARY_QMARK] && lexer->lookahead == '?') {
         return scan_ternary_qmark(lexer);

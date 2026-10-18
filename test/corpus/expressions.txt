@@ -2482,13 +2482,15 @@ function await(await) { await: await (await + await (0)); }
       (labeled_statement
         (statement_identifier)
         (expression_statement
-          (await_expression
-            (parenthesized_expression
-              (await_expression
-                (unary_expression
-                  (await_expression
-                    (parenthesized_expression
-                      (number))))))))))))
+          (call_expression
+            (identifier)
+            (arguments
+              (binary_expression
+                (identifier)
+                (call_expression
+                  (identifier)
+                  (arguments
+                    (number)))))))))))
 
 ============================================
 JSX
@@ -2975,19 +2977,22 @@ function script() {
             (identifier)
             (arguments))))
       (expression_statement
-        (await_expression
-          (subscript_expression
-            (identifier)
-            (number))))
+        (identifier))
+      (expression_statement
+        (subscript_expression
+          (identifier)
+          (number)))
+      (expression_statement
+        (identifier))
       (expression_statement
         (binary_expression
-          (await_expression
-            (identifier))
+          (identifier)
           (identifier)))
       (expression_statement
+        (identifier))
+      (expression_statement
         (binary_expression
-          (await_expression
-            (identifier))
+          (identifier)
           (identifier)))
       (expression_statement
         (identifier))

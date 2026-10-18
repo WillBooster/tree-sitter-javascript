@@ -113,6 +113,11 @@ module.exports = grammar({
     sym('_regex_flags_start'),
     sym('_argumentless_new_end'),
     sym('_constructor_async_function_start'),
+    sym('_sync_function_start'),
+    sym('_async_function_start'),
+    sym('_function_context_end'),
+    sym('_arrow_context_end'),
+    sym('_await_identifier'),
   ],
 
   extras: ($) => [$.comment, sym('html_comment'), /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -830,85 +835,97 @@ module.exports = grammar({
     function_expression: ($) =>
       prec(
         'literal',
-        seq(
-          optional('async'),
-          'function',
-          field('name', optional($.identifier)),
-          $._call_signature,
-          field('body', $.statement_block)
+        functionContext((async) =>
+          seq(
+            ...(async ? ['async'] : []),
+            'function',
+            field('name', optional($.identifier)),
+            $._call_signature,
+            contextBody(async, field('body', $.statement_block))
+          )
         )
       ),
 
     function_declaration: ($) =>
       prec.right(
         'declaration',
-        seq(
-          choice(
-            seq(
-              sym('_default_declaration_start'),
-              optional('async'),
-              'function',
-              field('name', optional($.identifier))
+        functionContext((async) =>
+          seq(
+            choice(
+              seq(
+                sym('_default_declaration_start'),
+                ...(async ? ['async'] : []),
+                'function',
+                field('name', optional($.identifier))
+              ),
+              seq(...(async ? ['async'] : []), 'function', field('name', $.identifier))
             ),
-            seq(optional('async'), 'function', field('name', $.identifier))
-          ),
-          $._call_signature,
-          field('body', $.statement_block)
+            $._call_signature,
+            contextBody(async, field('body', $.statement_block))
+          )
         )
       ),
 
     generator_function: ($) =>
       prec(
         'literal',
-        seq(
-          optional('async'),
-          'function',
-          '*',
-          field('name', optional($.identifier)),
-          $._call_signature,
-          field('body', $.statement_block)
+        functionContext((async) =>
+          seq(
+            ...(async ? ['async'] : []),
+            'function',
+            '*',
+            field('name', optional($.identifier)),
+            $._call_signature,
+            contextBody(async, field('body', $.statement_block))
+          )
         )
       ),
 
     generator_function_declaration: ($) =>
       prec.right(
         'declaration',
-        seq(
-          choice(
-            seq(
-              sym('_default_declaration_start'),
-              optional('async'),
-              'function',
-              '*',
-              field('name', optional($.identifier))
+        functionContext((async) =>
+          seq(
+            choice(
+              seq(
+                sym('_default_declaration_start'),
+                ...(async ? ['async'] : []),
+                'function',
+                '*',
+                field('name', optional($.identifier))
+              ),
+              seq(...(async ? ['async'] : []), 'function', '*', field('name', $.identifier))
             ),
-            seq(optional('async'), 'function', '*', field('name', $.identifier))
-          ),
-          $._call_signature,
-          field('body', $.statement_block)
+            $._call_signature,
+            contextBody(async, field('body', $.statement_block))
+          )
         )
       ),
 
     arrow_function: ($) =>
       prec.right(
-        seq(
-          optional('async'),
-          choice(
-            field(
-              'parameter',
-              choice(alias($._reserved_identifier, $.identifier), alias($.undefined, $.identifier), $.identifier)
+        functionContext((async) =>
+          seq(
+            ...(async ? ['async'] : []),
+            choice(
+              field(
+                'parameter',
+                choice(alias($._reserved_identifier, $.identifier), alias($.undefined, $.identifier), $.identifier)
+              ),
+              $._call_signature
             ),
-            $._call_signature
-          ),
-          '=>',
-          choice(
-            field('body', $.expression),
-            seq(
-              field('body', $.statement_block),
-              optional(seq(sym('_arrow_function_block_end'), optional(sym('_arrow_function_block_continuation'))))
-            )
-          ),
-          optional(sym('_completed_arrow_function'))
+            '=>',
+            sym(async ? '_async_function_start' : '_sync_function_start'),
+            choice(
+              seq(field('body', $.expression), sym('_arrow_context_end')),
+              seq(
+                field('body', $.statement_block),
+                optional(seq(sym('_arrow_function_block_end'), optional(sym('_arrow_function_block_continuation')))),
+                sym('_function_context_end')
+              )
+            ),
+            optional(sym('_completed_arrow_function'))
+          )
         )
       ),
 
@@ -941,27 +958,31 @@ module.exports = grammar({
     _constructor_function_expression: ($) =>
       prec(
         'literal',
-        seq(
-          optional(sym('_constructor_async_function_start')),
-          optional('async'),
-          'function',
-          field('name', optional($.identifier)),
-          $._call_signature,
-          field('body', $.statement_block)
+        functionContext((async) =>
+          seq(
+            optional(sym('_constructor_async_function_start')),
+            ...(async ? ['async'] : []),
+            'function',
+            field('name', optional($.identifier)),
+            $._call_signature,
+            contextBody(async, field('body', $.statement_block))
+          )
         )
       ),
 
     _constructor_generator_function: ($) =>
       prec(
         'literal',
-        seq(
-          optional(sym('_constructor_async_function_start')),
-          optional('async'),
-          'function',
-          '*',
-          field('name', optional($.identifier)),
-          $._call_signature,
-          field('body', $.statement_block)
+        functionContext((async) =>
+          seq(
+            optional(sym('_constructor_async_function_start')),
+            ...(async ? ['async'] : []),
+            'function',
+            '*',
+            field('name', optional($.identifier)),
+            $._call_signature,
+            contextBody(async, field('body', $.statement_block))
+          )
         )
       ),
 
@@ -1465,14 +1486,16 @@ module.exports = grammar({
     rest_pattern: ($) => prec.right(seq('...', choice($._lhs_expression, $.parenthesized_expression))),
 
     method_definition: ($) =>
-      seq(
-        repeat(field('decorator', $.decorator)),
-        optional('static'),
-        optional('async'),
-        optional(choice('get', 'set', '*')),
-        field('name', $._property_name),
-        field('parameters', $.formal_parameters),
-        field('body', alias($._class_member_body, $.statement_block))
+      functionContext((async) =>
+        seq(
+          repeat(field('decorator', $.decorator)),
+          optional('static'),
+          ...(async ? ['async'] : []),
+          optional(choice('get', 'set', '*')),
+          field('name', $._property_name),
+          field('parameters', $.formal_parameters),
+          contextBody(async, field('body', alias($._class_member_body, $.statement_block)))
+        )
       ),
 
     // The body of a method or a static block, a rule of its own rather than statement_block: sharing it let tree-sitter
@@ -1493,7 +1516,9 @@ module.exports = grammar({
             choice(
               $.identifier,
               $._escaped_let,
-              ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? sym('_await_keyword') : word))
+              ...CONTEXTUAL_KEYWORDS.map((word) =>
+                word === 'await' ? choice(sym('_await_keyword'), sym('_await_identifier')) : word
+              )
             ),
             sym('property_identifier')
           ),
@@ -1522,7 +1547,9 @@ module.exports = grammar({
       choice(
         ...MEMBER_MODIFIERS,
         $._escaped_let,
-        ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? sym('_await_keyword') : word))
+        ...CONTEXTUAL_KEYWORDS.map((word) =>
+          word === 'await' ? choice(sym('_await_keyword'), sym('_await_identifier')) : word
+        )
       ),
 
     _semicolon: () =>
@@ -1555,4 +1582,16 @@ function commaSep1(rule) {
  */
 function commaSep(rule) {
   return optional(commaSep1(rule));
+}
+
+/** @param {(isAsync: boolean) => import('@willbooster/web-tree-sitter/dsl').RuleOrLiteral} makeRule */
+function functionContext(makeRule) {
+  return choice(makeRule(false), makeRule(true));
+}
+/**
+ * @param {boolean} async
+ * @param {import('@willbooster/web-tree-sitter/dsl').RuleOrLiteral} body
+ */
+function contextBody(async, body) {
+  return seq(sym(async ? '_async_function_start' : '_sync_function_start'), body, sym('_function_context_end'));
 }
