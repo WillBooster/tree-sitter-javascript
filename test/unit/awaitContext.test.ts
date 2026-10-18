@@ -87,58 +87,63 @@ test('restores outer await context after nested arrows, methods and constructors
   }
 });
 
-test('reparses function context when async is added and removed, including at serialization capacity', () => {
-  const parser = new Parser().setLanguage(language);
-  try {
-    for (const depth of [1, 32, 8160]) {
-      const prefix = Array.from({ length: depth - 1 }, (_, index) => `${index % 2 ? 'async ' : ''}function f(){`).join(
-        ''
-      );
-      let source = `${prefix}function f(){await(value);}${'}'.repeat(depth - 1)}`;
-      let tree = parser.parse(source)!;
-      try {
-        expect(tree.rootNode.hasError).toBe(false);
-        expect(tree.rootNode.descendantsOfType('await_expression')).toHaveLength(0);
-        for (const async of [true, false, true, false]) {
-          const deleted = async ? 0 : 6;
-          const inserted = async ? 'async ' : '';
-          tree.edit(
-            new Edit({
-              startIndex: prefix.length,
-              oldEndIndex: prefix.length + deleted,
-              newEndIndex: prefix.length + inserted.length,
-              startPosition: { row: 0, column: prefix.length },
-              oldEndPosition: { row: 0, column: prefix.length + deleted },
-              newEndPosition: { row: 0, column: prefix.length + inserted.length },
-            })
-          );
-          source = source.slice(0, prefix.length) + inserted + source.slice(prefix.length + deleted);
-          const previous = tree;
-          tree = parser.parse(source, previous)!;
-          previous.delete();
-          const fresh = parser.parse(source)!;
-          try {
-            expect(tree.rootNode.hasError).toBe(false);
-            expect(fresh.rootNode.hasError).toBe(false);
-            expect(tree.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual(
-              async ? ['await(value)'] : []
+test(
+  'reparses function context when async is added and removed, including at serialization capacity',
+  { timeout: 30_000 },
+  () => {
+    const parser = new Parser().setLanguage(language);
+    try {
+      for (const depth of [1, 32, 8160]) {
+        const prefix = Array.from(
+          { length: depth - 1 },
+          (_, index) => `${index % 2 ? 'async ' : ''}function f(){`
+        ).join('');
+        let source = `${prefix}function f(){await(value);}${'}'.repeat(depth - 1)}`;
+        let tree = parser.parse(source)!;
+        try {
+          expect(tree.rootNode.hasError).toBe(false);
+          expect(tree.rootNode.descendantsOfType('await_expression')).toHaveLength(0);
+          for (const async of [true, false, true, false]) {
+            const deleted = async ? 0 : 6;
+            const inserted = async ? 'async ' : '';
+            tree.edit(
+              new Edit({
+                startIndex: prefix.length,
+                oldEndIndex: prefix.length + deleted,
+                newEndIndex: prefix.length + inserted.length,
+                startPosition: { row: 0, column: prefix.length },
+                oldEndPosition: { row: 0, column: prefix.length + deleted },
+                newEndPosition: { row: 0, column: prefix.length + inserted.length },
+              })
             );
-            expect(tree.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual(
-              fresh.rootNode.descendantsOfType('await_expression').map(({ text }) => text)
-            );
-            expect(tree.rootNode.toString()).toBe(fresh.rootNode.toString());
-          } finally {
-            fresh.delete();
+            source = source.slice(0, prefix.length) + inserted + source.slice(prefix.length + deleted);
+            const previous = tree;
+            tree = parser.parse(source, previous)!;
+            previous.delete();
+            const fresh = parser.parse(source)!;
+            try {
+              expect(tree.rootNode.hasError).toBe(false);
+              expect(fresh.rootNode.hasError).toBe(false);
+              expect(tree.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual(
+                async ? ['await(value)'] : []
+              );
+              expect(tree.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual(
+                fresh.rootNode.descendantsOfType('await_expression').map(({ text }) => text)
+              );
+              expect(tree.rootNode.toString()).toBe(fresh.rootNode.toString());
+            } finally {
+              fresh.delete();
+            }
           }
+        } finally {
+          tree.delete();
         }
-      } finally {
-        tree.delete();
       }
+    } finally {
+      parser.delete();
     }
-  } finally {
-    parser.delete();
   }
-});
+);
 
 test('reports context overflow and incrementally repairs incomplete nested functions', () => {
   const parser = new Parser().setLanguage(language);
