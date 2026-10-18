@@ -126,7 +126,7 @@ test('reparses function context when async is added and removed, including at se
             expect(tree.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual(
               fresh.rootNode.descendantsOfType('await_expression').map(({ text }) => text)
             );
-            if (depth < 8160) expect(tree.rootNode.toString()).toBe(fresh.rootNode.toString());
+            expect(tree.rootNode.toString()).toBe(fresh.rootNode.toString());
           } finally {
             fresh.delete();
           }
