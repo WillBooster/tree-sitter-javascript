@@ -1154,11 +1154,9 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         return true;
     }
 
-    if (scanner->automatic_semicolon_pending &&
-        (valid_symbols[AUTOMATIC_SEMICOLON] || valid_symbols[ARROW_FUNCTION_BLOCK_CONTINUATION])) {
+    if (scanner->automatic_semicolon_pending && valid_symbols[AUTOMATIC_SEMICOLON]) {
         scanner->automatic_semicolon_pending = false;
-        lexer->result_symbol =
-            valid_symbols[AUTOMATIC_SEMICOLON] ? AUTOMATIC_SEMICOLON : ARROW_FUNCTION_BLOCK_CONTINUATION;
+        lexer->result_symbol = AUTOMATIC_SEMICOLON;
         lexer->mark_end(lexer);
         return true;
     }
@@ -1202,8 +1200,7 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         return ret;
     }
 
-    if (valid_symbols[AUTOMATIC_SEMICOLON] || valid_symbols[ARROW_FUNCTION_BLOCK_END]) {
-        bool after_block_arrow = valid_symbols[ARROW_FUNCTION_BLOCK_END];
+    if (valid_symbols[AUTOMATIC_SEMICOLON]) {
         bool scanned_content = false;
         LineBreakRule rule = LINE_BREAK_BY_NEXT_TOKEN;
         if (valid_symbols[LINE_BREAK_AFTER_AWAIT]) {
@@ -1219,12 +1216,8 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         } else if (valid_symbols[LINE_BREAK_BEFORE_ATTRIBUTES]) {
             rule = LINE_BREAK_BEFORE_IMPORT_ATTRIBUTES;
         }
-        bool ret = scan_automatic_semicolon(lexer, !valid_symbols[LOGICAL_OR], after_block_arrow, rule, &scanned_content, NULL);
-        if (ret && after_block_arrow) {
-            lexer->result_symbol = ARROW_FUNCTION_BLOCK_END;
-            scanner->automatic_semicolon_pending = true;
-        }
-        if (ret && !after_block_arrow && valid_symbols[STATEMENT_BOUNDARY] && lexer->result_symbol == AUTOMATIC_SEMICOLON) {
+        bool ret = scan_automatic_semicolon(lexer, !valid_symbols[LOGICAL_OR], false, rule, &scanned_content, NULL);
+        if (ret && valid_symbols[STATEMENT_BOUNDARY] && lexer->result_symbol == AUTOMATIC_SEMICOLON) {
             lexer->result_symbol = STATEMENT_BOUNDARY;
         }
         if (!ret && !scanned_content && valid_symbols[TERNARY_QMARK] && lexer->lookahead == '?') {
