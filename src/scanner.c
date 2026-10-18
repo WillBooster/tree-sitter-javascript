@@ -50,7 +50,7 @@ enum TokenType {
 
 static bool scan_let(TSLexer *lexer);
 static bool is_reserved_word(const char *name);
-static bool scan_expression_trivia(TSLexer *lexer, bool *saw_newline);
+static bool scan_expression_trivia(TSLexer *lexer, bool *saw_newline, bool *scanned_comment);
 
 typedef struct {
     // A reused block arrow or postfix update can bypass the boundary state; serialize the pending semicolon.
@@ -799,7 +799,7 @@ static bool scan_expression_end(TSLexer *lexer, bool after_postfix, bool *statem
     lexer->mark_end(lexer);
     lexer->result_symbol = after_postfix ? POSTFIX_UPDATE_END : AWAIT_OPERAND_END;
     bool saw_newline = false;
-    if (!scan_expression_trivia(lexer, &saw_newline)) return valid_symbols[AWAIT_OPERAND_END] || after_postfix;
+    if (!scan_expression_trivia(lexer, &saw_newline, NULL)) return valid_symbols[AWAIT_OPERAND_END] || after_postfix;
     if (valid_symbols[RESOURCE_BINDING_START] || valid_symbols[RESOURCE_BINDING_CONTINUATION] ||
         valid_symbols[PLAIN_RESOURCE_FOR_OF_CONTEXT]) {
         bool first_binding = valid_symbols[RESOURCE_BINDING_START] || valid_symbols[PLAIN_RESOURCE_FOR_OF_CONTEXT];
@@ -977,10 +977,12 @@ static bool scan_await_or_async_constructor(Scanner *scanner, TSLexer *lexer, co
     return true;
 }
 
-static bool scan_arrow_context_end(TSLexer *lexer) {
+static bool scan_arrow_context_end(TSLexer *lexer, bool *can_scan_ternary) {
     lexer->mark_end(lexer);
     bool saw_newline = false;
-    if (!scan_expression_trivia(lexer, &saw_newline)) return false;
+    bool scanned_comment = false;
+    if (!scan_expression_trivia(lexer, &saw_newline, &scanned_comment)) return false;
+    *can_scan_ternary = !scanned_comment && lexer->lookahead == '?';
     switch (lexer->lookahead) {
         case '(': case '[': case '`': case '?': case '=': case '*': case '%':
         case '<': case '>': case '^': case '|': case '&': return false;
@@ -998,7 +1000,7 @@ static bool scan_arrow_context_end(TSLexer *lexer) {
     }
 }
 
-static bool scan_expression_trivia(TSLexer *lexer, bool *saw_newline) {
+static bool scan_expression_trivia(TSLexer *lexer, bool *saw_newline, bool *scanned_comment) {
     for (;;) {
         while (is_whitespace(lexer->lookahead)) {
             *saw_newline |= is_line_terminator(lexer->lookahead);
@@ -1007,6 +1009,7 @@ static bool scan_expression_trivia(TSLexer *lexer, bool *saw_newline) {
         if (lexer->lookahead != '/') {
             break;
         }
+        if (scanned_comment) *scanned_comment = true;
         skip(lexer);
         if (lexer->lookahead == '/') {
             while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) {
@@ -1045,6 +1048,15 @@ static bool scan_function_context(Scanner *scanner, TSLexer *lexer, const bool *
     }
     if (valid_symbols[FUNCTION_CONTEXT_END]) {
         lexer->mark_end(lexer);
+        if (scanner->automatic_semicolon_pending && valid_symbols[ARROW_FUNCTION_BLOCK_CONTINUATION]) {
+            bool saw_newline = false;
+            scan_expression_trivia(lexer, &saw_newline, NULL);
+            if (lexer->lookahead == ':' || lexer->lookahead == '}' || lexer->lookahead == ')' || lexer->lookahead == ']') {
+                scanner->automatic_semicolon_pending = false;
+                lexer->result_symbol = ARROW_FUNCTION_BLOCK_CONTINUATION;
+                return true;
+            }
+        }
         if (valid_symbols[ARROW_FUNCTION_BLOCK_END]) {
             bool scanned_content = false;
             if (scan_automatic_semicolon(lexer, !valid_symbols[LOGICAL_OR], true, LINE_BREAK_BY_NEXT_TOKEN, &scanned_content, NULL)) {
@@ -1070,8 +1082,9 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         if (valid_symbols[ARROW_CONTEXT_END] &&
             !(valid_symbols[LINE_BREAK_AFTER_AWAIT] && scanner->context_depth && in_async_function(scanner))) {
             lexer->mark_end(lexer);
-            if (!scanner->automatic_semicolon_pending && !scan_arrow_context_end(lexer)) {
-                return valid_symbols[TERNARY_QMARK] && lexer->lookahead == '?' && scan_ternary_qmark(lexer);
+            bool can_scan_ternary = false;
+            if (!scanner->automatic_semicolon_pending && !scan_arrow_context_end(lexer, &can_scan_ternary)) {
+                return valid_symbols[TERNARY_QMARK] && can_scan_ternary && scan_ternary_qmark(lexer);
             }
             leave_function(scanner);
             lexer->result_symbol = ARROW_CONTEXT_END;

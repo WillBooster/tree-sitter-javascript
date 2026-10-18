@@ -54,6 +54,8 @@ test('restores outer await context after nested arrows, methods and constructors
       'const f = () => () => { await(value); };',
       'const o = { f(){ await(value); } };',
       'new function(){ await(value); };',
+      'const f = condition ? () => {}\n : () => await(value);',
+      'const o = { f: () => { await(value); }\n }.method();',
     ]) {
       const source = `async function outer(){ ${inner} await\nvalue; }`;
       const tree = parser.parse(source)!;
