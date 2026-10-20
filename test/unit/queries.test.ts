@@ -240,7 +240,7 @@ test('parses awaited resource bindings with canonical expression queries', async
   parser.setLanguage(language);
   const bindings = new Query(
     language,
-    '(using_declaration (variable_declarator name: (identifier) @binding)) (for_in_statement left: (identifier) @binding)'
+    '(using_declaration (variable_declarator name: (identifier) @binding)) (for_in_clause left: (identifier) @binding)'
   );
   const callees = new Query(language, '(call_expression function: (primary_expression) @callee)');
   const keywords = new Query(language, '"await" @keyword');
@@ -406,7 +406,7 @@ test('retains resource binding errors across escaped-name edits', async () => {
   parser.setLanguage(language);
   const bindings = new Query(
     language,
-    '(using_declaration (variable_declarator name: (identifier) @binding)) (for_in_statement left: (identifier) @binding)'
+    '(using_declaration (variable_declarator name: (identifier) @binding)) (for_in_clause left: (identifier) @binding)'
   );
   try {
     for (const kind of ['using', 'await using']) {
@@ -519,13 +519,14 @@ test('retains resource for-of fields while rejecting for-in edits', async () => 
               expect(next.rootNode.hasError, nextSource).toBe(operator === 'in');
               if (operator === 'of') {
                 const loop = next.rootNode.descendantsOfType('for_in_statement')[0]!;
-                expect(loop.childForFieldName('left')?.text, nextSource).toBe(name);
+                const header = loop.childForFieldName('header')!;
+                expect(header.childForFieldName('left')?.text, nextSource).toBe(name);
                 expect(
-                  loop.childrenForFieldName('kind').map((node) => node.text),
+                  header.childrenForFieldName('kind').map((node) => node.text),
                   nextSource
                 ).toEqual(kind.split(' '));
-                expect(loop.childForFieldName('operator')?.text, nextSource).toBe('of');
-                expect(loop.childForFieldName('right')?.text, nextSource).toBe('items');
+                expect(header.childForFieldName('operator')?.text, nextSource).toBe('of');
+                expect(header.childForFieldName('right')?.text, nextSource).toBe('items');
                 expect(loop.childForFieldName('body')?.text, nextSource).toBe(`{consume(${name});}`);
               }
             } finally {

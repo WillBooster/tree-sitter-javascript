@@ -1585,6 +1585,27 @@
           "value": "for"
         },
         {
+          "type": "FIELD",
+          "name": "header",
+          "content": {
+            "type": "SYMBOL",
+            "name": "for_clause"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "body",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_single_statement"
+          }
+        }
+      ]
+    },
+    "for_clause": {
+      "type": "SEQ",
+      "members": [
+        {
           "type": "STRING",
           "value": "("
         },
@@ -1615,14 +1636,6 @@
         {
           "type": "STRING",
           "value": ")"
-        },
-        {
-          "type": "FIELD",
-          "name": "body",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_single_statement"
-          }
         }
       ]
     },
@@ -1920,8 +1933,12 @@
           ]
         },
         {
-          "type": "SYMBOL",
-          "name": "_for_header"
+          "type": "FIELD",
+          "name": "header",
+          "content": {
+            "type": "SYMBOL",
+            "name": "for_in_clause"
+          }
         },
         {
           "type": "FIELD",
@@ -1933,7 +1950,7 @@
         }
       ]
     },
-    "_for_header": {
+    "for_in_clause": {
       "type": "SEQ",
       "members": [
         {
@@ -9868,7 +9885,7 @@
     ],
     [
       "primary_expression",
-      "_for_header"
+      "for_in_clause"
     ],
     [
       "array",

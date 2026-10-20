@@ -210,7 +210,7 @@ module.exports = grammar({
     [$.primary_expression, $.method_definition],
     [$.primary_expression, $.rest_pattern],
     [$.primary_expression, $.pattern],
-    [$.primary_expression, $._for_header],
+    [$.primary_expression, $.for_in_clause],
     [$.array, $.array_pattern],
     [$.object, $.object_pattern],
     [$.assignment_expression, $.pattern],
@@ -436,20 +436,12 @@ module.exports = grammar({
 
     switch_statement: ($) => seq('switch', field('value', $.parenthesized_expression), field('body', $.switch_body)),
 
-    for_statement: ($) =>
-      seq(
-        'for',
-        '(',
-        $._for_initializer,
-        $._for_condition,
-        field('increment', optional($._expressions)),
-        ')',
-        field('body', $._single_statement)
-      ),
+    for_statement: ($) => seq('for', field('header', $.for_clause), field('body', $._single_statement)),
 
-    // Extracted into rules because tree-sitter expands a `choice` written inline in the `seq` above into one production
-    // per alternative, each repeating the parse states of the rest of the header (about 30 KB of Wasm). They are hidden
-    // so that `initializer` and `condition` stay fields of `for_statement` and no node type is added.
+    for_clause: ($) =>
+      seq('(', $._for_initializer, $._for_condition, field('increment', optional($._expressions)), ')'),
+
+    // Hidden alternatives avoid duplicating the remaining header states for every initializer form.
     _for_initializer: ($) =>
       choice(
         field(
@@ -488,9 +480,14 @@ module.exports = grammar({
       ),
 
     for_in_statement: ($) =>
-      seq('for', optional(alias(sym('_await_keyword'), 'await')), $._for_header, field('body', $._single_statement)),
+      seq(
+        'for',
+        optional(alias(sym('_await_keyword'), 'await')),
+        field('header', $.for_in_clause),
+        field('body', $._single_statement)
+      ),
 
-    _for_header: ($) =>
+    for_in_clause: ($) =>
       seq(
         '(',
         choice(
