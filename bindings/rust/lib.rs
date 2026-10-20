@@ -54,4 +54,20 @@ mod tests {
             assert_eq!(awaits, expected);
         }
     }
+
+    #[test]
+    fn parses_top_level_yield_as_a_script_identifier() {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&super::LANGUAGE_SCRIPT.into()).unwrap();
+        let tree = parser
+            .parse(
+                "yield / divisor / g; function* f(){ yield /value/g; }",
+                None,
+            )
+            .unwrap();
+        assert!(!tree.root_node().has_error());
+        let printed = tree.root_node().to_sexp();
+        assert_eq!(printed.matches("(yield_expression ").count(), 1);
+        assert_eq!(printed.matches("(binary_expression ").count(), 2);
+    }
 }

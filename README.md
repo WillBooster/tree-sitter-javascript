@@ -39,7 +39,9 @@ parser.setLanguage(await Language.load(wasmPath));
 const tree = parser.parse('const App = () => <p>Hello</p>;\n');
 ```
 
-In browsers, let your bundler serve both `.wasm` files and pass their URLs:
+In browsers, let your bundler serve the runtime and the selected language `.wasm` files, then pass their URLs.
+For the Script goal, replace the language import below with
+`@willbooster/tree-sitter-javascript/tree-sitter-javascript_script.wasm?url`:
 
 ```js
 import { Language, Parser } from '@willbooster/web-tree-sitter';
@@ -51,8 +53,9 @@ const parser = new Parser();
 parser.setLanguage(await Language.load(javascriptUrl));
 ```
 
-In Cloudflare Workers, which do not allow compiling Wasm at run time, import both `.wasm` files as modules, with or
-without Node.js compatibility:
+In Cloudflare Workers, which do not allow compiling Wasm at run time, import the runtime and the selected language
+`.wasm` files as modules, with or without Node.js compatibility. For the Script goal, replace the language import
+below with `@willbooster/tree-sitter-javascript/tree-sitter-javascript_script.wasm`:
 
 ```js
 import { Language, Parser } from '@willbooster/web-tree-sitter';

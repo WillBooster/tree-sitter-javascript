@@ -145,3 +145,35 @@ for (const wasm of [false, true]) {
     }
   );
 }
+
+test('combines Script identifiers, generator computed names, and nested async initializers', () => {
+  const parser = new Parser().setLanguage(scriptLanguage);
+  const source = `yield / divisor / g;
+function* outer(){
+  class C {
+    [yield /key/g] = async () => await value;
+    field = await
+    next;
+  }
+  yield /outer/g;
+}
+yield / other / g;`;
+  const tree = parser.parse(source)!;
+  try {
+    expect(tree.rootNode.hasError).toBe(false);
+    expect(tree.rootNode.descendantsOfType('yield_expression').map(({ text }) => text)).toEqual([
+      'yield /key/g',
+      'yield /outer/g',
+    ]);
+    expect(tree.rootNode.descendantsOfType('identifier').filter(({ text }) => text === 'yield')).toHaveLength(2);
+    expect(tree.rootNode.descendantsOfType('binary_expression')).toHaveLength(4);
+    expect(tree.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual(['await value']);
+    const fields = tree.rootNode.descendantsOfType('field_definition');
+    expect(fields).toHaveLength(3);
+    expect(fields[1]!.childForFieldName('value')?.text).toBe('await');
+    expect(fields[2]!.childForFieldName('property')?.text).toBe('next');
+  } finally {
+    tree.delete();
+    parser.delete();
+  }
+});

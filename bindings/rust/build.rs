@@ -34,5 +34,6 @@ fn main() {
         println!("cargo:rerun-if-changed={}", path.display());
     }
 
+    println!("cargo:rerun-if-changed=src/function_context.h");
     c_config.compile("tree-sitter-javascript");
 }
