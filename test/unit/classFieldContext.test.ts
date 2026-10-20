@@ -104,3 +104,44 @@ test('reparses field boundaries and public captures when an arrow becomes async 
     parser.delete();
   }
 });
+
+test('restores the outer context after an initializer at the serialized context capacity', () => {
+  const parser = new Parser().setLanguage(language);
+  const nested = '(function(){'.repeat(8159) + 'await\nvalue;' + '})'.repeat(8159);
+  let source = `class C { field = ${nested}; } const after = await outside;`;
+  let tree = parser.parse(source)!;
+  const start = source.lastIndexOf('outside');
+  const column = start - source.lastIndexOf('\n', start) - 1;
+  try {
+    for (const name of ['changed', 'outside']) {
+      tree.edit(
+        new Edit({
+          startIndex: start,
+          oldEndIndex: start + 7,
+          newEndIndex: start + 7,
+          startPosition: { row: 1, column },
+          oldEndPosition: { row: 1, column: column + 7 },
+          newEndPosition: { row: 1, column: column + 7 },
+        })
+      );
+      source = source.slice(0, start) + name + source.slice(start + 7);
+      const previous = tree;
+      tree = parser.parse(source, previous)!;
+      previous.delete();
+      const fresh = parser.parse(source)!;
+      try {
+        expect(tree.rootNode.hasError).toBe(false);
+        expect(tree.rootNode.toString()).toBe(fresh.rootNode.toString());
+        expect(tree.rootNode.descendantsOfType('function_expression')).toHaveLength(8159);
+        expect(tree.rootNode.descendantsOfType('field_definition')).toHaveLength(1);
+        expect(tree.rootNode.namedChildren.at(-1)!.type).toBe('lexical_declaration');
+        expect(tree.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual([`await ${name}`]);
+      } finally {
+        fresh.delete();
+      }
+    }
+  } finally {
+    tree.delete();
+    parser.delete();
+  }
+});
