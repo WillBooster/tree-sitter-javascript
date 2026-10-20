@@ -53,6 +53,7 @@ enum TokenType {
     YIELD_IDENTIFIER,
     FUNCTION_SIGNATURE_START,
     ASYNC_FUNCTION_SIGNATURE_START,
+    CALL_ARGUMENTS_CONTEXT,
 };
 
 static bool scan_let(TSLexer *lexer);
@@ -1045,7 +1046,7 @@ static bool scan_function_start(Scanner *scanner, TSLexer *lexer, const bool *va
     bool signature = valid_symbols[FUNCTION_SIGNATURE_START] || valid_symbols[ASYNC_FUNCTION_SIGNATURE_START];
     bool body = valid_symbols[SYNC_FUNCTION_START] || valid_symbols[ASYNC_FUNCTION_START];
     bool opener = lexer->lookahead == '(' || (generator && lexer->lookahead == '{');
-    if (!body && !(opener && (generator || signature))) return false;
+    if (!body && (!(opener && (generator || signature)) || valid_symbols[CALL_ARGUMENTS_CONTEXT])) return false;
     bool async = valid_symbols[ASYNC_FUNCTION_START] || valid_symbols[ASYNC_GENERATOR_FUNCTION_START] || valid_symbols[ASYNC_FUNCTION_SIGNATURE_START];
     if (!function_context_enter(&scanner->functions, async, generator)) return false;
     lexer->mark_end(lexer);
