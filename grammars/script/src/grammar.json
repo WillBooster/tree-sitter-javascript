@@ -9475,22 +9475,72 @@
     }
   ],
   "conflicts": [
-    ["_local_export_specifier", "_module_export_name"],
-    ["primary_expression", "_property_name"],
-    ["primary_expression", "await_expression"],
-    ["primary_expression", "await_expression", "_property_name"],
-    ["primary_expression", "arrow_function"],
-    ["primary_expression", "arrow_function", "_property_name"],
-    ["primary_expression", "method_definition"],
-    ["primary_expression", "rest_pattern"],
-    ["primary_expression", "pattern"],
-    ["primary_expression", "_for_header"],
-    ["array", "array_pattern"],
-    ["object", "object_pattern"],
-    ["assignment_expression", "pattern"],
-    ["assignment_expression", "object_assignment_pattern"],
-    ["computed_property_name", "array"],
-    ["binary_expression", "_initializer"]
+    [
+      "_local_export_specifier",
+      "_module_export_name"
+    ],
+    [
+      "primary_expression",
+      "_property_name"
+    ],
+    [
+      "primary_expression",
+      "await_expression"
+    ],
+    [
+      "primary_expression",
+      "await_expression",
+      "_property_name"
+    ],
+    [
+      "primary_expression",
+      "arrow_function"
+    ],
+    [
+      "primary_expression",
+      "arrow_function",
+      "_property_name"
+    ],
+    [
+      "primary_expression",
+      "method_definition"
+    ],
+    [
+      "primary_expression",
+      "rest_pattern"
+    ],
+    [
+      "primary_expression",
+      "pattern"
+    ],
+    [
+      "primary_expression",
+      "_for_header"
+    ],
+    [
+      "array",
+      "array_pattern"
+    ],
+    [
+      "object",
+      "object_pattern"
+    ],
+    [
+      "assignment_expression",
+      "pattern"
+    ],
+    [
+      "assignment_expression",
+      "object_assignment_pattern"
+    ],
+    [
+      "computed_property_name",
+      "array"
+    ],
+    [
+      "binary_expression",
+      "_initializer"
+    ]
   ],
   "precedences": [
     [
