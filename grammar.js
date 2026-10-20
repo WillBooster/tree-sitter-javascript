@@ -1517,14 +1517,14 @@ module.exports = grammar({
                   ),
                   generator ? 'generator_function' : 'function_signature'
                 ),
-                seq(
-                  field('parameters', $.formal_parameters),
-                  functionScope(
-                    async,
-                    field('body', alias($._class_member_body, $.statement_block)),
-                    generator ? 'generator_function' : 'function'
-                  )
-                )
+                ...(generator
+                  ? []
+                  : [
+                      seq(
+                        field('parameters', $.formal_parameters),
+                        functionScope(async, field('body', alias($._class_member_body, $.statement_block)), 'function')
+                      ),
+                    ])
               )
             )
           )

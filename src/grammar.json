@@ -9283,45 +9283,6 @@
                           "name": "_function_context_end"
                         }
                       ]
-                    },
-                    {
-                      "type": "SEQ",
-                      "members": [
-                        {
-                          "type": "FIELD",
-                          "name": "parameters",
-                          "content": {
-                            "type": "SYMBOL",
-                            "name": "formal_parameters"
-                          }
-                        },
-                        {
-                          "type": "SEQ",
-                          "members": [
-                            {
-                              "type": "SYMBOL",
-                              "name": "_generator_function_start"
-                            },
-                            {
-                              "type": "FIELD",
-                              "name": "body",
-                              "content": {
-                                "type": "ALIAS",
-                                "content": {
-                                  "type": "SYMBOL",
-                                  "name": "_class_member_body"
-                                },
-                                "named": true,
-                                "value": "statement_block"
-                              }
-                            },
-                            {
-                              "type": "SYMBOL",
-                              "name": "_function_context_end"
-                            }
-                          ]
-                        }
-                      ]
                     }
                   ]
                 }
@@ -9557,45 +9518,6 @@
                         {
                           "type": "SYMBOL",
                           "name": "_function_context_end"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "SEQ",
-                      "members": [
-                        {
-                          "type": "FIELD",
-                          "name": "parameters",
-                          "content": {
-                            "type": "SYMBOL",
-                            "name": "formal_parameters"
-                          }
-                        },
-                        {
-                          "type": "SEQ",
-                          "members": [
-                            {
-                              "type": "SYMBOL",
-                              "name": "_async_generator_function_start"
-                            },
-                            {
-                              "type": "FIELD",
-                              "name": "body",
-                              "content": {
-                                "type": "ALIAS",
-                                "content": {
-                                  "type": "SYMBOL",
-                                  "name": "_class_member_body"
-                                },
-                                "named": true,
-                                "value": "statement_block"
-                              }
-                            },
-                            {
-                              "type": "SYMBOL",
-                              "name": "_function_context_end"
-                            }
-                          ]
                         }
                       ]
                     }
