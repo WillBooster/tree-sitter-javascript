@@ -2,8 +2,10 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import treeSitterJson from '../../tree-sitter.json';
+
 export function generationInputMtime(root: string): number {
-  const corpus = path.join(root, 'test/corpus');
+  const corpora = treeSitterJson.grammars.map((grammar) => path.join(root, grammar.path, 'test/corpus'));
   const examples = execFileSync('git', ['ls-files', '-z', '--', 'examples'], {
     cwd: root,
     encoding: 'utf8',
@@ -20,8 +22,10 @@ export function generationInputMtime(root: string): number {
   }
   const inputs = [
     path.join(root, 'tree-sitter.json'),
-    corpus,
-    ...fs.readdirSync(corpus, { recursive: true, encoding: 'utf8' }).map((file) => path.join(corpus, file)),
+    ...corpora.flatMap((corpus) => [
+      corpus,
+      ...fs.readdirSync(corpus, { recursive: true, encoding: 'utf8' }).map((file) => path.join(corpus, file)),
+    ]),
     ...examples.map((file) => path.join(root, file)),
   ];
   return Math.max(

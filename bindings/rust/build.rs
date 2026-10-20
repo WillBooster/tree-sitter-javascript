@@ -27,6 +27,13 @@ fn main() {
         println!("cargo:rerun-if-changed={}", scanner_path.to_str().unwrap());
     }
 
+    let script_dir = std::path::Path::new("grammars/script/src");
+    for name in ["parser.c", "scanner.c"] {
+        let path = script_dir.join(name);
+        c_config.file(&path);
+        println!("cargo:rerun-if-changed={}", path.display());
+    }
+
     println!("cargo:rerun-if-changed=src/function_context.h");
     c_config.compile("tree-sitter-javascript");
 }

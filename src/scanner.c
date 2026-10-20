@@ -915,6 +915,10 @@ static bool scan_resource_binding(TSLexer *lexer, bool plain_for_of, bool *infix
     return !ascii_word || (strcmp(word, "enum") != 0 && !is_reserved_word(word));
 }
 
+#ifndef JAVASCRIPT_SCRIPT_GOAL
+#define JAVASCRIPT_SCRIPT_GOAL false
+#endif
+
 static bool scan_yield(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols, bool await_operand) {
     bool scanned_content = false;
     if (scan_whitespace_and_comments(lexer, &scanned_content, true, true) == REJECT || scanned_content) return false;
@@ -923,8 +927,8 @@ static bool scan_yield(Scanner *scanner, TSLexer *lexer, const bool *valid_symbo
         advance(lexer);
     }
     if (is_identifier_part(lexer->lookahead)) return false;
-    TSSymbol symbol = await_operand ? AWAIT_YIELD_IDENTIFIER
-        : scanner->functions.depth && !function_context_generator(&scanner->functions) ? YIELD_IDENTIFIER : YIELD_KEYWORD;
+    bool identifier = (scanner->functions.depth || JAVASCRIPT_SCRIPT_GOAL) && !function_context_generator(&scanner->functions);
+    TSSymbol symbol = await_operand ? AWAIT_YIELD_IDENTIFIER : identifier ? YIELD_IDENTIFIER : YIELD_KEYWORD;
     if (!valid_symbols[symbol]) return false;
     lexer->mark_end(lexer);
     lexer->result_symbol = symbol;
@@ -941,16 +945,12 @@ static bool scan_await_or_async_constructor(Scanner *scanner, TSLexer *lexer, co
     if (!scan_identifier(lexer, keyword, sizeof(keyword), false)) return false;
     if (strcmp(keyword, "async") == 0 && valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START]) {
         if (!scan_default_trivia(lexer, false)) return false;
-        for (const char *word = "function"; *word; word++) {
-            if (lexer->lookahead != *word) return false;
-            advance(lexer);
-        }
-        if (is_identifier_part(lexer->lookahead)) return false;
+        if (!scan_identifier(lexer, keyword, sizeof(keyword), false) || strcmp(keyword, "function") != 0) return false;
         lexer->result_symbol = CONSTRUCTOR_ASYNC_FUNCTION_START;
         return true;
     }
     if (strcmp(keyword, "await") != 0) return false;
-    bool identifier = scanner->functions.depth && !function_context_async(&scanner->functions);
+    bool identifier = scanner->functions.depth ? !function_context_async(&scanner->functions) : JAVASCRIPT_SCRIPT_GOAL;
     if (identifier ? !valid_symbols[AWAIT_IDENTIFIER] : !valid_symbols[AWAIT_KEYWORD]) return false;
     lexer->mark_end(lexer);
     // Record the operand decision on both keyword and identifier tokens so restored nodes cannot keep stale roles.

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { generationInputMtime } from '../helpers/generationInputs.js';
+import treeSitterJson from '../../tree-sitter.json';
 
 import { Language, Parser } from '@willbooster/web-tree-sitter';
 
@@ -19,21 +20,26 @@ function mtime(file: string): number {
 
 // The tests load the Wasm build as it is, so a check against a stale one would pass after a source edit that
 // brings the slowdown back.
-test('uses a Wasm build built from the current parser', () => {
-  expect(
-    Math.max(generationInputMtime(Root), mtime('grammar.js')) > mtime('src/parser.c'),
-    'generation inputs changed after src/parser.c was generated; run `bun run build/ci`'
-  ).toBe(false);
-  expect(
-    Math.max(
-      mtime('src/parser.c'),
-      mtime('src/scanner.c'),
-      mtime('src/function_context.h'),
-      mtime('src/tree_sitter/parser.h')
-    ) > mtime(WasmPath),
-    'src/ changed after the Wasm build was built; run `bun run build/ci`'
-  ).toBe(false);
-});
+for (const grammar of treeSitterJson.grammars) {
+  test(`uses a current ${grammar.name} Wasm build`, () => {
+    const parserPath = path.join(grammar.path, 'src/parser.c');
+    const sources = [
+      parserPath,
+      path.join(grammar.path, 'src/scanner.c'),
+      path.join(grammar.path, 'src/tree_sitter/parser.h'),
+      ...(grammar['external-files'] ?? []),
+    ];
+    expect(
+      Math.max(generationInputMtime(Root), mtime('grammar.js'), mtime(path.join(grammar.path, 'grammar.js'))) >
+        mtime(parserPath),
+      'generation inputs changed after parser generation; run `bun run build/ci`'
+    ).toBe(false);
+    expect(
+      Math.max(...sources.map(mtime)) > mtime(`tree-sitter-${grammar.name}.wasm`),
+      'parser sources changed after the Wasm build; run `bun run build/ci`'
+    ).toBe(false);
+  });
+}
 
 // Consumers parse files being edited, so recovering from many errors must stay linear: ten times the lines take about
 // ten times as long, against a hundred times for quadratic recovery. The check compares the two sizes instead of using

@@ -8735,7 +8735,7 @@
                               "members": [
                                 {
                                   "type": "SYMBOL",
-                                  "name": "_initializer"
+                                  "name": "_field_initializer"
                                 },
                                 {
                                   "type": "SYMBOL",
@@ -8783,7 +8783,7 @@
                               "members": [
                                 {
                                   "type": "SYMBOL",
-                                  "name": "_initializer"
+                                  "name": "_field_initializer"
                                 },
                                 {
                                   "type": "SYMBOL",
@@ -8830,7 +8830,7 @@
                       "members": [
                         {
                           "type": "SYMBOL",
-                          "name": "_initializer"
+                          "name": "_field_initializer"
                         },
                         {
                           "type": "SYMBOL",
@@ -8873,7 +8873,7 @@
                       "members": [
                         {
                           "type": "SYMBOL",
-                          "name": "_initializer"
+                          "name": "_field_initializer"
                         },
                         {
                           "type": "SYMBOL",
@@ -8889,6 +8889,31 @@
               ]
             }
           ]
+        }
+      ]
+    },
+    "_field_initializer": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "="
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_sync_function_start"
+        },
+        {
+          "type": "FIELD",
+          "name": "value",
+          "content": {
+            "type": "SYMBOL",
+            "name": "expression"
+          }
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_arrow_context_end"
         }
       ]
     },

@@ -7,12 +7,11 @@ const oxfmtConfig = require('@willbooster/oxfmt-config');
 const oxfmtResolvedConfig: OxfmtConfig = oxfmtConfig.default ?? oxfmtConfig;
 // wbfy:end oxfmt-base
 
-// `tree-sitter generate` writes src/ and `tree-sitter init` writes bindings/ in their own style. examples/ holds
-// JavaScript that the parser tests take as input.
 oxfmtResolvedConfig.ignorePatterns = [
   ...(oxfmtResolvedConfig.ignorePatterns ?? []),
   'bindings/**',
   'examples/**',
+  'grammars/*/src/**',
   'src/**',
 ];
 

@@ -1455,27 +1455,35 @@ module.exports = grammar({
           seq(
             optional('static'),
             choice(
-              seq(field('property', $._field_name), optional(choice($._initializer, sym('_line_break_after_field')))),
+              seq(
+                field('property', $._field_name),
+                optional(choice($._field_initializer, sym('_line_break_after_field')))
+              ),
               // A line break after `get` or `set` continues a getter or setter. Allowing both sentinels here tells
               // the scanner that a `*` on the next line cannot continue the member, unlike after `static`.
               seq(
                 field('property', alias(choice('get', 'set'), sym('property_identifier'))),
-                optional(choice($._initializer, sym('_line_break_after_modifier'), sym('_line_break_after_field')))
+                optional(
+                  choice($._field_initializer, sym('_line_break_after_modifier'), sym('_line_break_after_field'))
+                )
               )
             )
           ),
           // A line break after a leading `static` continues a static member; after `static static`, it ends the field.
           seq(
             field('property', alias('static', sym('property_identifier'))),
-            optional(choice($._initializer, sym('_line_break_after_modifier')))
+            optional(choice($._field_initializer, sym('_line_break_after_modifier')))
           ),
           seq(
             'static',
             field('property', alias('static', sym('property_identifier'))),
-            optional(choice($._initializer, sym('_line_break_after_field')))
+            optional(choice($._field_initializer, sym('_line_break_after_field')))
           )
         )
       ),
+
+    _field_initializer: ($) =>
+      seq('=', sym('_sync_function_start'), field('value', $.expression), sym('_arrow_context_end')),
 
     formal_parameters: ($) => seq('(', optional(seq(commaSep1($._formal_parameter), optional(','))), ')'),
 
