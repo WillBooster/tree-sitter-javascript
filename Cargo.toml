@@ -14,12 +14,12 @@ version = "0.0.0"
 build = "bindings/rust/build.rs"
 include = [
   "bindings/rust/*",
-  "grammar.js",
+  "/grammar.js",
   "grammars/script/grammar.js",
   "grammars/script/src/*",
   "queries/*.scm",
   "src/*",
-  "tree-sitter.json",
+  "/tree-sitter.json",
   "/LICENSE",
 ]
 
