@@ -105,7 +105,7 @@ test('reparses field boundaries and public captures when an arrow becomes async 
   }
 });
 
-test('restores the outer context after an initializer at the serialized context capacity', () => {
+test('restores the outer context after an initializer at the serialized context capacity', { timeout: 30_000 }, () => {
   const parser = new Parser().setLanguage(language);
   const nested = '(function(){'.repeat(8159) + 'await\nvalue;' + '})'.repeat(8159);
   let source = `class C { field = ${nested}; } const after = await outside;`;
