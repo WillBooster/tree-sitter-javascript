@@ -167,3 +167,87 @@ test('reparses yield roles after generator edits across mixed nested contexts', 
     parser.delete();
   }
 });
+
+test('resets ordinary object-method parameters inside generator functions', () => {
+  const parser = new Parser().setLanguage(language);
+  try {
+    for (const method of [
+      'method(value = yield / divisor / other){ return value; }',
+      'method(yield){ return yield / divisor / other; }',
+      'method(value = yield / divisor / other){ yield / divisor / other; }',
+      'set value(yield){ this.value = yield / divisor / other; }',
+    ]) {
+      const source = `function* outer(){ const object = { ${method} }; yield /outer/g; }`;
+      const tree = parser.parse(source)!;
+      try {
+        expect(tree.rootNode.hasError, source).toBe(false);
+        expect(
+          tree.rootNode.descendantsOfType('yield_expression').map(({ text }) => text),
+          source
+        ).toEqual(['yield /outer/g']);
+        expect(
+          tree.rootNode.descendantsOfType('regex').map(({ text }) => text),
+          source
+        ).toEqual(['/outer/g']);
+        const methodNode = tree.rootNode.descendantsOfType('method_definition')[0]!;
+        expect(methodNode.text).toBe(method);
+        const query = new Query(language, '(expression) @expression (primary_expression) @primary');
+        try {
+          for (const node of methodNode
+            .descendantsOfType('identifier')
+            .filter(
+              ({ text, parent }) =>
+                text === 'yield' && !['formal_parameters', 'assignment_pattern'].includes(parent!.type)
+            )) {
+            expect(
+              query
+                .captures(tree.rootNode)
+                .filter(
+                  ({ node: captured }) => captured.startIndex === node.startIndex && captured.endIndex === node.endIndex
+                )
+                .map(({ name }) => name)
+                .toSorted()
+            ).toEqual(['expression', 'primary']);
+          }
+        } finally {
+          query.delete();
+        }
+      } finally {
+        tree.delete();
+      }
+      let changed = source;
+      let previous = parser.parse(changed)!;
+      const start = 'function'.length;
+      for (const generator of [false, true]) {
+        previous.edit(
+          new Edit({
+            startIndex: start,
+            oldEndIndex: start + (generator ? 0 : 1),
+            newEndIndex: start + (generator ? 1 : 0),
+            startPosition: { row: 0, column: start },
+            oldEndPosition: { row: 0, column: start + (generator ? 0 : 1) },
+            newEndPosition: { row: 0, column: start + (generator ? 1 : 0) },
+          })
+        );
+        changed = changed.slice(0, start) + (generator ? '*' : '') + changed.slice(start + (generator ? 0 : 1));
+        const updated = parser.parse(changed, previous)!;
+        previous.delete();
+        previous = updated;
+        const fresh = parser.parse(changed)!;
+        try {
+          expect(updated.rootNode.hasError, changed).toBe(false);
+          expect(updated.rootNode.toString(), changed).toBe(fresh.rootNode.toString());
+          expect(
+            updated.rootNode.descendantsOfType('yield_expression').map(({ text }) => text),
+            changed
+          ).toEqual(generator ? ['yield /outer/g'] : []);
+        } finally {
+          fresh.delete();
+        }
+      }
+      previous.delete();
+    }
+  } finally {
+    parser.delete();
+  }
+});

@@ -124,6 +124,7 @@ module.exports = grammar({
     sym('_yield_identifier'),
     sym('_function_signature_start'),
     sym('_async_function_signature_start'),
+    sym('_call_arguments_context'),
   ],
 
   extras: ($) => [$.comment, sym('html_comment'), /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -1393,7 +1394,8 @@ module.exports = grammar({
     // Expression components
     //
 
-    arguments: ($) => seq('(', commaSep(optional(choice($.expression, $.spread_element))), ')'),
+    arguments: ($) =>
+      seq(choice('(', sym('_call_arguments_context')), commaSep(optional(choice($.expression, $.spread_element))), ')'),
 
     decorator: ($) =>
       seq(
@@ -1506,11 +1508,23 @@ module.exports = grammar({
               ...(async ? ['async'] : []),
               ...(generator ? ['*'] : [optional(choice('get', 'set'))]),
               field('name', $._property_name),
-              field('parameters', $.formal_parameters),
-              functionScope(
-                async,
-                field('body', alias($._class_member_body, $.statement_block)),
-                generator ? 'generator_function' : 'function'
+              choice(
+                functionScope(
+                  async,
+                  seq(
+                    field('parameters', $.formal_parameters),
+                    field('body', alias($._class_member_body, $.statement_block))
+                  ),
+                  generator ? 'generator_function' : 'function_signature'
+                ),
+                ...(generator
+                  ? []
+                  : [
+                      seq(
+                        field('parameters', $.formal_parameters),
+                        functionScope(async, field('body', alias($._class_member_body, $.statement_block)), 'function')
+                      ),
+                    ])
               )
             )
           )
