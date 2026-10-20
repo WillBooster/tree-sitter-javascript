@@ -4001,7 +4001,7 @@ function f() {
       (expression_statement
         (augmented_assignment_expression
           (member_expression
-            (yield_expression)
+            (identifier)
             (property_identifier))
           (number)))
       (expression_statement
@@ -4011,7 +4011,7 @@ function f() {
           (member_expression
             (call_expression
               (member_expression
-                (yield_expression)
+                (identifier)
                 (property_identifier))
               (arguments
                 (number)))
