@@ -11,7 +11,8 @@
       "injections": "queries/injections.scm",
       "locals": "queries/locals.scm",
       "tags": "queries/tags.scm",
-      "injection-regex": "^(js|javascript)$"
+      "injection-regex": "^(js|javascript)$",
+      "external-files": ["src/function_context.h"]
     }
   ],
   "metadata": {
