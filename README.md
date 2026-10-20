@@ -17,11 +17,16 @@ This fork fixes parsing bugs and raises conformance with [ECMAScript (ECMA-262)]
 
 ## Usage
 
-The npm package ships `tree-sitter-javascript.wasm` for
+The npm package ships two languages for
 [@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter), which runs in Node.js, Bun,
 browsers, and Cloudflare Workers. The parser carries the ABI number of WillBooster/tree-sitter (`0x57420006`), so it
 loads only with that runtime, version 7.0.5 or newer within major 7; the upstream runtime rejects it. In Node.js and Bun, load it from
-the package:
+the package. Choose `tree-sitter-javascript.wasm` for the Module goal, or
+`tree-sitter-javascript_script.wasm` for the Script goal. The source goal comes from the host or file type;
+`.mjs` uses Module and `.cjs` uses Script, while `.js` depends on the host. For example, `await\nvalue` is one
+await expression in a Module and two identifier statements in a Script. Both languages preserve the same node
+schema and query names. As with other tree-sitter grammars, parsing does not enforce every ECMAScript early error.
+For the native CLI, select Script with `tree-sitter parse --grammar-path grammars/script`.
 
 ```js
 import { fileURLToPath } from 'node:url';
@@ -75,6 +80,7 @@ tree-sitter-javascript = { package = "willbooster-tree-sitter-javascript", versi
 ```rust
 let mut parser = tree_sitter::Parser::new();
 parser.set_language(&tree_sitter_javascript::LANGUAGE.into())?;
+// Use LANGUAGE_SCRIPT for the Script goal.
 ```
 
 ## Development
@@ -96,7 +102,7 @@ the download fails or the release has no binary that runs here.
 `bun run generate` records a fresh generation profile from the applicable `test/corpus` cases and Git-tracked
 files in `examples/`, then generates compact parser tables. The parser also embeds metadata from `tree-sitter.json`. After changing a grammar,
 `tree-sitter.json`, a corpus case, or a tracked example,
-regenerate and commit `src/`. Stage added or removed examples with `git add -A examples` before generation so the profile uses the intended file list.
+regenerate and commit the affected grammar's `src/` directory. Stage added or removed examples with `git add -A examples` before generation so the profile uses the intended file list.
 Profiles in `.tmp/generation-profiles/` are temporary and must not be committed. `bun run build-wasm`, `bun run build/ci`,
 and the release build regenerate the parsers before compiling them.
 

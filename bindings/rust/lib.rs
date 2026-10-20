@@ -21,10 +21,15 @@ use tree_sitter_language::LanguageFn;
 
 unsafe extern "C" {
     fn tree_sitter_javascript() -> *const ();
+    fn tree_sitter_javascript_script() -> *const ();
 }
 
 /// The tree-sitter [`LanguageFn`] for this grammar.
 pub const LANGUAGE: LanguageFn = unsafe { LanguageFn::from_raw(tree_sitter_javascript) };
+
+/// Parses the ECMAScript Script goal, where top-level `await` is an identifier.
+pub const LANGUAGE_SCRIPT: LanguageFn =
+    unsafe { LanguageFn::from_raw(tree_sitter_javascript_script) };
 
 /// The content of the [`node-types.json`] file for this grammar.
 ///
@@ -34,10 +39,19 @@ pub const NODE_TYPES: &str = include_str!("../../src/node-types.json");
 #[cfg(test)]
 mod tests {
     #[test]
-    fn test_can_load_grammar() {
-        let mut parser = tree_sitter::Parser::new();
-        parser
-            .set_language(&super::LANGUAGE.into())
-            .expect("Error loading JavaScript parser");
+    fn parses_await_with_the_selected_source_goal() {
+        let source = "await\nvalue; async function f(){ await operand; } await(next);";
+        for (language, expected) in [(super::LANGUAGE, 3), (super::LANGUAGE_SCRIPT, 1)] {
+            let mut parser = tree_sitter::Parser::new();
+            parser.set_language(&language.into()).unwrap();
+            let tree = parser.parse(source, None).unwrap();
+            assert!(!tree.root_node().has_error());
+            let awaits = tree
+                .root_node()
+                .to_sexp()
+                .matches("(await_expression ")
+                .count();
+            assert_eq!(awaits, expected);
+        }
     }
 }

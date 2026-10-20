@@ -1,0 +1,24 @@
+==================
+Script await identifiers and nested async functions
+==================
+await
+value;
+await(value);
+async function f() { await value; }
+await
+last;
+
+---
+
+(program
+  (expression_statement (identifier))
+  (expression_statement (identifier))
+  (expression_statement
+    (call_expression function: (identifier) arguments: (arguments (identifier))))
+  (function_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (statement_block
+      (expression_statement (await_expression (identifier)))))
+  (expression_statement (identifier))
+  (expression_statement (identifier)))

@@ -930,9 +930,14 @@ static bool scan_await_yield_identifier(TSLexer *lexer) {
     return true;
 }
 
+#ifndef JAVASCRIPT_TOP_LEVEL_AWAIT
+#define JAVASCRIPT_TOP_LEVEL_AWAIT true
+#endif
+
 static bool in_async_function(const Scanner *scanner) {
+    if (!scanner->context_depth) return JAVASCRIPT_TOP_LEVEL_AWAIT;
     unsigned index = scanner->context_depth - 1;
-    return scanner->context_depth && (scanner->async_context[index / 8] & (1u << (index % 8)));
+    return scanner->async_context[index / 8] & (1u << (index % 8));
 }
 
 static void leave_function(Scanner *scanner) {
@@ -951,16 +956,12 @@ static bool scan_await_or_async_constructor(Scanner *scanner, TSLexer *lexer, co
     if (!scan_identifier(lexer, keyword, sizeof(keyword), false)) return false;
     if (strcmp(keyword, "async") == 0 && valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START]) {
         if (!scan_default_trivia(lexer, false)) return false;
-        for (const char *word = "function"; *word; word++) {
-            if (lexer->lookahead != *word) return false;
-            advance(lexer);
-        }
-        if (is_identifier_part(lexer->lookahead)) return false;
+        if (!scan_identifier(lexer, keyword, sizeof(keyword), false) || strcmp(keyword, "function") != 0) return false;
         lexer->result_symbol = CONSTRUCTOR_ASYNC_FUNCTION_START;
         return true;
     }
     if (strcmp(keyword, "await") != 0) return false;
-    bool identifier = scanner->context_depth && !in_async_function(scanner);
+    bool identifier = !in_async_function(scanner);
     if (identifier ? !valid_symbols[AWAIT_IDENTIFIER] : !valid_symbols[AWAIT_KEYWORD]) return false;
     lexer->mark_end(lexer);
     // Record the operand decision on both keyword and identifier tokens so restored nodes cannot keep stale roles.

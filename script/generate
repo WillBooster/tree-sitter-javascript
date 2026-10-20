@@ -39,7 +39,7 @@ trap 'exit 143' TERM
 examples="$workspace/examples.z"
 git ls-files -z -- examples > "$examples"
 
-training=(--corpus "$root/test/corpus")
+training=()
 while IFS= read -r -d '' file; do
   training+=("$root/$file")
 done < "$examples"
@@ -52,7 +52,8 @@ while IFS= read -r grammar; do
   script/tree-sitter generate "$grammar/grammar.js"
   name=$(node -e 'console.log(JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).name)' "$grammar/src/grammar.json")
   profile="$workspace/$name.json"
-  script/tree-sitter profile --grammar-path "$grammar" --output "$profile" "${training[@]}"
+  corpus="$root/$grammar/test/corpus"
+  script/tree-sitter profile --grammar-path "$grammar" --output "$profile" --corpus "$corpus" "${training[@]}"
   script/tree-sitter generate "$grammar/grammar.js" --profile "$profile"
   if [[ ${1:-} == --build-wasm ]]; then
     script/tree-sitter build --wasm "$grammar"
