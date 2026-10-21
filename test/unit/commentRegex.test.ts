@@ -157,6 +157,79 @@ test('preserves declaration continuations when edits reuse bindings before newli
   }
 });
 
+test.each(['javascript', 'javascript_script'])(
+  'ends block arrows before regex statements following line comments in %s',
+  async (goal) => {
+    const language = await Language.load(`tree-sitter-${goal}.wasm`);
+    const parser = new Parser().setLanguage(language);
+    const query = new Query(language, '(regex) @regex (arrow_function) @arrow');
+    try {
+      for (const newline of ['\n', '\r', '\r\n', '\u2028', '\u2029']) {
+        for (const [enclosing, prefix] of [
+          ['function', ''],
+          ['function', 'const callback = '],
+          ['async function', ''],
+          ['async function', 'const callback = '],
+          ['function*', ''],
+          ['async function*', ''],
+        ]) {
+          for (const arrow of ['() => {}', '(value) => { x: value; }', 'async () => {}']) {
+            const before = `${enclosing} outer(){ ${prefix}${arrow}`;
+            const suffix = '/pattern/g.test(input); const following = 1; }';
+            let comment = `// first${newline}`;
+            let source = before + comment + suffix;
+            let tree = parser.parse(source)!;
+            try {
+              for (const replacement of [comment, `// first${newline}/* second */`, comment]) {
+                const next = before + replacement + suffix;
+                tree.edit(
+                  new Edit({
+                    startIndex: before.length,
+                    oldEndIndex: before.length + comment.length,
+                    newEndIndex: before.length + replacement.length,
+                    startPosition: position(source, before.length),
+                    oldEndPosition: position(source, before.length + comment.length),
+                    newEndPosition: position(next, before.length + replacement.length),
+                  })
+                );
+                const previous = tree;
+                tree = parser.parse(next, previous)!;
+                previous.delete();
+                source = next;
+                comment = replacement;
+                const fresh = parser.parse(source)!;
+                try {
+                  expect(tree.rootNode.hasError, source).toBe(false);
+                  const parsedArrow = tree.rootNode.descendantsOfType('arrow_function')[0]!;
+                  expect(parsedArrow.text).toBe(arrow);
+                  expect(parsedArrow.childForFieldName('body')!.endIndex).toBe(before.length);
+                  expect(tree.rootNode.descendantsOfType('regex')).toHaveLength(1);
+                  const regex = tree.rootNode.descendantsOfType('regex')[0]!;
+                  expect(regex.text).toBe('/pattern/g');
+                  expect(regex.startIndex).toBe(before.length + comment.length);
+                  expect(tree.rootNode.descendantsOfType('binary_expression')).toEqual([]);
+                  expect(query.captures(tree.rootNode).map(({ name, node }) => [name, node.text])).toEqual([
+                    ['arrow', arrow],
+                    ['regex', '/pattern/g'],
+                  ]);
+                  expect(snapshot(tree.rootNode)).toEqual(snapshot(fresh.rootNode));
+                } finally {
+                  fresh.delete();
+                }
+              }
+            } finally {
+              tree.delete();
+            }
+          }
+        }
+      }
+    } finally {
+      query.delete();
+      parser.delete();
+    }
+  }
+);
+
 function position(source: string, index: number): { row: number; column: number } {
   const preceding = source.slice(0, index);
   return { row: preceding.split('\n').length - 1, column: index - preceding.lastIndexOf('\n') - 1 };

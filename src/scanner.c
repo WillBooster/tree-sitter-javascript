@@ -175,61 +175,56 @@ typedef enum {
     REJECT,     // Semicolon is illegal, ie a syntax error occurred
     NO_NEWLINE, // Unclear if semicolon will be legal, continue
     ACCEPT,     // Semicolon is legal, assuming a comment was encountered
-    // Like ACCEPT, but the line break is inside the block comment that the lexer stopped after, so it will not be seen
-    // again once tree-sitter has consumed that comment.
-    ACCEPT_IN_BLOCK_COMMENT,
-    ACCEPT_IN_BLOCK_COMMENT_BEFORE_SLASH,
+    // Retain a line break when probing comments has already advanced past it.
+    ACCEPT_AFTER_COMMENT_LINE_BREAK,
+    ACCEPT_AFTER_COMMENT_LINE_BREAK_BEFORE_SLASH,
 } WhitespaceResult;
 
-/**
- * @param consume If false, only consume enough to check if comment indicates semicolon-legality
- */
-static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scanned_content, bool consume, bool skip_contents) {
-    bool saw_block_newline = false;
+static bool scan_block_comment(TSLexer *lexer, bool *saw_newline, bool skip_contents);
 
+static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scanned_content, bool consume, bool skip_contents) {
+    bool saw_comment_newline = false;
     for (;;) {
         while (is_whitespace(lexer->lookahead)) {
             lexer->advance(lexer, skip_contents);
         }
-
+        if (lexer->lookahead != '/') return ACCEPT;
+        lexer->advance(lexer, skip_contents);
         if (lexer->lookahead == '/') {
             lexer->advance(lexer, skip_contents);
-
-            if (lexer->lookahead == '/') {
+            while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) {
                 lexer->advance(lexer, skip_contents);
-                while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) {
-                    lexer->advance(lexer, skip_contents);
-                }
-                *scanned_content = true;
-            } else if (lexer->lookahead == '*') {
-                lexer->advance(lexer, skip_contents);
-                while (!lexer->eof(lexer)) {
-                    if (lexer->lookahead == '*') {
-                        lexer->advance(lexer, skip_contents);
-                        if (lexer->lookahead == '/') {
-                            lexer->advance(lexer, skip_contents);
-                            *scanned_content = true;
-
-                            if (!consume && lexer->lookahead != '/') {
-                                return saw_block_newline ? ACCEPT_IN_BLOCK_COMMENT : NO_NEWLINE;
-                            }
-
-                            break;
-                        }
-                    } else if (is_line_terminator(lexer->lookahead)) {
-                        saw_block_newline = true;
-                        lexer->advance(lexer, skip_contents);
-                    } else {
-                        lexer->advance(lexer, skip_contents);
-                    }
-                }
-            } else {
-                return !consume && saw_block_newline ? ACCEPT_IN_BLOCK_COMMENT_BEFORE_SLASH : REJECT;
             }
-        } else {
-            return ACCEPT;
+            saw_comment_newline |= is_line_terminator(lexer->lookahead);
+            *scanned_content = true;
+            continue;
+        }
+        if (lexer->lookahead != '*') {
+            return !consume && saw_comment_newline ? ACCEPT_AFTER_COMMENT_LINE_BREAK_BEFORE_SLASH : REJECT;
+        }
+        lexer->advance(lexer, skip_contents);
+        if (!scan_block_comment(lexer, &saw_comment_newline, skip_contents)) return ACCEPT;
+        *scanned_content = true;
+        if (!consume && lexer->lookahead != '/') {
+            return saw_comment_newline ? ACCEPT_AFTER_COMMENT_LINE_BREAK : NO_NEWLINE;
         }
     }
+}
+
+static bool scan_block_comment(TSLexer *lexer, bool *saw_newline, bool skip_contents) {
+    while (!lexer->eof(lexer)) {
+        if (lexer->lookahead != '*') {
+            *saw_newline |= is_line_terminator(lexer->lookahead);
+            lexer->advance(lexer, skip_contents);
+            continue;
+        }
+        lexer->advance(lexer, skip_contents);
+        if (lexer->lookahead == '/') {
+            lexer->advance(lexer, skip_contents);
+            return true;
+        }
+    }
+    return false;
 }
 
 // Called after an arrow function's block body and a line break: such a function cannot be continued by a member
@@ -275,7 +270,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
                                      LineBreakRule rule, bool *scanned_content, const bool *resource_symbols) {
     lexer->result_symbol = AUTOMATIC_SEMICOLON;
     lexer->mark_end(lexer);
-    bool line_break_in_block_comment = false;
+    bool line_break_in_comment = false;
     bool resource_line_break = false;
 
     for (;;) {
@@ -288,7 +283,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
             if (result == REJECT) {
                 return false;
             }
-            if (result == ACCEPT_IN_BLOCK_COMMENT_BEFORE_SLASH) {
+            if (result == ACCEPT_AFTER_COMMENT_LINE_BREAK_BEFORE_SLASH) {
                 return scan_after_line_break(lexer, after_block_arrow, rule, scanned_content, true);
             }
 
@@ -299,7 +294,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
             if (result == NO_NEWLINE && rule == LINE_BREAK_AFTER_AWAIT_KEYWORD) {
                 return false;
             }
-            if (result == ACCEPT || result == ACCEPT_IN_BLOCK_COMMENT) {
+            if (result == ACCEPT || result == ACCEPT_AFTER_COMMENT_LINE_BREAK) {
                 resource_line_break = true;
                 if (after_block_arrow || rule != LINE_BREAK_BY_NEXT_TOKEN) {
                     return scan_after_line_break(lexer, after_block_arrow, rule, scanned_content, false);
@@ -307,7 +302,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
                 if (comment_condition && lexer->lookahead != ',' && lexer->lookahead != '=') {
                     return true;
                 }
-                line_break_in_block_comment = result == ACCEPT_IN_BLOCK_COMMENT;
+                line_break_in_comment = result == ACCEPT_AFTER_COMMENT_LINE_BREAK;
             }
         }
 
@@ -335,7 +330,7 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool comment_condition, boo
                 return false;
             }
             // Otherwise tree-sitter consumes the comments and calls the scanner again after them.
-            return line_break_in_block_comment && scan_after_line_break(lexer, false, rule, scanned_content, false);
+            return line_break_in_comment && scan_after_line_break(lexer, false, rule, scanned_content, false);
         }
 
         skip(lexer);
@@ -1025,18 +1020,7 @@ static bool scan_expression_trivia(TSLexer *lexer, bool *saw_newline, bool *scan
             }
         } else if (lexer->lookahead == '*') {
             skip(lexer);
-            while (!lexer->eof(lexer)) {
-                *saw_newline |= is_line_terminator(lexer->lookahead);
-                if (lexer->lookahead == '*') {
-                    skip(lexer);
-                    if (lexer->lookahead == '/') {
-                        skip(lexer);
-                        break;
-                    }
-                } else {
-                    skip(lexer);
-                }
-            }
+            scan_block_comment(lexer, saw_newline, true);
         } else {
             return false;
         }
