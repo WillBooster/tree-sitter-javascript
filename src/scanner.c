@@ -54,6 +54,7 @@ enum TokenType {
     FUNCTION_SIGNATURE_START,
     ASYNC_FUNCTION_SIGNATURE_START,
     CALL_ARGUMENTS_CONTEXT,
+    ASYNC_KEYWORD,
 };
 
 static bool scan_let(TSLexer *lexer);
@@ -71,6 +72,7 @@ typedef struct {
 static bool scan_export_default(Scanner *scanner, TSLexer *lexer);
 static bool starts_default_declaration(TSLexer *lexer);
 static bool scan_default_trivia(TSLexer *lexer, bool allow_line_breaks);
+static bool scan_async_start(TSLexer *lexer, char *keyword, unsigned capacity, const bool *valid_symbols);
 
 void *tree_sitter_javascript_external_scanner_create() { return ts_calloc(1, sizeof(Scanner)); }
 
@@ -936,26 +938,18 @@ static bool scan_yield(Scanner *scanner, TSLexer *lexer, const bool *valid_symbo
     return true;
 }
 
-static bool scan_await_or_async_constructor(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
-    bool scanned_content = false;
-    if (scan_whitespace_and_comments(lexer, &scanned_content, true, true) == REJECT || scanned_content) {
-        return false;
-    }
+static bool scan_await_or_async(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     lexer->mark_end(lexer);
     char keyword[16] = {0};
     if (!scan_identifier(lexer, keyword, sizeof(keyword), false)) return false;
-    if (strcmp(keyword, "async") == 0 && valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START]) {
-        if (!scan_default_trivia(lexer, false)) return false;
-        if (!scan_identifier(lexer, keyword, sizeof(keyword), false) || strcmp(keyword, "function") != 0) return false;
-        lexer->result_symbol = CONSTRUCTOR_ASYNC_FUNCTION_START;
-        return true;
-    }
+    if (strcmp(keyword, "async") == 0) return scan_async_start(lexer, keyword, sizeof(keyword), valid_symbols);
     if (strcmp(keyword, "await") != 0) return false;
     bool identifier = scanner->functions.depth ? !function_context_async(&scanner->functions) : JAVASCRIPT_SCRIPT_GOAL;
     if (identifier ? !valid_symbols[AWAIT_IDENTIFIER] : !valid_symbols[AWAIT_KEYWORD]) return false;
     lexer->mark_end(lexer);
     // Record the operand decision on both keyword and identifier tokens so restored nodes cannot keep stale roles.
     // Advancing without skipping after mark_end preserves the consuming keyword's start across probed comments.
+    bool scanned_content = false;
     for (unsigned words = 0; words <= 2; words++) {
         if (scan_whitespace_and_comments(lexer, &scanned_content, true, false) == REJECT ||
             words == 2 || !is_identifier_part(lexer->lookahead)) {
@@ -968,9 +962,18 @@ static bool scan_await_or_async_constructor(Scanner *scanner, TSLexer *lexer, co
     return true;
 }
 
+static bool scan_async_start(TSLexer *lexer, char *keyword, unsigned capacity, const bool *valid_symbols) {
+    bool constructor = valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START];
+    if (!constructor) lexer->mark_end(lexer);
+    lexer->result_symbol = constructor ? CONSTRUCTOR_ASYNC_FUNCTION_START : ASYNC_KEYWORD;
+    return scan_default_trivia(lexer, false) &&
+        (constructor ? scan_identifier(lexer, keyword, capacity, false) && strcmp(keyword, "function") == 0
+                     : valid_symbols[ASYNC_KEYWORD]);
+}
+
 static bool scan_contextual_keyword(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
-    if ((valid_symbols[AWAIT_KEYWORD] || valid_symbols[AWAIT_IDENTIFIER] || valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START]) && lexer->lookahead == 'a') {
-        return scan_await_or_async_constructor(scanner, lexer, valid_symbols);
+    if ((valid_symbols[AWAIT_KEYWORD] || valid_symbols[AWAIT_IDENTIFIER] || valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START] || valid_symbols[ASYNC_KEYWORD]) && lexer->lookahead == 'a') {
+        return scan_await_or_async(scanner, lexer, valid_symbols);
     }
     if ((valid_symbols[YIELD_KEYWORD] || valid_symbols[YIELD_IDENTIFIER]) && lexer->lookahead == 'y') {
         return scan_yield(scanner, lexer, valid_symbols, false);
