@@ -223,3 +223,30 @@ JSX with a bare ampersand
         (string
           (string_fragment)
           (html_character_reference))))))
+
+===============================================
+Whitespace before JSX attribute entities
+===============================================
+
+const a = <X title=" &amp;"/>;
+const b = <X title=' 	&#x20;'/>;
+
+----
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (jsx_self_closing_element
+        name: (identifier)
+        attribute: (jsx_attribute
+          (property_identifier)
+          (string (string_fragment) (html_character_reference))))))
+  (lexical_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (jsx_self_closing_element
+        name: (identifier)
+        attribute: (jsx_attribute
+          (property_identifier)
+          (string (string_fragment) (html_character_reference)))))))
