@@ -63,17 +63,16 @@ export class ProgramGenerator {
         async: this.chance(0.5),
         func: true,
       };
-      body = node(
-        'm',
+      body = [
         inner.async ? 'async ' : '',
         'function* G() {',
         this.whitespace(),
         this.statement(3, inner),
         this.whitespace(),
         this.statement(2, inner),
-        '}'
-      );
-    } else body = node('m', ...stmts);
+        '}',
+      ];
+    } else body = [...stmts];
     return body;
   }
   random() {
@@ -91,13 +90,13 @@ export class ProgramGenerator {
   }
   whitespace(pNl = 0.12) {
     const r = this.random();
-    if (r < pNl) return node('w', this.pick(['\n', '\n', ' \n ', '\n\n', '//c\n', '/*\n*/']));
-    if (r < pNl + 0.04) return node('w', this.pick(['/*c*/', ' /*c*/ ']));
-    if (r < pNl + 0.2) return node('w', '');
-    return node('w', ' ');
+    if (r < pNl) return [this.pick(['\n', '\n', ' \n ', '\n\n', '//c\n', '/*\n*/'])];
+    if (r < pNl + 0.04) return [this.pick(['/*c*/', ' /*c*/ '])];
+    if (r < pNl + 0.2) return [''];
+    return [' '];
   }
   requiredSpace() {
-    return this.chance(0.08) ? node('w', this.pick(['\n', '//c\n', '/*\n*/'])) : node('w', ' ');
+    return this.chance(0.08) ? [this.pick(['\n', '//c\n', '/*\n*/'])] : [' '];
   }
   identifier() {
     const r = this.random();
@@ -108,10 +107,7 @@ export class ProgramGenerator {
     const n = Math.floor(this.random() * 3);
     const ps = [];
     for (let i = 0; i < n; i++) {
-      let p = this.pick(['x', 'y', '{a, b: c}', '[a, , b]', '...r', 'x = 1', '{a = 1}', 'z', 'this']);
-      if (p === 'this') {
-        p = 'z';
-      }
+      let p = this.pick(['x', 'y', '{a, b: c}', '[a, , b]', '...r', 'x = 1', '{a = 1}', 'z', 'z']);
       ps.push(p);
     }
     return ps.join(', ');
@@ -139,35 +135,35 @@ export class ProgramGenerator {
   }
   primary(d, ctx) {
     const r = this.random();
-    if (r < 0.45) return node('e', this.identifier());
-    if (r < 0.75) return node('e', this.literal());
-    if (d <= 0) return node('e', this.identifier());
+    if (r < 0.45) return [this.identifier()];
+    if (r < 0.75) return [this.literal()];
+    if (d <= 0) return [this.identifier()];
     return this.compound(d, ctx);
   }
   lhs(d, ctx) {
     switch (Math.floor(this.random() * 6)) {
       case 0: {
-        return node('e', this.expression(d - 1, ctx), '.x');
+        return [this.expression(d - 1, ctx), '.x'];
       }
 
       case 1: {
-        return node('e', this.expression(d - 1, ctx), '[', this.expression(d - 1, ctx), ']');
+        return [this.expression(d - 1, ctx), '[', this.expression(d - 1, ctx), ']'];
       }
 
       case 2: {
-        return node('e', '[', this.identifier(), ', ...', this.identifier(), ']');
+        return ['[', this.identifier(), ', ...', this.identifier(), ']'];
       }
 
       case 3: {
-        return node('e', '{', this.identifier(), ', b: ', this.identifier(), '}');
+        return ['{', this.identifier(), ', b: ', this.identifier(), '}'];
       }
 
       case 4: {
-        return node('e', '(', this.identifier(), ')');
+        return ['(', this.identifier(), ')'];
       }
 
       default: {
-        return node('e', this.identifier());
+        return [this.identifier()];
       }
     }
   }
@@ -181,18 +177,18 @@ export class ProgramGenerator {
     };
     let head;
     const r = this.random();
-    head = r < 0.3 ? this.identifier() : node('m', '', '(', this.params(), ')', '');
+    head = r < 0.3 ? this.identifier() : ['', '(', this.params(), ')', ''];
     let body;
     const b = this.random();
     body =
       b < 0.35
-        ? node('m', '{', this.block(d - 1, inner), '}')
+        ? ['{', this.block(d - 1, inner), '}']
         : b < 0.45
-          ? node('e', '({', this.identifier(), ': ', this.expression(d - 1, inner), '})')
+          ? ['({', this.identifier(), ': ', this.expression(d - 1, inner), '})']
           : b < 0.52
-            ? node('m', '{', this.identifier(), ': ', this.expression(d - 1, inner), '}')
+            ? ['{', this.identifier(), ': ', this.expression(d - 1, inner), '}']
             : this.expression(d - 1, inner);
-    return node('e', a, head, this.whitespace(0.03), '=>', this.whitespace(0.1), body);
+    return [a, head, this.whitespace(0.03), '=>', this.whitespace(0.1), body];
   }
   functionExpression(d, ctx, decl) {
     const g = this.chance(0.25) ? '*' : '';
@@ -204,8 +200,7 @@ export class ProgramGenerator {
       func: true,
       loop: false,
     };
-    return node(
-      decl ? 's' : 'e',
+    return [
       a,
       'function',
       g,
@@ -217,14 +212,14 @@ export class ProgramGenerator {
       '',
       ' {',
       this.block(d - 1, inner),
-      '}'
-    );
+      '}',
+    ];
   }
   classMember(d, ctx) {
     const inner = {
       ...ctx,
       func: true,
-      method: true,
+
       gen: false,
       async: false,
       loop: false,
@@ -255,20 +250,18 @@ export class ProgramGenerator {
     const pre = mods.length > 0 ? mods.join(' ') + this.pick([' ', '\n']) : '';
     switch (Math.floor(this.random() * 7)) {
       case 0: {
-        return node(
-          'm',
+        return [
           pre,
           name,
           '',
           '',
-          this.chance(0.5) ? node('m', ' = ', this.expression(d - 1, inner)) : '',
-          this.pick([';', '\n', ';'])
-        );
+          this.chance(0.5) ? [' = ', this.expression(d - 1, inner)] : '',
+          this.pick([';', '\n', ';']),
+        ];
       }
 
       case 1: {
-        return node(
-          'm',
+        return [
           pre,
           this.pick(['', 'async ', '*', 'get ', 'set ', 'async *']),
           name,
@@ -278,28 +271,28 @@ export class ProgramGenerator {
           ')',
           ' {',
           this.block(d - 1, inner),
-          '}'
-        );
+          '}',
+        ];
       }
 
       case 2: {
-        return node('m', 'static {', this.block(d - 1, inner), '}');
+        return ['static {', this.block(d - 1, inner), '}'];
       }
 
       case 3: {
-        return node('m', name, ';');
+        return [name, ';'];
       }
 
       case 4: {
-        return node('m', ';');
+        return [';'];
       }
 
       case 5: {
-        return node('m', '', pre, name, '() {}');
+        return ['', pre, name, '() {}'];
       }
 
       default: {
-        return node('m', pre, name, this.pick([';', '\n']));
+        return [pre, name, this.pick([';', '\n'])];
       }
     }
   }
@@ -307,9 +300,8 @@ export class ProgramGenerator {
     const members = [];
     const n = Math.floor(this.random() * 3);
     for (let i = 0; i < n; i++) members.push(this.classMember(d - 1, ctx), this.whitespace(0.3));
-    const heritage = this.chance(0.3) ? node('m', ' extends ', this.expression(d - 1, ctx), '') : '';
-    return node(
-      decl ? 's' : 'e',
+    const heritage = this.chance(0.3) ? [' extends ', this.expression(d - 1, ctx), ''] : '';
+    return [
       '',
       'class',
       decl ? ' C' : this.chance(0.3) ? ' K' : '',
@@ -319,8 +311,8 @@ export class ProgramGenerator {
       ' {',
       this.whitespace(0.3),
       ...members,
-      '}'
-    );
+      '}',
+    ];
   }
   objectLiteral(d, ctx) {
     const props = [];
@@ -329,7 +321,7 @@ export class ProgramGenerator {
       const inner = {
         ...ctx,
         func: true,
-        method: true,
+
         gen: false,
         async: false,
         loop: false,
@@ -337,43 +329,41 @@ export class ProgramGenerator {
       let p;
       switch (Math.floor(this.random() * 9)) {
         case 0: {
-          p = node('m', this.identifier());
+          p = [this.identifier()];
           break;
         }
 
         case 1: {
-          p = node('m', '...', this.expression(d - 1, ctx));
+          p = ['...', this.expression(d - 1, ctx)];
           break;
         }
 
         case 2: {
-          p = node(
-            'm',
+          p = [
             this.pick(['', 'async ', '*', 'get ', 'set ', 'async *']),
             this.pick(['m', 'get', 'set', 'async', '"s"', '[k]', '1']),
             '(',
             this.params(),
             ') {',
             this.block(d - 1, inner),
-            '}'
-          );
+            '}',
+          ];
           break;
         }
 
         case 3: {
-          p = node('m', '[', this.expression(d - 1, ctx), ']: ', this.expression(d - 1, ctx));
+          p = ['[', this.expression(d - 1, ctx), ']: ', this.expression(d - 1, ctx)];
           break;
         }
 
         default: {
-          p = node(
-            'm',
+          p = [
             this.pick([this.identifier(), '"s"', '1', 'if', 'new', 'class']),
             this.whitespace(0.05),
             ':',
             this.whitespace(0.05),
-            this.expression(d - 1, ctx)
-          );
+            this.expression(d - 1, ctx),
+          ];
         }
       }
       props.push(p);
@@ -384,10 +374,10 @@ export class ProgramGenerator {
     if (n && this.chance(0.15)) {
       props.push(',');
     }
-    return node('e', '{', this.whitespace(0.1), ...props, this.whitespace(0.1), '}');
+    return ['{', this.whitespace(0.1), ...props, this.whitespace(0.1), '}'];
   }
   jsxElement(d, ctx) {
-    if (d < 0) return node('e', this.pick(['<a />', '<></>', '<A.B></A.B>']));
+    if (d < 0) return [this.pick(['<a />', '<></>', '<A.B></A.B>'])];
     const name = this.pick(['div', 'A', 'A.B', 'a-b', 'a:b', 'this.x']);
     const attrs = [];
     const n = Math.floor(this.random() * 3);
@@ -395,14 +385,14 @@ export class ProgramGenerator {
       attrs.push(
         ' ',
         this.pick([
-          node('m', this.pick(['x', 'if', 'a-b', 'a:b']), '="s"'),
-          node('m', 'x={', this.expression(d - 1, ctx), '}'),
-          node('m', '{...', this.expression(d - 1, ctx), '}'),
+          [this.pick(['x', 'if', 'a-b', 'a:b']), '="s"'],
+          ['x={', this.expression(d - 1, ctx), '}'],
+          ['{...', this.expression(d - 1, ctx), '}'],
           'x',
-          node('m', 'x=', this.jsxElement(d - 1, ctx)),
+          ['x=', this.jsxElement(d - 1, ctx)],
         ])
       );
-    if (this.chance(0.3)) return node('e', '<', name, ...attrs, ' />');
+    if (this.chance(0.3)) return ['<', name, ...attrs, ' />'];
     const kids = [];
     const k = Math.floor(this.random() * 3);
     for (let i = 0; i < k; i++)
@@ -410,15 +400,15 @@ export class ProgramGenerator {
         this.pick([
           'text',
           ' t > u ',
-          node('m', '{', this.expression(d - 1, ctx), '}'),
+          ['{', this.expression(d - 1, ctx), '}'],
           '{/*c*/}',
           d > 0 ? this.jsxElement(d - 1, ctx) : 'x',
           '&amp;',
           '\n',
         ])
       );
-    if (this.chance(0.2)) return node('e', '<>', ...kids, '</>');
-    return node('e', '<', name, ...attrs, '>', ...kids, '</', name, '>');
+    if (this.chance(0.2)) return ['<>', ...kids, '</>'];
+    return ['<', name, ...attrs, '>', ...kids, '</', name, '>'];
   }
   compound(d, ctx) {
     const e = () => this.expression(d - 1, ctx);
@@ -429,87 +419,73 @@ export class ProgramGenerator {
       case 2:
       case 3:
       case 4: {
-        return node('e', e(), this.whitespace(), this.pick(BIN), this.whitespace(), e());
+        return [e(), this.whitespace(), this.pick(BIN), this.whitespace(), e()];
       }
 
       case 5: {
-        return node('e', this.lhs(d, ctx), this.whitespace(0.05), this.pick(ASG), this.whitespace(), e());
+        return [this.lhs(d, ctx), this.whitespace(0.05), this.pick(ASG), this.whitespace(), e()];
       }
 
       case 6: {
-        return node('e', this.pick(UN), this.whitespace(0.05), e());
+        return [this.pick(UN), this.whitespace(0.05), e()];
       }
 
       case 7: {
         return this.chance(0.5)
-          ? node('e', this.pick(['++', '--']), this.whitespace(0.05), this.lhs(d, ctx))
-          : node('e', this.lhs(d, ctx), this.whitespace(0.15), this.pick(['++', '--']));
+          ? [this.pick(['++', '--']), this.whitespace(0.05), this.lhs(d, ctx)]
+          : [this.lhs(d, ctx), this.whitespace(0.15), this.pick(['++', '--'])];
       }
 
       case 8: {
-        return node(
-          'e',
-          e(),
-          this.whitespace(),
-          '?',
-          this.whitespace(),
-          e(),
-          this.whitespace(),
-          ':',
-          this.whitespace(),
-          e()
-        );
+        return [e(), this.whitespace(), '?', this.whitespace(), e(), this.whitespace(), ':', this.whitespace(), e()];
       }
 
       case 9:
       case 10: {
-        return node(
-          'e',
+        return [
           e(),
           this.whitespace(0.08),
           this.pick(['(', '?.(']),
           this.chance(0.3) ? '' : e(),
-          this.chance(0.2) ? node('m', ', ...', e()) : '',
-          ')'
-        );
+          this.chance(0.2) ? [', ...', e()] : '',
+          ')',
+        ];
       }
 
       case 11: {
-        return node(
-          'e',
+        return [
           e(),
           this.whitespace(0.08),
           this.pick(['.', '?.']),
           this.whitespace(0.05),
-          this.pick(['x', 'if', 'new', 'class', '#p', 'await', 'yield', 'get'])
-        );
+          this.pick(['x', 'if', 'new', 'class', '#p', 'await', 'yield', 'get']),
+        ];
       }
 
       case 12: {
-        return node('e', e(), this.whitespace(0.08), this.pick(['[', '?.[']), e(), ']');
+        return [e(), this.whitespace(0.08), this.pick(['[', '?.[']), e(), ']'];
       }
 
       case 13: {
-        return node('e', 'new ', e(), this.chance(0.5) ? node('m', '(', this.chance(0.5) ? '' : e(), ')') : '');
+        return ['new ', e(), this.chance(0.5) ? ['(', this.chance(0.5) ? '' : e(), ')'] : ''];
       }
 
       case 14: {
-        return node('e', e(), this.whitespace(0.08), this.pick(['`t`', node('m', '`a${', e(), '}b`')]));
+        return [e(), this.whitespace(0.08), this.pick(['`t`', ['`a${', e(), '}b`']])];
       }
 
       case 15: {
-        return node('e', '(', this.whitespace(0.05), e(), this.whitespace(0.05), ')');
+        return ['(', this.whitespace(0.05), e(), this.whitespace(0.05), ')'];
       }
 
       case 16: {
-        return node(
-          'e',
+        return [
           '[',
           this.chance(0.3) ? '' : e(),
           this.pick(['', ', ', ', , ']),
-          this.chance(0.4) ? node('m', '...', e()) : '',
-          ']'
-        );
+          this.chance(0.4) ? ['...', e()] : '',
+          ']',
+        ];
       }
 
       case 17: {
@@ -530,34 +506,31 @@ export class ProgramGenerator {
       }
 
       case 22: {
-        return ctx.async || ctx.top ? node('e', 'await', this.whitespace(0.08), e()) : node('e', 'a');
+        return ctx.async || ctx.top ? ['await', this.whitespace(0.08), e()] : ['a'];
       }
 
       case 23: {
-        return ctx.gen
-          ? node('e', 'yield', this.pick(['', '*', ' ', '\n']), this.chance(0.2) ? '' : node('m', ' ', e()))
-          : node('e', 'a');
+        return ctx.gen ? ['yield', this.pick(['', '*', ' ', '\n']), this.chance(0.2) ? '' : [' ', e()]] : ['a'];
       }
 
       case 24: {
-        return node('e', '`a${', e(), '}b${', e(), '}`');
+        return ['`a${', e(), '}b${', e(), '}`'];
       }
 
       case 25: {
-        return node('e', this.pick(['import(', 'import.meta', 'new.target', 'super.x', 'super(', 'import.meta.x']), '');
+        return [this.pick(['import(', 'import.meta', 'new.target', 'super.x', 'super(', 'import.meta.x']), ''];
       }
 
       case 26: {
-        return node('e', 'import(', e(), ')');
+        return ['import(', e(), ')'];
       }
 
       case 27: {
-        return node('e', e(), ', ', e());
+        return [e(), ', ', e()];
       }
 
       case 28: {
-        return node(
-          'e',
+        return [
           'new ',
           this.identifier(),
           this.whitespace(0.05),
@@ -565,8 +538,8 @@ export class ProgramGenerator {
           this.whitespace(0.05),
           this.identifier(),
           '(',
-          ')'
-        );
+          ')',
+        ];
       }
 
       case 29: {
@@ -574,29 +547,27 @@ export class ProgramGenerator {
       }
 
       case 30: {
-        return node('e', this.identifier(), this.whitespace(0.05), '=>', this.whitespace(), e());
+        return [this.identifier(), this.whitespace(0.05), '=>', this.whitespace(), e()];
       }
 
       case 31: {
-        return node(
-          'e',
+        return [
           'async',
           this.pick([' ', '\n', ' ']),
           this.identifier(),
           this.whitespace(0.05),
           '=>',
           this.whitespace(),
-          e()
-        );
+          e(),
+        ];
       }
 
       case 32: {
-        return node('e', 'async', this.whitespace(0.05), '(', e(), ')');
+        return ['async', this.whitespace(0.05), '(', e(), ')'];
       }
 
       case 33: {
-        return node(
-          'e',
+        return [
           e(),
           this.whitespace(),
           this.pick(['/', '/=']),
@@ -604,32 +575,32 @@ export class ProgramGenerator {
           e(),
           this.whitespace(),
           '/',
-          this.pick(['', 'g', ' '])
-        );
+          this.pick(['', 'g', ' ']),
+        ];
       }
 
       case 34: {
-        return node('e', '#p in ', e());
+        return ['#p in ', e()];
       }
 
       case 35: {
-        return node('e', e(), '?.', this.whitespace(0.05), '#p');
+        return [e(), '?.', this.whitespace(0.05), '#p'];
       }
 
       case 36: {
-        return node('e', 'new ', e(), '?.', 'x');
+        return ['new ', e(), '?.', 'x'];
       }
 
       case 37: {
-        return node('e', 'async ', '(', this.params(), ')', this.whitespace(0.05), '=>', this.whitespace(), e());
+        return ['async ', '(', this.params(), ')', this.whitespace(0.05), '=>', this.whitespace(), e()];
       }
 
       case 38: {
-        return node('e', e(), this.whitespace(), this.pick(['++', '--']), this.whitespace(), e());
+        return [e(), this.whitespace(), this.pick(['++', '--']), this.whitespace(), e()];
       }
 
       case 39: {
-        return node('e', this.pick(['let', 'yield', 'await', 'async', 'of', 'static', 'implements', 'package']));
+        return [this.pick(['let', 'yield', 'await', 'async', 'of', 'static', 'implements', 'package'])];
       }
     }
   }
@@ -640,8 +611,8 @@ export class ProgramGenerator {
   semicolon() {
     const r = this.random();
     if (r < 0.5) return ';';
-    if (r < 0.8) return node('w', '\n');
-    return node('w', this.pick([' ', '', '//c\n', '/*\n*/']));
+    if (r < 0.8) return ['\n'];
+    return [this.pick([' ', '', '//c\n', '/*\n*/'])];
   }
   variableDeclaration(d, ctx) {
     const kind = this.pick(['let', 'const', 'var', 'let', 'using', 'await using']);
@@ -649,21 +620,16 @@ export class ProgramGenerator {
     const ds = [];
     for (let i = 0; i < n; i++) {
       const name = this.pick(['x', 'y', '[a, b]', '{a, b: c}', this.identifier()]);
-      ds.push(
-        node(
-          'm',
-          name,
-          '',
-          this.chance(0.8)
-            ? node('m', this.whitespace(0.04), '=', this.whitespace(0.08), this.expression(d - 1, ctx))
-            : ''
-        )
-      );
+      ds.push([
+        name,
+        '',
+        this.chance(0.8) ? [this.whitespace(0.04), '=', this.whitespace(0.08), this.expression(d - 1, ctx)] : '',
+      ]);
       if (i < n - 1) {
         ds.push(',', this.whitespace(0.15));
       }
     }
-    return node('s', kind, ' ', ...ds, this.semicolon());
+    return [kind, ' ', ...ds, this.semicolon()];
   }
   statement(d, ctx) {
     const e = () => this.expression(d - 1, ctx);
@@ -675,30 +641,27 @@ export class ProgramGenerator {
       case 3:
       case 4:
       case 5: {
-        return node('s', e(), this.semicolon());
+        return [e(), this.semicolon()];
       }
 
       case 6: {
-        return node('s', '{', this.whitespace(), this.block(d - 1, ctx), this.whitespace(), '}');
+        return ['{', this.whitespace(), this.block(d - 1, ctx), this.whitespace(), '}'];
       }
 
       case 7: {
-        return node(
-          's',
+        return [
           this.pick(['a', 'b', 'async', 'L', 'get', 'of', 'yield', 'await', 'type', 'declare']),
           this.whitespace(0.05),
           ':',
           this.whitespace(),
           this.statement(d - 1, {
             ...ctx,
-            label: true,
-          })
-        );
+          }),
+        ];
       }
 
       case 8: {
-        return node(
-          's',
+        return [
           'if',
           this.whitespace(0.05),
           '(',
@@ -706,17 +669,16 @@ export class ProgramGenerator {
           ')',
           this.whitespace(),
           this.statement(d - 1, ctx),
-          this.chance(0.4) ? node('m', this.whitespace(), 'else', this.requiredSpace(), this.statement(d - 1, ctx)) : ''
-        );
+          this.chance(0.4) ? [this.whitespace(), 'else', this.requiredSpace(), this.statement(d - 1, ctx)] : '',
+        ];
       }
 
       case 9: {
-        return node(
-          's',
+        return [
           'for',
           this.whitespace(0.03),
           '(',
-          this.pick([node('m', this.chance(0.5) ? e() : this.variableDeclaration(d - 1, ctx), ';'), ';']),
+          this.pick([[this.chance(0.5) ? e() : this.variableDeclaration(d - 1, ctx), ';'], ';']),
           this.chance(0.5) ? e() : '',
           ';',
           this.chance(0.5) ? e() : '',
@@ -725,13 +687,12 @@ export class ProgramGenerator {
           this.statement(d - 1, {
             ...ctx,
             loop: true,
-          })
-        );
+          }),
+        ];
       }
 
       case 10: {
-        return node(
-          's',
+        return [
           'for',
           this.chance(0.2) && (ctx.async || ctx.top) ? ' await' : '',
           ' (',
@@ -745,13 +706,12 @@ export class ProgramGenerator {
           this.statement(d - 1, {
             ...ctx,
             loop: true,
-          })
-        );
+          }),
+        ];
       }
 
       case 11: {
-        return node(
-          's',
+        return [
           'while (',
           e(),
           ')',
@@ -759,13 +719,12 @@ export class ProgramGenerator {
           this.statement(d - 1, {
             ...ctx,
             loop: true,
-          })
-        );
+          }),
+        ];
       }
 
       case 12: {
-        return node(
-          's',
+        return [
           'do',
           this.requiredSpace(),
           this.statement(d - 1, {
@@ -776,37 +735,35 @@ export class ProgramGenerator {
           'while (',
           e(),
           ')',
-          this.semicolon()
-        );
+          this.semicolon(),
+        ];
       }
 
       case 13: {
         return ctx.func
-          ? node('s', 'return', this.pick([' ', '\n', ' ', '']), this.chance(0.3) ? '' : e(), this.semicolon())
-          : node('s', 'throw ', e(), this.semicolon());
+          ? ['return', this.pick([' ', '\n', ' ', '']), this.chance(0.3) ? '' : e(), this.semicolon()]
+          : ['throw ', e(), this.semicolon()];
       }
 
       case 14: {
-        return node('s', 'throw ', e(), this.semicolon());
+        return ['throw ', e(), this.semicolon()];
       }
 
       case 15: {
-        return node(
-          's',
+        return [
           'try {',
           this.block(d - 1, ctx),
           '}',
           this.whitespace(),
           this.pick([
-            node('m', 'catch', this.chance(0.3) ? '' : ' (e)', ' {', this.block(d - 1, ctx), '}'),
-            node('m', 'finally {', this.block(d - 1, ctx), '}'),
-          ])
-        );
+            ['catch', this.chance(0.3) ? '' : ' (e)', ' {', this.block(d - 1, ctx), '}'],
+            ['finally {', this.block(d - 1, ctx), '}'],
+          ]),
+        ];
       }
 
       case 16: {
-        return node(
-          's',
+        return [
           'switch (',
           e(),
           ') {',
@@ -816,9 +773,9 @@ export class ProgramGenerator {
           ':',
           this.whitespace(),
           this.block(d - 1, ctx),
-          this.chance(0.5) ? node('m', 'default:', this.whitespace(), this.statement(d - 1, ctx)) : '',
-          '}'
-        );
+          this.chance(0.5) ? ['default:', this.whitespace(), this.statement(d - 1, ctx)] : '',
+          '}',
+        ];
       }
 
       case 17:
@@ -835,18 +792,15 @@ export class ProgramGenerator {
       }
 
       case 21: {
-        return ctx.loop
-          ? node('s', this.pick(['break', 'continue']), this.pick(['', ' a', '\na']), this.semicolon())
-          : node('s', ';');
+        return ctx.loop ? [this.pick(['break', 'continue']), this.pick(['', ' a', '\na']), this.semicolon()] : [';'];
       }
 
       case 22: {
-        return node('s', ';');
+        return [';'];
       }
 
       case 23: {
-        return node(
-          's',
+        return [
           this.pick([
             'let',
             'async',
@@ -859,14 +813,13 @@ export class ProgramGenerator {
             'let\n[a]',
             'async\nfunction f() {}',
           ]),
-          this.semicolon()
-        );
+          this.semicolon(),
+        ];
       }
 
       case 24: {
         return ctx.top
-          ? node(
-              's',
+          ? [
               this.pick([
                 'export ',
                 'export default ',
@@ -877,19 +830,18 @@ export class ProgramGenerator {
                 'export * as ns from "m"',
               ]),
               this.pick([e(), '', this.functionExpression(d - 1, ctx, true), this.classExpression(d - 1, ctx, true)]),
-              this.semicolon()
-            )
-          : node('s', ';');
+              this.semicolon(),
+            ]
+          : [';'];
       }
 
       case 25: {
-        return node(
-          's',
+        return [
           '@',
           this.pick(['d', 'd()', 'd.e', '(d)']),
           this.requiredSpace(),
-          this.classExpression(d - 1, ctx, true)
-        );
+          this.classExpression(d - 1, ctx, true),
+        ];
       }
     }
   }
@@ -897,14 +849,10 @@ export class ProgramGenerator {
     const n = Math.floor(this.random() * 3);
     const out = [];
     for (let i = 0; i < n; i++) out.push(this.statement(Math.max(d, 0), ctx), this.whitespace(0.4));
-    return node('m', ...out);
+    return [...out];
   }
 }
-function node(c, ...p) {
-  return { c, p };
-}
-export function render(n) {
-  if (typeof n === 'string') return n;
-  if (n.r !== void 0) return n.r;
-  return n.p.map(render).join('');
+
+export function render(fragment) {
+  return typeof fragment === 'string' ? fragment : fragment.map(render).join('');
 }

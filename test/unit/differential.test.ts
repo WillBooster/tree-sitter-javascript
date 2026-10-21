@@ -3,7 +3,7 @@ import { expect } from 'vitest';
 import { testCommand } from './run.js';
 
 testCommand(
-  'matches expression and statement structure accepted by Acorn, Babel and V8',
+  'matches Acorn/Babel structure with V8 validation for non-JSX inputs',
   [
     'node',
     '--experimental-vm-modules',

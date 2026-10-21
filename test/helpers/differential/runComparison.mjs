@@ -24,7 +24,10 @@ try {
       tree.delete();
     }
   }
-  assert.ok(accepted > 0, 'The reference parsers accepted no generated inputs');
+  assert.ok(
+    accepted >= generated / 4,
+    `Reference parsers accepted only ${accepted} of ${generated} programs; investigate the loss of comparison coverage`
+  );
   console.log(JSON.stringify({ generated, accepted, seed: 7, mismatches: 0 }));
 } finally {
   parser.delete();
