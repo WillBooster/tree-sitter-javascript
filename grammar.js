@@ -500,11 +500,14 @@ module.exports = grammar({
                 field('left', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern)),
                 optional($._initializer)
               ),
-              seq(
-                field('kind', choice('let', 'const')),
-                field(
-                  'left',
-                  choice(reserved('lexical', $.identifier), alias('of', $.identifier), $._destructuring_pattern)
+              prec.dynamic(
+                1,
+                seq(
+                  field('kind', choice('let', 'const')),
+                  field(
+                    'left',
+                    choice(reserved('lexical', $.identifier), alias('of', $.identifier), $._destructuring_pattern)
+                  )
                 )
               )
             ),

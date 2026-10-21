@@ -83,6 +83,65 @@ test.each(['javascript', 'javascript_script'])('pairs loop-header delimiters thr
   }
 });
 
+test.each(['javascript', 'javascript_script'])(
+  'retains declaration fields for loop bindings named of in %s',
+  async (goal) => {
+    await Parser.init();
+    const language = await Language.load(`tree-sitter-${goal}.wasm`);
+    const parser = new Parser().setLanguage(language);
+    const query = new Query(language, '(for_in_clause left: (identifier) @binding)');
+    try {
+      for (const kind of ['let', 'const', 'var']) {
+        for (const iterable of ['[of]', '(of)', '+ of', 'of(of)', 'of + of', 'of']) {
+          let binding = 'of';
+          let source = `for (${kind} ${binding} of ${iterable}) { consume(of); }`;
+          let tree = parser.parse(source)!;
+          try {
+            for (const replacement of ['of', 'ofValue', 'of']) {
+              const start = source.indexOf(kind) + kind.length + 1;
+              const next = source.slice(0, start) + replacement + source.slice(start + binding.length);
+              tree.edit(
+                new Edit({
+                  startIndex: start,
+                  oldEndIndex: start + binding.length,
+                  newEndIndex: start + replacement.length,
+                  startPosition: { row: 0, column: start },
+                  oldEndPosition: { row: 0, column: start + binding.length },
+                  newEndPosition: { row: 0, column: start + replacement.length },
+                })
+              );
+              const previous = tree;
+              tree = parser.parse(next, previous)!;
+              previous.delete();
+              source = next;
+              binding = replacement;
+              const fresh = parser.parse(source)!;
+              try {
+                expect(tree.rootNode.hasError, source).toBe(false);
+                const header = tree.rootNode.descendantsOfType('for_in_clause')[0]!;
+                expect(header.childForFieldName('kind')?.text, source).toBe(kind);
+                expect(header.childForFieldName('left')?.text).toBe(binding);
+                expect(header.childForFieldName('left')?.startIndex).toBe(start);
+                expect(header.childForFieldName('operator')?.text).toBe('of');
+                expect(header.childForFieldName('right')?.text).toBe(iterable);
+                expect(query.captures(tree.rootNode).map(({ node }) => node.text)).toEqual([binding]);
+                expect(snapshot(tree.rootNode)).toEqual(snapshot(fresh.rootNode));
+              } finally {
+                fresh.delete();
+              }
+            }
+          } finally {
+            tree.delete();
+          }
+        }
+      }
+    } finally {
+      query.delete();
+      parser.delete();
+    }
+  }
+);
+
 function snapshot(node: Node): unknown {
   return [
     node.type,
