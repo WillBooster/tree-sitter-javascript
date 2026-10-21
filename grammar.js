@@ -125,6 +125,7 @@ module.exports = grammar({
     sym('_function_signature_start'),
     sym('_async_function_signature_start'),
     sym('_call_arguments_context'),
+    sym('_async_keyword'),
   ],
 
   extras: ($) => [$.comment, sym('html_comment'), /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -574,7 +575,10 @@ module.exports = grammar({
 
     labeled_statement: ($) =>
       seq(
-        field('label', alias(choice($.identifier, $.undefined, $._reserved_identifier), sym('statement_identifier'))),
+        field(
+          'label',
+          aliasWithAsyncKeyword(choice($.identifier, $.undefined, $._reserved_identifier), sym('statement_identifier'))
+        ),
         ':',
         field('body', $._single_statement)
       ),
@@ -624,7 +628,7 @@ module.exports = grammar({
         $.parenthesized_expression,
         $._identifier,
         alias(sym('_await_yield_identifier'), $.identifier),
-        alias($._reserved_identifier, $.identifier),
+        aliasWithAsyncKeyword($._reserved_identifier, $.identifier),
         $.this,
         $.super,
         $.number,
@@ -667,7 +671,10 @@ module.exports = grammar({
                 $.pair,
                 $.spread_element,
                 $.method_definition,
-                alias(choice($.identifier, $._reserved_identifier), sym('shorthand_property_identifier'))
+                aliasWithAsyncKeyword(
+                  choice($.identifier, $._reserved_identifier),
+                  sym('shorthand_property_identifier')
+                )
               )
             )
           ),
@@ -686,7 +693,10 @@ module.exports = grammar({
                 $.pair_pattern,
                 $.rest_pattern,
                 $.object_assignment_pattern,
-                alias(choice($.identifier, $._reserved_identifier), sym('shorthand_property_identifier_pattern'))
+                aliasWithAsyncKeyword(
+                  choice($.identifier, $._reserved_identifier),
+                  sym('shorthand_property_identifier_pattern')
+                )
               )
             )
           ),
@@ -701,7 +711,10 @@ module.exports = grammar({
         field(
           'left',
           choice(
-            alias(choice($._reserved_identifier, $.identifier), sym('shorthand_property_identifier_pattern')),
+            aliasWithAsyncKeyword(
+              choice($._reserved_identifier, $.identifier),
+              sym('shorthand_property_identifier_pattern')
+            ),
             $._destructuring_pattern
           )
         ),
@@ -844,7 +857,7 @@ module.exports = grammar({
         'literal',
         functionContext((async) =>
           seq(
-            ...(async ? ['async'] : []),
+            ...(async ? [alias(sym('_async_keyword'), 'async')] : []),
             'function',
             field('name', optional($.identifier)),
             functionScope(async, seq($._call_signature, field('body', $.statement_block)))
@@ -860,11 +873,11 @@ module.exports = grammar({
             choice(
               seq(
                 sym('_default_declaration_start'),
-                ...(async ? ['async'] : []),
+                ...(async ? [alias(sym('_async_keyword'), 'async')] : []),
                 'function',
                 field('name', optional($.identifier))
               ),
-              seq(...(async ? ['async'] : []), 'function', field('name', $.identifier))
+              seq(...(async ? [alias(sym('_async_keyword'), 'async')] : []), 'function', field('name', $.identifier))
             ),
             functionScope(async, seq($._call_signature, field('body', $.statement_block)))
           )
@@ -876,7 +889,7 @@ module.exports = grammar({
         'literal',
         functionContext((async) =>
           seq(
-            ...(async ? ['async'] : []),
+            ...(async ? [alias(sym('_async_keyword'), 'async')] : []),
             'function',
             '*',
             field('name', optional($.identifier)),
@@ -893,12 +906,17 @@ module.exports = grammar({
             choice(
               seq(
                 sym('_default_declaration_start'),
-                ...(async ? ['async'] : []),
+                ...(async ? [alias(sym('_async_keyword'), 'async')] : []),
                 'function',
                 '*',
                 field('name', optional($.identifier))
               ),
-              seq(...(async ? ['async'] : []), 'function', '*', field('name', $.identifier))
+              seq(
+                ...(async ? [alias(sym('_async_keyword'), 'async')] : []),
+                'function',
+                '*',
+                field('name', $.identifier)
+              )
             ),
             functionScope(async, seq($._call_signature, field('body', $.statement_block)), 'generator_function')
           )
@@ -909,11 +927,15 @@ module.exports = grammar({
       prec.right(
         functionContext((async) =>
           seq(
-            ...(async ? ['async'] : []),
+            ...(async ? [alias(sym('_async_keyword'), 'async')] : []),
             choice(
               field(
                 'parameter',
-                choice(alias($._reserved_identifier, $.identifier), alias($.undefined, $.identifier), $.identifier)
+                choice(
+                  aliasWithAsyncKeyword($._reserved_identifier, $.identifier),
+                  alias($.undefined, $.identifier),
+                  $.identifier
+                )
               ),
               $._call_signature
             ),
@@ -964,7 +986,7 @@ module.exports = grammar({
         functionContext((async) =>
           seq(
             optional(sym('_constructor_async_function_start')),
-            ...(async ? ['async'] : []),
+            ...(async ? [alias(sym('_async_keyword'), 'async')] : []),
             'function',
             field('name', optional($.identifier)),
             functionScope(async, seq($._call_signature, field('body', $.statement_block)))
@@ -978,7 +1000,7 @@ module.exports = grammar({
         functionContext((async) =>
           seq(
             optional(sym('_constructor_async_function_start')),
-            ...(async ? ['async'] : []),
+            ...(async ? [alias(sym('_async_keyword'), 'async')] : []),
             'function',
             '*',
             field('name', optional($.identifier)),
@@ -993,7 +1015,7 @@ module.exports = grammar({
         $.parenthesized_expression,
         $._identifier,
         alias(sym('_await_yield_identifier'), $.identifier),
-        alias($._reserved_identifier, $.identifier),
+        aliasWithAsyncKeyword($._reserved_identifier, $.identifier),
         $.this,
         $.super,
         $.number,
@@ -1122,7 +1144,7 @@ module.exports = grammar({
         $.member_expression,
         $.subscript_expression,
         $._identifier,
-        alias($._reserved_identifier, $.identifier),
+        aliasWithAsyncKeyword($._reserved_identifier, $.identifier),
         $._destructuring_pattern
       ),
 
@@ -1136,7 +1158,7 @@ module.exports = grammar({
       choice(
         $.member_expression,
         $.subscript_expression,
-        alias($._reserved_identifier, $.identifier),
+        aliasWithAsyncKeyword($._reserved_identifier, $.identifier),
         $._identifier,
         $.parenthesized_expression
       ),
@@ -1502,7 +1524,7 @@ module.exports = grammar({
             seq(
               repeat(field('decorator', $.decorator)),
               optional('static'),
-              ...(async ? ['async'] : []),
+              ...(async ? [alias(sym('_async_keyword'), 'async')] : []),
               ...(generator ? ['*'] : [optional(choice('get', 'set'))]),
               field('name', $._property_name),
               choice(
@@ -1542,7 +1564,7 @@ module.exports = grammar({
       reserved(
         'properties',
         choice(
-          alias(
+          aliasWithAsyncKeyword(
             choice(
               $.identifier,
               sym('_yield_identifier'),
@@ -1564,7 +1586,7 @@ module.exports = grammar({
       reserved(
         'properties',
         choice(
-          alias(choice($.identifier, $._reserved_identifier), sym('property_identifier')),
+          aliasWithAsyncKeyword(choice($.identifier, $._reserved_identifier), sym('property_identifier')),
           $.private_property_identifier,
           $.string,
           $.number,
@@ -1593,6 +1615,14 @@ module.exports = grammar({
       ),
   },
 });
+
+/**
+ * @param {import('@willbooster/web-tree-sitter/dsl').RuleOrLiteral} rule
+ * @param {import('@willbooster/web-tree-sitter/dsl').SymbolRule<string>} symbol
+ */
+function aliasWithAsyncKeyword(rule, symbol) {
+  return choice(alias(rule, symbol), alias(sym('_async_keyword'), symbol));
+}
 
 /**
  * Creates a rule to match one or more of the rules separated by a comma
