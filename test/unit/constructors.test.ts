@@ -128,6 +128,79 @@ test('restores constructor ownership and captures across optional-chain, parenth
   }
 });
 
+test.each(['javascript', 'javascript_script'])(
+  'ends construction before a decimal statement after a line break in %s',
+  async (goal) => {
+    await Parser.init();
+    const language = await Language.load(path.join(Root, `tree-sitter-${goal}.wasm`));
+    const parser = new Parser().setLanguage(language);
+    const query = new Query(
+      language,
+      '(new_expression constructor: (primary_expression) @constructor) (number) @number'
+    );
+    try {
+      for (const newline of ['\n', '\r', '\r\n', '\u2028', '\u2029']) {
+        for (const construction of ['new Ctor', 'new Namespace.Ctor', 'new Ctor()']) {
+          for (const decimal of ['.5', '.5e+1', '.5_0']) {
+            let separator = newline;
+            let source = `${construction}${separator}${decimal}; const sentinel = 1;`;
+            let tree = parser.parse(source)!;
+            try {
+              for (const replacement of [newline, `// boundary${newline}`, ' ', newline]) {
+                const next = `${construction}${replacement}${decimal}; const sentinel = 1;`;
+                tree.edit(
+                  new Edit({
+                    startIndex: construction.length,
+                    oldEndIndex: construction.length + separator.length,
+                    newEndIndex: construction.length + replacement.length,
+                    startPosition: pointAt(source, construction.length),
+                    oldEndPosition: pointAt(source, construction.length + separator.length),
+                    newEndPosition: pointAt(next, construction.length + replacement.length),
+                  })
+                );
+                const previous = tree;
+                tree = parser.parse(next, previous)!;
+                previous.delete();
+                source = next;
+                separator = replacement;
+                const fresh = parser.parse(source)!;
+                try {
+                  expect(tree.rootNode.hasError, source).toBe(replacement === ' ');
+                  expect(snapshot(tree.rootNode), source).toEqual(snapshot(fresh.rootNode));
+                  expect(captures(query, tree), source).toEqual(captures(query, fresh));
+                  if (replacement !== ' ') {
+                    checkConstructors(tree, query, source);
+                    const expressions = tree.rootNode.namedChildren.filter(
+                      (node) => node.type === 'expression_statement'
+                    );
+                    expect(expressions).toHaveLength(2);
+                    const parsedConstruction = expressions[0]!.namedChildren.find(
+                      (node) => node.type === 'new_expression'
+                    )!;
+                    expect(parsedConstruction.text).toBe(construction);
+                    expect(parsedConstruction.endIndex).toBe(construction.length);
+                    const number = expressions[1]!.firstNamedChild!;
+                    expect(number.type).toBe('number');
+                    expect(number.text).toBe(decimal);
+                    expect(number.startIndex).toBe(construction.length + replacement.length);
+                  }
+                } finally {
+                  fresh.delete();
+                }
+              }
+            } finally {
+              tree.delete();
+            }
+          }
+        }
+      }
+    } finally {
+      query.delete();
+      parser.delete();
+    }
+  }
+);
+
 function checkConstructors(tree: Tree, query: Query, source: string): void {
   expect(tree.rootNode.hasError, source).toBe(false);
   const constructors = tree.rootNode.descendantsOfType('new_expression');

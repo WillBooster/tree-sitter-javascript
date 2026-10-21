@@ -1,0 +1,20 @@
+====================
+Constructor expressions before decimal statements
+====================
+
+new Factory
+.5;
+new Factory()
+.5e+1;
+new ns.Factory // boundary
+.5_0;
+
+---
+
+(program
+  (expression_statement (new_expression (identifier)))
+  (expression_statement (number))
+  (expression_statement (new_expression (identifier) (arguments)))
+  (expression_statement (number))
+  (expression_statement (new_expression (member_expression (identifier) (property_identifier))) (comment))
+  (expression_statement (number)))
