@@ -73,6 +73,7 @@ static bool scan_export_default(Scanner *scanner, TSLexer *lexer);
 static bool starts_default_declaration(TSLexer *lexer);
 static bool scan_default_trivia(TSLexer *lexer, bool allow_line_breaks);
 static bool scan_async_start(TSLexer *lexer, char *keyword, unsigned capacity, const bool *valid_symbols);
+static bool await_is_identifier(const Scanner *scanner);
 
 void *tree_sitter_javascript_external_scanner_create() { return ts_calloc(1, sizeof(Scanner)); }
 
@@ -939,7 +940,7 @@ static bool scan_await_or_async(Scanner *scanner, TSLexer *lexer, const bool *va
     if (!scan_identifier(lexer, keyword, sizeof(keyword), false)) return false;
     if (strcmp(keyword, "async") == 0) return scan_async_start(lexer, keyword, sizeof(keyword), valid_symbols);
     if (strcmp(keyword, "await") != 0) return false;
-    bool identifier = scanner->functions.depth ? !function_context_async(&scanner->functions) : JAVASCRIPT_SCRIPT_GOAL;
+    bool identifier = await_is_identifier(scanner);
     if (identifier ? !valid_symbols[AWAIT_IDENTIFIER] : !valid_symbols[AWAIT_KEYWORD]) return false;
     lexer->mark_end(lexer);
     // Record the operand decision on both keyword and identifier tokens so restored nodes cannot keep stale roles.
@@ -955,6 +956,10 @@ static bool scan_await_or_async(Scanner *scanner, TSLexer *lexer, const bool *va
     }
     lexer->result_symbol = identifier ? AWAIT_IDENTIFIER : AWAIT_KEYWORD;
     return true;
+}
+
+static bool await_is_identifier(const Scanner *scanner) {
+    return scanner->functions.depth ? !function_context_async(&scanner->functions) : JAVASCRIPT_SCRIPT_GOAL;
 }
 
 static bool scan_async_start(TSLexer *lexer, char *keyword, unsigned capacity, const bool *valid_symbols) {
@@ -1204,7 +1209,7 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         bool scanned_content = false;
         LineBreakRule rule = LINE_BREAK_BY_NEXT_TOKEN;
         if (valid_symbols[LINE_BREAK_AFTER_AWAIT]) {
-            rule = function_context_async(&scanner->functions) ? LINE_BREAK_AWAIT_OPERAND : LINE_BREAK_AFTER_AWAIT_KEYWORD;
+            rule = await_is_identifier(scanner) ? LINE_BREAK_AFTER_AWAIT_KEYWORD : LINE_BREAK_AWAIT_OPERAND;
         } else if (valid_symbols[LINE_BREAK_ENDS_STATEMENT]) {
             rule = LINE_BREAK_ENDS;
         } else if (valid_symbols[LINE_BREAK_AFTER_BINDING]) {

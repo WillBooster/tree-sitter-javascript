@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { Edit, Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Edit, Language, Parser, Query, type Node } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -214,3 +214,105 @@ test('reports context overflow and incrementally repairs incomplete nested funct
     parser.delete();
   }
 });
+
+test.each(['javascript', 'javascript_script'])(
+  'preserves await operands before contextual-word statement boundaries in %s',
+  async (goal) => {
+    const selectedLanguage = await Language.load(path.join(import.meta.dirname, `../../tree-sitter-${goal}.wasm`));
+    const parser = new Parser().setLanguage(selectedLanguage);
+    const query = new Query(
+      selectedLanguage,
+      '(await_expression (identifier) @operand) (expression) @reference (primary_expression) @primary'
+    );
+    try {
+      for (const newline of ['\n', '\r', '\r\n', '\u2028', '\u2029']) {
+        for (const [prefix, suffix, hasOperand] of [
+          ['', '', goal === 'javascript'],
+          ['function outer(){', '}', false],
+          ['function* outer(){', '}', false],
+          ['async function outer(){', '}', true],
+        ] as const) {
+          for (const [word, continuation] of [
+            ['using', 'value;'],
+            ['async', 'value => value;'],
+          ] as const) {
+            const before = prefix + 'await';
+            const tail = `${word}${newline}${continuation}${suffix} const sentinel = 1;`;
+            let separator = newline;
+            let source = before + separator + tail;
+            let tree = parser.parse(source)!;
+            try {
+              for (const replacement of [newline, `/* boundary */${newline}`, newline]) {
+                const next = before + replacement + tail;
+                tree.edit(
+                  new Edit({
+                    startIndex: before.length,
+                    oldEndIndex: before.length + separator.length,
+                    newEndIndex: before.length + replacement.length,
+                    startPosition: boundaryPoint(source, before.length),
+                    oldEndPosition: boundaryPoint(source, before.length + separator.length),
+                    newEndPosition: boundaryPoint(next, before.length + replacement.length),
+                  })
+                );
+                const previous = tree;
+                tree = parser.parse(next, previous)!;
+                previous.delete();
+                source = next;
+                separator = replacement;
+                const fresh = parser.parse(source)!;
+                try {
+                  expect(tree.rootNode.hasError, source).toBe(false);
+                  expect(boundaryMetadata(tree.rootNode), source).toEqual(boundaryMetadata(fresh.rootNode));
+                  const awaits = tree.rootNode.descendantsOfType('await_expression');
+                  expect(awaits, source).toHaveLength(hasOperand ? 1 : 0);
+                  const captures = query.captures(tree.rootNode);
+                  if (hasOperand) {
+                    expect(awaits[0]!.text).toBe('await' + replacement + word);
+                    expect(awaits[0]!.endIndex).toBe(before.length + replacement.length + word.length);
+                    expect(captures.filter(({ name }) => name === 'operand').map(({ node }) => node.text)).toEqual([
+                      word,
+                    ]);
+                  } else {
+                    const names = captures.filter(({ node }) => node.text === 'await');
+                    expect(names.map(({ name }) => name).toSorted()).toEqual(['primary', 'reference']);
+                    expect(
+                      names.every(({ node }) => node.childCount === 0 && node.endIndex - node.startIndex === 5)
+                    ).toBe(true);
+                  }
+                  expect(tree.rootNode.lastNamedChild!.text).toBe('const sentinel = 1;');
+                } finally {
+                  fresh.delete();
+                }
+              }
+            } finally {
+              tree.delete();
+            }
+          }
+        }
+      }
+    } finally {
+      query.delete();
+      parser.delete();
+    }
+  }
+);
+
+function boundaryPoint(source: string, index: number): { row: number; column: number } {
+  const preceding = source.slice(0, index).split('\n');
+  return { row: preceding.length - 1, column: preceding.at(-1)!.length };
+}
+
+function boundaryMetadata(node: Node): unknown {
+  return [
+    node.type,
+    node.isNamed,
+    node.isExtra,
+    node.isMissing,
+    node.hasError,
+    node.startIndex,
+    node.endIndex,
+    node.startPosition,
+    node.endPosition,
+    node.children.map((child, index) => [node.fieldNameForChild(index), boundaryMetadata(child)]),
+  ];
+}

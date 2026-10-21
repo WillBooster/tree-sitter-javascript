@@ -2948,12 +2948,11 @@ function script() {
           (identifier)
           (identifier)))))
   (expression_statement
-    (identifier))
-  (import_statement
-    (import_clause
-      (identifier))
-    (string
-      (string_fragment)))
+    (await_expression
+      (ERROR
+        (identifier))
+      (string
+        (string_fragment))))
   (expression_statement
     (await_expression
       (call_expression
@@ -3194,7 +3193,7 @@ async function asyncOperand() {
           (identifier))))))
 
 ====================
-Await identifiers before arrows and escaped labels
+Module await before arrows and escaped labels
 ====================
 
 await
@@ -3211,25 +3210,43 @@ function script() {
 ---
 
 (program
-  (expression_statement (identifier))
-  (expression_statement (arrow_function (identifier) (number)))
-  (expression_statement (identifier))
-  (expression_statement (arrow_function (identifier) (number)))
-  (expression_statement (assignment_expression (identifier) (identifier)))
-  (expression_statement (arrow_function (identifier) (number)))
+  (expression_statement
+    (binary_expression
+      (await_expression
+        (identifier))
+      (ERROR)
+      (number)))
+  (expression_statement
+    (identifier)
+    (ERROR
+      (arrow_function
+        (identifier)
+        (number))))
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (binary_expression
+        (await_expression
+          (identifier))
+        (ERROR)
+        (number))))
   (function_declaration
     (identifier)
     (formal_parameters)
     (statement_block
-      (expression_statement (identifier))
+      (expression_statement
+        (identifier))
       (labeled_statement
         (statement_identifier)
         (while_statement
-          (parenthesized_expression (true))
-          (statement_block (break_statement (statement_identifier))))))))
+          (parenthesized_expression
+            (true))
+          (statement_block
+            (break_statement
+              (statement_identifier))))))))
 
 ====================
-Await identifiers before async arrows with parenthesized parameters
+Module await before async arrows with parenthesized parameters
 ====================
 
 await
@@ -3244,24 +3261,42 @@ async (x);
 ---
 
 (program
-  (expression_statement (identifier))
-  (expression_statement (arrow_function (formal_parameters) (number)))
-  (expression_statement (identifier))
-  (expression_statement (arrow_function (formal_parameters (identifier)) (number)))
-  (expression_statement (identifier))
   (expression_statement
-    (arrow_function
-      (formal_parameters
-        (assignment_pattern
-          (identifier)
-          (parenthesized_expression
-            (object (pair (property_identifier) (string (string_fragment)))))))
-      (statement_block)))
+    (identifier)
+    (ERROR
+      (arrow_function
+        (formal_parameters)
+        (number))))
   (expression_statement
-    (await_expression (call_expression (identifier) (arguments (identifier))))))
+    (identifier)
+    (ERROR
+      (arrow_function
+        (formal_parameters
+          (identifier))
+        (number))))
+  (expression_statement
+    (await_expression
+      (arrow_function
+        (formal_parameters
+          (assignment_pattern
+            (identifier)
+            (parenthesized_expression
+              (object
+                (pair
+                  (property_identifier)
+                  (string
+                    (string_fragment)))))))
+        (statement_block))
+      (MISSING _await_operand_end)))
+  (expression_statement
+    (await_expression
+      (call_expression
+        (identifier)
+        (arguments
+          (identifier))))))
 
 ====================
-Await identifiers before following assignments
+Module await before following assignments
 ====================
 
 await
@@ -3282,18 +3317,51 @@ foo.bar;
 ---
 
 (program
-  (expression_statement (identifier))
-  (expression_statement (assignment_expression (identifier) (number)))
-  (expression_statement (identifier))
-  (expression_statement (augmented_assignment_expression (identifier) (number)))
-  (expression_statement (identifier))
-  (expression_statement (assignment_expression (member_expression (identifier) (property_identifier)) (number)))
-  (expression_statement (identifier))
-  (expression_statement (augmented_assignment_expression (subscript_expression (identifier) (identifier)) (number)))
-  (expression_statement (identifier))
-  (expression_statement (assignment_expression (member_expression (call_expression (identifier) (arguments)) (property_identifier)) (number)))
-  (expression_statement (binary_expression (await_expression (identifier)) (number)))
-  (expression_statement (await_expression (member_expression (identifier) (property_identifier)))))
+  (expression_statement
+    (await_expression
+      (identifier))
+    (ERROR
+      (number)))
+  (expression_statement
+    (binary_expression
+      (await_expression
+        (identifier))
+      (ERROR)
+      (number)))
+  (expression_statement
+    (await_expression
+      (member_expression
+        (identifier)
+        (property_identifier)))
+    (ERROR
+      (number)))
+  (expression_statement
+    (binary_expression
+      (await_expression
+        (subscript_expression
+          (identifier)
+          (identifier)))
+      (ERROR)
+      (number)))
+  (expression_statement
+    (await_expression
+      (member_expression
+        (call_expression
+          (identifier)
+          (arguments))
+        (property_identifier)))
+    (ERROR
+      (number)))
+  (expression_statement
+    (binary_expression
+      (await_expression
+        (identifier))
+      (number)))
+  (expression_statement
+    (await_expression
+      (member_expression
+        (identifier)
+        (property_identifier)))))
 
 ====================
 Await identifiers before yield operand starts
@@ -3969,7 +4037,7 @@ function g() {
 
 
 ====================
-Await yield identifiers before member assignments
+Module await yield before member assignments
 ====================
 
 await
@@ -3985,12 +4053,11 @@ function f() {
 
 (program
   (expression_statement
-    (identifier))
-  (expression_statement
-    (assignment_expression
+    (await_expression
       (member_expression
-        (yield_expression)
-        (property_identifier))
+        (identifier)
+        (property_identifier)))
+    (ERROR
       (number)))
   (function_declaration
     (identifier)
@@ -4054,3 +4121,19 @@ undefined++;
   (expression_statement
     (update_expression
       (undefined))))
+
+====================
+Module await before contextual-word statement boundaries
+====================
+
+await
+using
+value;
+await
+async
+value => value;
+const sentinel = 1;
+
+---
+
+(program (expression_statement (await_expression (identifier))) (expression_statement (identifier)) (expression_statement (await_expression (identifier))) (expression_statement (arrow_function (identifier) (identifier))) (lexical_declaration (variable_declarator (identifier) (number))))
