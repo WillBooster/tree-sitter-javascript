@@ -45,6 +45,32 @@ test('distinguishes await identifiers from operators in function bodies and publ
   }
 });
 
+test('keeps of as the operand of await in case values and expression contexts', () => {
+  const parser = new Parser().setLanguage(language);
+  try {
+    for (const source of [
+      'switch(value) { case await of >> of: break; }',
+      'consume(await of);',
+      'flag ? await of : fallback;',
+      'async function f(){ switch(value) { case await of >> of: break; } }',
+    ]) {
+      const tree = parser.parse(source)!;
+      try {
+        expect(tree.rootNode.hasError, source).toBe(false);
+        const awaited = tree.rootNode.descendantsOfType('await_expression')[0]!;
+        expect(awaited.text).toBe('await of');
+        expect(awaited.namedChild(0)!.type).toBe('identifier');
+        expect(awaited.namedChild(0)!.text).toBe('of');
+        expect(awaited.namedChild(0)!.childCount).toBe(0);
+      } finally {
+        tree.delete();
+      }
+    }
+  } finally {
+    parser.delete();
+  }
+});
+
 test('restores outer await context after nested arrows, methods and constructors', () => {
   const parser = new Parser().setLanguage(language);
   try {

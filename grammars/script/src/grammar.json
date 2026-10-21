@@ -9897,6 +9897,10 @@
                     },
                     {
                       "type": "STRING",
+                      "value": "of"
+                    },
+                    {
+                      "type": "STRING",
                       "value": "using"
                     }
                   ]
@@ -10052,6 +10056,10 @@
         {
           "type": "STRING",
           "value": "let"
+        },
+        {
+          "type": "STRING",
+          "value": "of"
         },
         {
           "type": "STRING",
