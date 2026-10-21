@@ -619,62 +619,69 @@ for (var j
 
 (program
   (for_statement
-    initializer: (variable_declaration
-      (variable_declarator
-        name: (identifier))
-      (variable_declarator
-        name: (identifier)))
-    condition: (identifier)
-    increment: (identifier)
+    header: (for_clause
+      initializer: (variable_declaration
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier)))
+      condition: (identifier)
+      increment: (identifier))
     body: (expression_statement
       (identifier)))
   (for_statement
-    initializer: (sequence_expression
-      (assignment_expression
+    header: (for_clause
+      initializer: (sequence_expression
+        (assignment_expression
+          left: (identifier)
+          right: (number))
+        (call_expression
+          function: (identifier)
+          arguments: (arguments)))
+      condition: (binary_expression
         left: (identifier)
         right: (number))
-      (call_expression
-        function: (identifier)
-        arguments: (arguments)))
-    condition: (binary_expression
-      left: (identifier)
-      right: (number))
-    increment: (update_expression
-      argument: (identifier))
+      increment: (update_expression
+        argument: (identifier)))
     body: (expression_statement
       (call_expression
         function: (identifier)
         arguments: (arguments
           (identifier)))))
   (for_statement
-    initializer: (empty_statement)
-    condition: (empty_statement)
+    header: (for_clause
+      initializer: (empty_statement)
+      condition: (empty_statement))
     body: (statement_block
       (expression_statement
         (identifier))
       (continue_statement)))
   (for_statement
-    initializer: (variable_declaration
-      (variable_declarator
-        name: (identifier)
-        value: (number)))
-    condition: (binary_expression
-      left: (identifier)
-      right: (identifier))
-    increment: (update_expression
-      argument: (identifier))
+    header: (for_clause
+      initializer: (variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number)))
+      condition: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      increment: (update_expression
+        argument: (identifier)))
     body: (statement_block))
   (for_in_statement
-    left: (identifier)
-    right: (object)
+    header: (for_in_clause
+      left: (identifier)
+      right: (object))
     body: (empty_statement))
   (for_in_statement
-    left: (identifier)
-    right: (identifier)
+    header: (for_in_clause
+      left: (identifier)
+      right: (identifier))
     body: (empty_statement))
   (for_in_statement
-    left: (identifier)
-    right: (identifier)
+    header: (for_in_clause
+      left: (identifier)
+      right: (identifier))
     body: (empty_statement)))
 
 ============================================
@@ -707,33 +714,7 @@ for (var foo = bar in baz) {}
 
 (program
   (for_in_statement
-    (identifier)
-    (identifier)
-    (expression_statement
-      (call_expression
-        (identifier)
-        (arguments))))
-  (for_in_statement
-    (identifier)
-    (binary_expression
-      (identifier)
-      (object))
-    (expression_statement
-      (call_expression
-        (identifier)
-        (arguments))))
-  (for_in_statement
-    (object_pattern
-      (shorthand_property_identifier_pattern))
-    (identifier)
-    (expression_statement
-      (call_expression
-        (identifier)
-        (arguments))))
-  (for_in_statement
-    (identifier)
-    (sequence_expression
-      (identifier)
+    (for_in_clause
       (identifier)
       (identifier))
     (expression_statement
@@ -741,32 +722,67 @@ for (var foo = bar in baz) {}
         (identifier)
         (arguments))))
   (for_in_statement
-    (subscript_expression
+    (for_in_clause
+      (identifier)
+      (binary_expression
+        (identifier)
+        (object)))
+    (expression_statement
+      (call_expression
+        (identifier)
+        (arguments))))
+  (for_in_statement
+    (for_in_clause
+      (object_pattern
+        (shorthand_property_identifier_pattern))
+      (identifier))
+    (expression_statement
+      (call_expression
+        (identifier)
+        (arguments))))
+  (for_in_statement
+    (for_in_clause
+      (identifier)
+      (sequence_expression
+        (identifier)
+        (identifier)
+        (identifier)))
+    (expression_statement
+      (call_expression
+        (identifier)
+        (arguments))))
+  (for_in_statement
+    (for_in_clause
+      (subscript_expression
+        (identifier)
+        (identifier))
+      (identifier))
+    (statement_block))
+  (for_in_statement
+    (for_in_clause
+      (member_expression
+        (identifier)
+        (property_identifier))
+      (identifier))
+    (statement_block))
+  (for_in_statement
+    (for_in_clause
+      (array_pattern
+        (identifier)
+        (identifier))
+      (identifier))
+    (statement_block))
+  (for_in_statement
+    (for_in_clause
+      (parenthesized_expression
+        (identifier))
+      (identifier))
+    (statement_block))
+  (for_in_statement
+    (for_in_clause
+      (identifier)
       (identifier)
       (identifier))
-    (identifier)
-    (statement_block))
-  (for_in_statement
-    (member_expression
-      (identifier)
-      (property_identifier))
-    (identifier)
-    (statement_block))
-  (for_in_statement
-    (array_pattern
-      (identifier)
-      (identifier))
-    (identifier)
-    (statement_block))
-  (for_in_statement
-    (parenthesized_expression
-      (identifier))
-    (identifier)
-    (statement_block))
-  (for_in_statement
-    (identifier)
-    (identifier)
-    (identifier)
     (statement_block)))
 
 ==========================================
@@ -781,18 +797,19 @@ for (key in something && i = 0; i < n; i++) {
 
 (program
   (for_statement
-    (binary_expression
+    (for_clause
+      (binary_expression
+        (binary_expression
+          (identifier)
+          (identifier))
+        (assignment_expression
+          (identifier)
+          (number)))
       (binary_expression
         (identifier)
         (identifier))
-      (assignment_expression
-        (identifier)
-        (number)))
-    (binary_expression
-      (identifier)
-      (identifier))
-    (update_expression
-      (identifier))
+      (update_expression
+        (identifier)))
     (statement_block
       (expression_statement
         (call_expression
@@ -813,20 +830,22 @@ for (let {a, b} of items || [])
 
 (program
   (for_in_statement
-    (identifier)
-    (identifier)
+    (for_in_clause
+      (identifier)
+      (identifier))
     (expression_statement
       (call_expression
         (identifier)
         (arguments
           (identifier)))))
   (for_in_statement
-    (object_pattern
-      (shorthand_property_identifier_pattern)
-      (shorthand_property_identifier_pattern))
-    (binary_expression
-      (identifier)
-      (array))
+    (for_in_clause
+      (object_pattern
+        (shorthand_property_identifier_pattern)
+        (shorthand_property_identifier_pattern))
+      (binary_expression
+        (identifier)
+        (array)))
     (expression_statement
       (call_expression
         (identifier)
@@ -846,8 +865,9 @@ for await (const chunk of stream) {
 
 (program
   (for_in_statement
-    (identifier)
-    (identifier)
+    (for_in_clause
+      (identifier)
+      (identifier))
     (statement_block
       (expression_statement
         (augmented_assignment_expression
@@ -928,8 +948,9 @@ while (0);
     condition: (parenthesized_expression
       (identifier)))
   (for_in_statement
-    left: (identifier)
-    right: (identifier)
+    header: (for_in_clause
+      left: (identifier)
+      right: (identifier))
     body: (statement_block
       (do_statement
         body: (empty_statement)
@@ -1038,20 +1059,41 @@ for (using of = i(); ; ) {}
 
 (program
   (for_statement
-    (using_declaration
-      (variable_declarator (identifier) (call_expression (identifier) (arguments)))
-      (variable_declarator (identifier) (call_expression (identifier) (arguments))))
-    (member_expression (identifier) (property_identifier))
+    (for_clause
+      (using_declaration
+        (variable_declarator
+          (identifier)
+          (call_expression
+            (identifier)
+            (arguments)))
+        (variable_declarator
+          (identifier)
+          (call_expression
+            (identifier)
+            (arguments))))
+      (member_expression
+        (identifier)
+        (property_identifier)))
     (statement_block))
   (for_statement
-    (using_declaration
-      (variable_declarator (identifier) (call_expression (identifier) (arguments))))
-    (empty_statement)
+    (for_clause
+      (using_declaration
+        (variable_declarator
+          (identifier)
+          (call_expression
+            (identifier)
+            (arguments))))
+      (empty_statement))
     (statement_block))
   (for_statement
-    (using_declaration
-      (variable_declarator (identifier) (call_expression (identifier) (arguments))))
-    (empty_statement)
+    (for_clause
+      (using_declaration
+        (variable_declarator
+          (identifier)
+          (call_expression
+            (identifier)
+            (arguments))))
+      (empty_statement))
     (statement_block)))
 
 ============================================
@@ -1074,29 +1116,51 @@ async function f() {
 
 (program
   (expression_statement
-    (assignment_expression (identifier) (number)))
-  (expression_statement
     (assignment_expression
-      (member_expression (identifier) (property_identifier))
+      (identifier)
       (number)))
   (expression_statement
     (assignment_expression
-      (subscript_expression (identifier) (number))
+      (member_expression
+        (identifier)
+        (property_identifier))
       (number)))
   (expression_statement
-    (call_expression (identifier) (arguments (identifier))))
-  (expression_statement (identifier))
+    (assignment_expression
+      (subscript_expression
+        (identifier)
+        (number))
+      (number)))
   (expression_statement
-    (assignment_expression (identifier) (number)))
+    (call_expression
+      (identifier)
+      (arguments
+        (identifier))))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (assignment_expression
+      (identifier)
+      (number)))
   (labeled_statement
     (statement_identifier)
-    (for_statement (empty_statement) (empty_statement) (statement_block)))
-  (for_in_statement (identifier) (identifier) (statement_block))
+    (for_statement
+      (for_clause
+        (empty_statement)
+        (empty_statement))
+      (statement_block)))
+  (for_in_statement
+    (for_in_clause
+      (identifier)
+      (identifier))
+    (statement_block))
   (function_declaration
     (identifier)
     (formal_parameters)
     (statement_block
-      (expression_statement (await_expression (identifier))))))
+      (expression_statement
+        (await_expression
+          (identifier))))))
 
 ============================================
 Using declarations in for loops
@@ -1114,8 +1178,9 @@ for await (await using resource of resources) {
 
 (program
   (for_in_statement
-    (identifier)
-    (identifier)
+    (for_in_clause
+      (identifier)
+      (identifier))
     (statement_block
       (expression_statement
         (call_expression
@@ -1123,8 +1188,9 @@ for await (await using resource of resources) {
           (arguments
             (identifier))))))
   (for_in_statement
-    (identifier)
-    (identifier)
+    (for_in_clause
+      (identifier)
+      (identifier))
     (statement_block
       (expression_statement
         (call_expression
@@ -1144,15 +1210,17 @@ const of = 2;
 
 (program
   (for_in_statement
-    (identifier)
-    (array)
+    (for_in_clause
+      (identifier)
+      (array))
     (break_statement))
   (for_statement
-    (lexical_declaration
-      (variable_declarator
-        (identifier)
-        (string)))
-    (empty_statement)
+    (for_clause
+      (lexical_declaration
+        (variable_declarator
+          (identifier)
+          (string)))
+      (empty_statement))
     (break_statement))
   (lexical_declaration
     (variable_declarator
@@ -1561,8 +1629,9 @@ while (true) {
   (labeled_statement
     label: (statement_identifier)
     body: (for_statement
-      initializer: (empty_statement)
-      condition: (empty_statement)
+      header: (for_clause
+        initializer: (empty_statement)
+        condition: (empty_statement))
       body: (statement_block
         (if_statement
           condition: (parenthesized_expression
@@ -1923,15 +1992,17 @@ inCase; }
   (expression_statement
     (identifier))
   (for_statement
-    (empty_statement)
-    (empty_statement)
+    (for_clause
+      (empty_statement)
+      (empty_statement))
     (expression_statement
       (identifier)))
   (expression_statement
     (identifier))
   (for_in_statement
-    (identifier)
-    (identifier)
+    (for_in_clause
+      (identifier)
+      (identifier))
     (expression_statement
       (identifier)))
   (expression_statement

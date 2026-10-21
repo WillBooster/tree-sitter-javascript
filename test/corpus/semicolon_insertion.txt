@@ -218,31 +218,67 @@ if (p) { var q }
 ---
 
 (program
-  (if_statement (parenthesized_expression (identifier)) (statement_block
-    (if_statement
-      (parenthesized_expression (identifier))
-      (return_statement (identifier)))))
-  (if_statement (parenthesized_expression (identifier)) (statement_block
-    (for_statement
-      (empty_statement)
-      (empty_statement)
-      (break_statement))))
-  (if_statement (parenthesized_expression (identifier)) (statement_block
-    (for_in_statement (identifier) (identifier)
-      (break_statement))))
-  (if_statement (parenthesized_expression (identifier)) (statement_block
-    (for_in_statement (identifier) (identifier)
-      (continue_statement))))
-  (if_statement (parenthesized_expression (identifier)) (statement_block
-    (while_statement
-      (parenthesized_expression (identifier))
-      (break_statement))))
-  (if_statement (parenthesized_expression (identifier)) (statement_block
-    (do_statement
-      (statement_block (expression_statement (identifier)))
-      (parenthesized_expression (identifier)))))
-  (if_statement (parenthesized_expression (identifier)) (statement_block
-    (variable_declaration (variable_declarator (identifier))))))
+  (if_statement
+    (parenthesized_expression
+      (identifier))
+    (statement_block
+      (if_statement
+        (parenthesized_expression
+          (identifier))
+        (return_statement
+          (identifier)))))
+  (if_statement
+    (parenthesized_expression
+      (identifier))
+    (statement_block
+      (for_statement
+        (for_clause
+          (empty_statement)
+          (empty_statement))
+        (break_statement))))
+  (if_statement
+    (parenthesized_expression
+      (identifier))
+    (statement_block
+      (for_in_statement
+        (for_in_clause
+          (identifier)
+          (identifier))
+        (break_statement))))
+  (if_statement
+    (parenthesized_expression
+      (identifier))
+    (statement_block
+      (for_in_statement
+        (for_in_clause
+          (identifier)
+          (identifier))
+        (continue_statement))))
+  (if_statement
+    (parenthesized_expression
+      (identifier))
+    (statement_block
+      (while_statement
+        (parenthesized_expression
+          (identifier))
+        (break_statement))))
+  (if_statement
+    (parenthesized_expression
+      (identifier))
+    (statement_block
+      (do_statement
+        (statement_block
+          (expression_statement
+            (identifier)))
+        (parenthesized_expression
+          (identifier)))))
+  (if_statement
+    (parenthesized_expression
+      (identifier))
+    (statement_block
+      (variable_declaration
+        (variable_declarator
+          (identifier))))))
 
 =====================================================
 Single-line declarations without semicolons
@@ -464,31 +500,62 @@ function* f() {
     (formal_parameters)
     (statement_block
       (return_statement)
-      (expression_statement (parenthesized_expression (identifier)))
-      (expression_statement (yield_expression))
-      (expression_statement (array (identifier)))
-      (expression_statement (yield_expression))
+      (expression_statement
+        (parenthesized_expression
+          (identifier)))
+      (expression_statement
+        (yield_expression))
+      (expression_statement
+        (array
+          (identifier)))
+      (expression_statement
+        (yield_expression))
       (comment)
-      (expression_statement (unary_expression (identifier)))
-      (return_statement (comment) (parenthesized_expression (identifier)))
-      (expression_statement (call_expression (identifier) (arguments (yield_expression (identifier)))))
+      (expression_statement
+        (unary_expression
+          (identifier)))
+      (return_statement
+        (comment)
+        (parenthesized_expression
+          (identifier)))
+      (expression_statement
+        (call_expression
+          (identifier)
+          (arguments
+            (yield_expression
+              (identifier)))))
       (lexical_declaration
-        (variable_declarator (identifier) (yield_expression))
-        (variable_declarator (identifier) (number)))
+        (variable_declarator
+          (identifier)
+          (yield_expression))
+        (variable_declarator
+          (identifier)
+          (number)))
       (expression_statement
         (assignment_expression
           (identifier)
-          (ternary_expression (identifier) (yield_expression) (identifier))))
+          (ternary_expression
+            (identifier)
+            (yield_expression)
+            (identifier))))
       (debugger_statement)
-      (expression_statement (parenthesized_expression (identifier)))
+      (expression_statement
+        (parenthesized_expression
+          (identifier)))
       (for_statement
-        (empty_statement)
-        (empty_statement)
+        (for_clause
+          (empty_statement)
+          (empty_statement))
         (statement_block
           (break_statement)
-          (expression_statement (parenthesized_expression (identifier)))
-          (continue_statement (statement_identifier))
-          (expression_statement (array (identifier))))))))
+          (expression_statement
+            (parenthesized_expression
+              (identifier)))
+          (continue_statement
+            (statement_identifier))
+          (expression_statement
+            (array
+              (identifier))))))))
 
 ============================================
 Line breaks after declarations without initializers
