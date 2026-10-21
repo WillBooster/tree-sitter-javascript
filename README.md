@@ -19,8 +19,8 @@ This fork fixes parsing bugs and raises conformance with [ECMAScript (ECMA-262)]
 
 The npm package ships two languages for
 [@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter), which runs in Node.js, Bun,
-browsers, and Cloudflare Workers. The parser carries the ABI number of WillBooster/tree-sitter (`0x57420006`), so it
-loads only with that runtime, version 7.0.5 or newer within major 7; the upstream runtime rejects it. In Node.js and Bun, load it from
+browsers, and Cloudflare Workers. The parser carries the ABI number of WillBooster/tree-sitter (`0x57420007`), so it
+requires that runtime ABI; the upstream runtime rejects it. This package is tested with runtime 10.0.1, and its optional peer dependency covers major 10. In Node.js and Bun, load it from
 the package. Choose `tree-sitter-javascript.wasm` for the Module goal, or
 `tree-sitter-javascript_script.wasm` for the Script goal. The source goal comes from the host or file type;
 `.mjs` uses Module and `.cjs` uses Script, while `.js` depends on the host. For example, `await\nvalue` is one
@@ -72,12 +72,12 @@ The package also ships the node types in `src/node-types.json`, the highlight, i
 `require('@willbooster/tree-sitter-javascript/grammar')`). The crate ships `tree-sitter.json` and `queries/` too.
 
 In Rust, depend on the [crate](https://crates.io/crates/willbooster-tree-sitter-javascript) and the
-[willbooster-tree-sitter](https://crates.io/crates/willbooster-tree-sitter) runtime, 7.0.5 or newer within major 7:
+[willbooster-tree-sitter](https://crates.io/crates/willbooster-tree-sitter) runtime with the matching ABI. The tested version is 10.0.1:
 
 ```toml
 [dependencies]
-tree-sitter = { package = "willbooster-tree-sitter", version = "7.0.5" }
-tree-sitter-javascript = { package = "willbooster-tree-sitter-javascript", version = "8" }
+tree-sitter = { package = "willbooster-tree-sitter", version = "10.0.1" }
+tree-sitter-javascript = { package = "willbooster-tree-sitter-javascript", version = "9" }
 ```
 
 ```rust
