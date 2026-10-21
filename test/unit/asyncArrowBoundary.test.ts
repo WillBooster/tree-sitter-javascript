@@ -17,7 +17,7 @@ test.each(['javascript', 'javascript_script'])(
     const captures = (node: Node): unknown =>
       queries.map((q) => q.captures(node).map((c) => [c.name, snapshot(c.node)]));
     try {
-      for (const parameter of ['value', '(value)', '({value})']) {
+      for (const parameter of ['value', '(value)', '({value})', 'of']) {
         for (const lineBreak of LineBreaks) {
           let source = `consume(async /* same line */ ${parameter} => value);\n${Following}`;
           let tree = parser.parse(source)!;
@@ -25,7 +25,9 @@ test.each(['javascript', 'javascript_script'])(
             expect(tree.rootNode.hasError).toBe(false);
             const arrow = tree.rootNode.descendantsOfType('arrow_function')[0]!;
             expect(arrow.children.find((node) => node.type === 'async')!.text).toBe('async');
-            expect(arrow.childForFieldName(parameter === 'value' ? 'parameter' : 'parameters')!.text).toBe(parameter);
+            expect(arrow.childForFieldName(parameter.startsWith('(') ? 'parameters' : 'parameter')!.text).toBe(
+              parameter
+            );
             const start = source.indexOf('/* same line */');
             for (const [before, after, hasError] of [
               ['/* same line */', lineBreak, true],
@@ -129,6 +131,76 @@ async: while (flag) { break async; }
       }
     } finally {
       for (const query of queries) query.delete();
+      parser.delete();
+    }
+  }
+);
+
+test.each(['javascript', 'javascript_script'])(
+  'keeps of as an async arrow parameter in %s expression contexts',
+  async (goal) => {
+    await Parser.init();
+    const language = await Language.load(`tree-sitter-${goal}.wasm`);
+    const parser = new Parser().setLanguage(language);
+    const query = new Query(language, '(arrow_function parameter: (identifier) @parameter)');
+    try {
+      for (const [before, after] of [
+        ['consume(', ');'],
+        ['switch(value) { case ', ': break; }'],
+        ['flag ? ', ' : fallback;'],
+        ['do work(); while (', ');'],
+        ['const arrow = ', ';'],
+        ['const array = [', '];'],
+      ]) {
+        for (const gap of [' ', ' /* same line */ ']) {
+          let source = `${before}async${gap}of => of${after}\n${Following}`;
+          let tree = parser.parse(source)!;
+          let oldParameter = 'of';
+          try {
+            for (const parameter of ['of', 'ofValue', 'of']) {
+              const arrowStart = source.indexOf('async');
+              const start = arrowStart + 5 + gap.length;
+              const next = source.slice(0, start) + parameter + source.slice(start + oldParameter.length);
+              tree.edit(
+                new Edit({
+                  startIndex: start,
+                  oldEndIndex: start + oldParameter.length,
+                  newEndIndex: start + parameter.length,
+                  startPosition: point(source, start),
+                  oldEndPosition: point(source, start + oldParameter.length),
+                  newEndPosition: point(next, start + parameter.length),
+                })
+              );
+              const previous = tree;
+              tree = parser.parse(next, previous)!;
+              previous.delete();
+              source = next;
+              oldParameter = parameter;
+              const fresh = parser.parse(source)!;
+              try {
+                expect(tree.rootNode.hasError, source).toBe(false);
+                const arrow = tree.rootNode.descendantsOfType('arrow_function')[0]!;
+                expect(arrow.text).toBe(`async${gap}${parameter} => of`);
+                expect(arrow.children.find((node) => node.type === 'async')!.text).toBe('async');
+                const binding = arrow.childForFieldName('parameter')!;
+                expect(binding.text).toBe(parameter);
+                expect(binding.childCount).toBe(0);
+                expect(binding.startIndex).toBe(start);
+                expect(binding.endIndex).toBe(start + parameter.length);
+                expect(query.captures(tree.rootNode).map(({ node }) => node.text)).toEqual([parameter]);
+                expect(tree.rootNode.lastNamedChild!.text).toBe(Following);
+                expect(snapshot(tree.rootNode)).toEqual(snapshot(fresh.rootNode));
+              } finally {
+                fresh.delete();
+              }
+            }
+          } finally {
+            tree.delete();
+          }
+        }
+      }
+    } finally {
+      query.delete();
       parser.delete();
     }
   }

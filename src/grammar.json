@@ -2035,56 +2035,60 @@
                       ]
                     },
                     {
-                      "type": "SEQ",
-                      "members": [
-                        {
-                          "type": "FIELD",
-                          "name": "kind",
-                          "content": {
-                            "type": "CHOICE",
-                            "members": [
-                              {
-                                "type": "STRING",
-                                "value": "let"
-                              },
-                              {
-                                "type": "STRING",
-                                "value": "const"
-                              }
-                            ]
-                          }
-                        },
-                        {
-                          "type": "FIELD",
-                          "name": "left",
-                          "content": {
-                            "type": "CHOICE",
-                            "members": [
-                              {
-                                "type": "RESERVED",
-                                "content": {
-                                  "type": "SYMBOL",
-                                  "name": "identifier"
-                                },
-                                "context_name": "lexical"
-                              },
-                              {
-                                "type": "ALIAS",
-                                "content": {
+                      "type": "PREC_DYNAMIC",
+                      "value": 1,
+                      "content": {
+                        "type": "SEQ",
+                        "members": [
+                          {
+                            "type": "FIELD",
+                            "name": "kind",
+                            "content": {
+                              "type": "CHOICE",
+                              "members": [
+                                {
                                   "type": "STRING",
-                                  "value": "of"
+                                  "value": "let"
                                 },
-                                "named": true,
-                                "value": "identifier"
-                              },
-                              {
-                                "type": "SYMBOL",
-                                "name": "_destructuring_pattern"
-                              }
-                            ]
+                                {
+                                  "type": "STRING",
+                                  "value": "const"
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "type": "FIELD",
+                            "name": "left",
+                            "content": {
+                              "type": "CHOICE",
+                              "members": [
+                                {
+                                  "type": "RESERVED",
+                                  "content": {
+                                    "type": "SYMBOL",
+                                    "name": "identifier"
+                                  },
+                                  "context_name": "lexical"
+                                },
+                                {
+                                  "type": "ALIAS",
+                                  "content": {
+                                    "type": "STRING",
+                                    "value": "of"
+                                  },
+                                  "named": true,
+                                  "value": "identifier"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "_destructuring_pattern"
+                                }
+                              ]
+                            }
                           }
-                        }
-                      ]
+                        ]
+                      }
                     }
                   ]
                 },
@@ -9896,6 +9900,10 @@
                     },
                     {
                       "type": "STRING",
+                      "value": "of"
+                    },
+                    {
+                      "type": "STRING",
                       "value": "using"
                     }
                   ]
@@ -10051,6 +10059,10 @@
         {
           "type": "STRING",
           "value": "let"
+        },
+        {
+          "type": "STRING",
+          "value": "of"
         },
         {
           "type": "STRING",
