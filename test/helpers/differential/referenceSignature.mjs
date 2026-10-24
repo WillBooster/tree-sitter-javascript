@@ -1,7 +1,8 @@
+import { SourceTextModule } from 'node:vm';
+
+import { parse } from '@babel/parser';
 import { Parser } from 'acorn';
 import jsx from 'acorn-jsx';
-import { parse } from '@babel/parser';
-import { SourceTextModule } from 'node:vm';
 
 const JsxParser = Parser.extend(jsx());
 const statements = {

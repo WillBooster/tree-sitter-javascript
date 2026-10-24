@@ -2,9 +2,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { expect, test } from 'vitest';
-
 import { Edit, Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { expect, test } from 'vitest';
 
 import treeSitterJson from '../../tree-sitter.json';
 

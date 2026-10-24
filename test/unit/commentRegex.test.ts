@@ -1,7 +1,7 @@
 import path from 'node:path';
 
+import { Edit, Language, type Node, Parser, Query } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
-import { Edit, Language, Parser, Query, type Node } from '@willbooster/web-tree-sitter';
 
 await Parser.init();
 const language = await Language.load(path.join(import.meta.dirname, '../../tree-sitter-javascript.wasm'));
