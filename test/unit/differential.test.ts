@@ -1,5 +1,7 @@
 import path from 'node:path';
+
 import { expect } from 'vitest';
+
 import { testCommand } from './run.js';
 
 testCommand(

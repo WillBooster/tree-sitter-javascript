@@ -5,7 +5,7 @@
 [![Test](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test.yml/badge.svg)](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test.yml)
 [![Test rust](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test-rust.yml/badge.svg)](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test-rust.yml)
 [![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
-[![wbfy](https://img.shields.io/badge/wbfy-20.43.2-1e90ff.svg)](https://github.com/WillBooster/shared/tree/main/packages/wbfy)
+[![wbfy](https://img.shields.io/badge/wbfy-20.48.9-1e90ff.svg)](https://github.com/WillBooster/shared/tree/main/packages/wbfy)
 [![crates.io](https://img.shields.io/crates/v/willbooster-tree-sitter-javascript.svg)](https://crates.io/crates/willbooster-tree-sitter-javascript)
 
 JavaScript and JSX grammar for [tree-sitter](https://github.com/tree-sitter/tree-sitter), forked from
@@ -30,6 +30,7 @@ For the native CLI, select Script with `tree-sitter parse --grammar-path grammar
 
 ```js
 import { fileURLToPath } from 'node:url';
+
 import { Language, Parser } from '@willbooster/web-tree-sitter';
 
 await Parser.init();
@@ -44,9 +45,9 @@ For the Script goal, replace the language import below with
 `@willbooster/tree-sitter-javascript/tree-sitter-javascript_script.wasm?url`:
 
 ```js
+import javascriptUrl from '@willbooster/tree-sitter-javascript/tree-sitter-javascript.wasm?url';
 import { Language, Parser } from '@willbooster/web-tree-sitter';
 import runtimeUrl from '@willbooster/web-tree-sitter/web-tree-sitter.wasm?url'; // Vite
-import javascriptUrl from '@willbooster/tree-sitter-javascript/tree-sitter-javascript.wasm?url';
 
 await Parser.init({ locateFile: () => runtimeUrl });
 const parser = new Parser();
@@ -58,9 +59,9 @@ In Cloudflare Workers, which do not allow compiling Wasm at run time, import the
 below with `@willbooster/tree-sitter-javascript/tree-sitter-javascript_script.wasm`:
 
 ```js
+import javascript from '@willbooster/tree-sitter-javascript/tree-sitter-javascript.wasm';
 import { Language, Parser } from '@willbooster/web-tree-sitter';
 import runtime from '@willbooster/web-tree-sitter/web-tree-sitter.wasm';
-import javascript from '@willbooster/tree-sitter-javascript/tree-sitter-javascript.wasm';
 
 await Parser.init({ wasmModule: runtime });
 const parser = new Parser();

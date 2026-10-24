@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { Parser, Language } from '@willbooster/web-tree-sitter';
+
+import { Language, Parser } from '@willbooster/web-tree-sitter';
+
 import { ProgramGenerator, render } from './programGenerator.mjs';
 import { referenceSignature } from './referenceSignature.mjs';
 import { treeSignature } from './treeSignature.mjs';

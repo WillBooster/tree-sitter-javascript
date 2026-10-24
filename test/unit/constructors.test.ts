@@ -1,8 +1,7 @@
 import path from 'node:path';
 
+import { Edit, Language, type Node, Parser, type Point, Query, type Tree } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
-
-import { Edit, Language, Parser, Query, type Node, type Point, type Tree } from '@willbooster/web-tree-sitter';
 
 const Root = path.join(import.meta.dirname, '../..');
 
