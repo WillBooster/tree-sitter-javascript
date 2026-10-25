@@ -114,6 +114,79 @@ test('ends module declarations before following expression statements across com
   }
 });
 
+test('keeps trailing module comments outside reused declarations after unrelated edits', async () => {
+  await Parser.init();
+  const parser = new Parser().setLanguage(
+    await Language.load(path.join(import.meta.dirname, '../../tree-sitter-javascript.wasm'))
+  );
+  try {
+    for (const declaration of [
+      'import x from "y" with { type: "json" }',
+      'import "y" with {}',
+      'export { a } from "y" with {}',
+      'export * from "y" with {}',
+      'export * as ns from "y" with {}',
+    ]) {
+      for (const separator of [' // note\n', ' /* note\n*/', '\n']) {
+        for (const suffix of ['foo();', '(z);', '[z];', '`tag`;']) {
+          const original = `const a = 1;\n${declaration}${separator}${suffix}`;
+          let source = original;
+          let tree = parser.parse(source)!;
+          try {
+            const valueIndex = original.indexOf('1');
+            for (const [index, length, replacement] of [
+              [valueIndex, 1, '2'],
+              [0, 0, ';'],
+              [0, 1, ''],
+              [valueIndex, 1, '1'],
+            ] as const) {
+              const oldEnd = index + length;
+              const newEnd = index + replacement.length;
+              const next = source.slice(0, index) + replacement + source.slice(oldEnd);
+              tree.edit(
+                new Edit({
+                  startIndex: index,
+                  oldEndIndex: oldEnd,
+                  newEndIndex: newEnd,
+                  startPosition: position(source, index),
+                  oldEndPosition: position(source, oldEnd),
+                  newEndPosition: position(next, newEnd),
+                })
+              );
+              const previous = tree;
+              tree = parser.parse(next, previous)!;
+              previous.delete();
+              source = next;
+              const fresh = parser.parse(source)!;
+              try {
+                expect(tree.rootNode.hasError, source).toBe(false);
+                expect(tree.rootNode.toString(), source).toBe(fresh.rootNode.toString());
+                const statementType = declaration.startsWith('import') ? 'import_statement' : 'export_statement';
+                const statement = tree.rootNode.descendantsOfType(statementType)[0]!;
+                const freshStatement = fresh.rootNode.descendantsOfType(statementType)[0]!;
+                expect(statement.text, source).toBe(declaration);
+                expect([statement.startIndex, statement.endIndex], source).toEqual([
+                  freshStatement.startIndex,
+                  freshStatement.endIndex,
+                ]);
+                for (const comment of tree.rootNode.descendantsOfType('comment')) {
+                  expect(comment.parent?.type, source).toBe('program');
+                }
+              } finally {
+                fresh.delete();
+              }
+            }
+          } finally {
+            tree.delete();
+          }
+        }
+      }
+    }
+  } finally {
+    parser.delete();
+  }
+});
+
 function checkModuleBoundary(parser: Parser, declaration: string, separator: string, suffix: string): void {
   const prefix = `const a = 1; ${declaration}`;
   let previousSemicolon = ';';

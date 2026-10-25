@@ -254,10 +254,9 @@ module.exports = grammar({
         seq(
           'export',
           choice(
-            seq(choice('*', $.namespace_export, $.export_clause), $._from_clause, optional($._import_attributes)),
-            seq(alias($._local_export_clause, $.export_clause), optional(sym('_line_break_before_from')))
-          ),
-          $._semicolon
+            seq(choice('*', $.namespace_export, $.export_clause), $._from_clause, $._module_statement_end),
+            seq(alias($._local_export_clause, $.export_clause), optional(sym('_line_break_before_from')), $._semicolon)
+          )
         ),
         seq(
           'export',
@@ -330,12 +329,7 @@ module.exports = grammar({
     import: () => token('import'),
 
     import_statement: ($) =>
-      seq(
-        'import',
-        choice(seq($.import_clause, $._from_clause), field('source', $.string)),
-        optional($._import_attributes),
-        $._semicolon
-      ),
+      seq('import', choice(seq($.import_clause, $._from_clause), field('source', $.string)), $._module_statement_end),
 
     import_clause: ($) =>
       choice(
@@ -356,10 +350,10 @@ module.exports = grammar({
         seq(field('name', $._module_export_name), 'as', field('alias', $.identifier))
       ),
 
-    _import_attributes: ($) =>
+    _module_statement_end: ($) =>
       choice(
-        seq($.import_attribute, optional(sym('_line_break_ends_statement'))),
-        sym('_line_break_before_attributes')
+        seq($.import_attribute, choice($._semicolon, sym('_line_break_ends_statement'))),
+        seq(optional(sym('_line_break_before_attributes')), $._semicolon)
       ),
 
     import_attribute: ($) => seq('with', $.object),

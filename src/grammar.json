@@ -128,16 +128,8 @@
                       "name": "_from_clause"
                     },
                     {
-                      "type": "CHOICE",
-                      "members": [
-                        {
-                          "type": "SYMBOL",
-                          "name": "_import_attributes"
-                        },
-                        {
-                          "type": "BLANK"
-                        }
-                      ]
+                      "type": "SYMBOL",
+                      "name": "_module_statement_end"
                     }
                   ]
                 },
@@ -164,14 +156,14 @@
                           "type": "BLANK"
                         }
                       ]
+                    },
+                    {
+                      "type": "SYMBOL",
+                      "name": "_semicolon"
                     }
                   ]
                 }
               ]
-            },
-            {
-              "type": "SYMBOL",
-              "name": "_semicolon"
             }
           ]
         },
@@ -812,20 +804,8 @@
           ]
         },
         {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "SYMBOL",
-              "name": "_import_attributes"
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
           "type": "SYMBOL",
-          "name": "_semicolon"
+          "name": "_module_statement_end"
         }
       ]
     },
@@ -1011,7 +991,7 @@
         }
       ]
     },
-    "_import_attributes": {
+    "_module_statement_end": {
       "type": "CHOICE",
       "members": [
         {
@@ -1026,18 +1006,36 @@
               "members": [
                 {
                   "type": "SYMBOL",
-                  "name": "_line_break_ends_statement"
+                  "name": "_semicolon"
                 },
                 {
-                  "type": "BLANK"
+                  "type": "SYMBOL",
+                  "name": "_line_break_ends_statement"
                 }
               ]
             }
           ]
         },
         {
-          "type": "SYMBOL",
-          "name": "_line_break_before_attributes"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_line_break_before_attributes"
+                },
+                {
+                  "type": "BLANK"
+                }
+              ]
+            },
+            {
+              "type": "SYMBOL",
+              "name": "_semicolon"
+            }
+          ]
         }
       ]
     },
