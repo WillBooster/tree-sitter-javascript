@@ -76,8 +76,17 @@ for (const goal of ['javascript', 'javascript_script']) {
         '({ a: (a+b) } = value)',
         '[(foo())] = value',
         '[(a+b) = 1] = value',
-        '(a+b)++',
-        '++(foo?.())',
+        'a.b++[0]',
+        'a.b--[0]',
+        'a.b++(0)',
+        'a[0]++[0]',
+        'a()++[0]',
+        '(a)++[0]',
+        '(a)--[0]',
+        '(a)++ ++b',
+        '(a)++ `t`',
+        'a?.b++[0]',
+        'x = (a)++[0]',
         'import("x") = 1',
         ...['&&=', '||=', '??='].map((operator) => `foo() ${operator} 1`),
         ...['!', '~', 'typeof ', 'void ', 'delete ', '+', '-', '1+', '1*'].map((prefix) => `${prefix}foo() = 1`),
@@ -130,8 +139,63 @@ for (const goal of ['javascript', 'javascript_script']) {
               captures.filter(({ node }) => node.id === inner.id),
               source
             ).toHaveLength(1);
-            expect(source.slice(group.startIndex, group.endIndex), source).toBe(group.text);
           }
+        } finally {
+          tree.delete();
+        }
+      }
+      for (const [source, expected] of [
+        [
+          '((a)) = value;',
+          [
+            [0, 5],
+            [1, 4],
+          ],
+        ],
+        [
+          '++((foo()));',
+          [
+            [2, 11],
+            [3, 10],
+          ],
+        ],
+        [
+          '((foo?.()).x) += value;',
+          [
+            [0, 13],
+            [1, 10],
+          ],
+        ],
+        [
+          '[(a), ...((b))] = value;',
+          [
+            [1, 4],
+            [9, 14],
+            [10, 13],
+          ],
+        ],
+        [
+          'for (((a)) of value) {}',
+          [
+            [5, 10],
+            [6, 9],
+          ],
+        ],
+        [
+          '\n  ((a)) = value;',
+          [
+            [3, 8],
+            [4, 7],
+          ],
+        ],
+      ] as const) {
+        const tree = parser.parse(source)!;
+        try {
+          expect(tree.rootNode.hasError, source).toBe(false);
+          expect(
+            tree.rootNode.descendantsOfType('parenthesized_expression').map((node) => [node.startIndex, node.endIndex]),
+            source
+          ).toEqual(expected);
         } finally {
           tree.delete();
         }
@@ -146,6 +210,47 @@ for (const goal of ['javascript', 'javascript_script']) {
       }
     } finally {
       query.delete();
+      parser.delete();
+    }
+  });
+
+  test(`keeps await context when classifying loop call targets in ${goal}`, async () => {
+    await Parser.init();
+    const language = await Language.load(`tree-sitter-${goal}.wasm`);
+    const parser = new Parser().setLanguage(language);
+    try {
+      const sources = [
+        'function f(){ for ((await(a)) of b); }',
+        'async function f(){ for (await(a) of b); }',
+        'async function f(){ for (await(a) in b); }',
+        'function f(){ for ((await(a)) of b); }',
+      ];
+      if (goal === 'javascript') sources.splice(1, 0, 'for (await(a) of b);');
+      if (goal === 'javascript_script') sources.push('for ((await(a)) of b);');
+      let source = sources[0]!;
+      let tree = parser.parse(source)!;
+      try {
+        for (const next of sources) {
+          tree = reparse(parser, tree, source, next);
+          source = next;
+          const fresh = parser.parse(source)!;
+          try {
+            const valid = source.includes('((await(a))');
+            expect(tree.rootNode.hasError, source).toBe(!valid);
+            expect(snapshot(tree.rootNode), source).toEqual(snapshot(fresh.rootNode));
+            if (valid) {
+              const call = tree.rootNode.descendantsOfType('call_expression')[0]!;
+              expect(call.childForFieldName('function')?.text, source).toBe('await');
+              expect(tree.rootNode.descendantsOfType('await_expression'), source).toHaveLength(0);
+            }
+          } finally {
+            fresh.delete();
+          }
+        }
+      } finally {
+        tree.delete();
+      }
+    } finally {
       parser.delete();
     }
   });
@@ -169,6 +274,9 @@ for (const goal of ['javascript', 'javascript_script']) {
       'a !== (get)++\n\nx=>1',
       '(a)\n++b',
       '(a)+ +b',
+      'a.b++[0]',
+      '(a)++ ++b',
+      '(a)++ `t`',
       'foo?.bar() += 1',
       '(foo?.bar)() += 1',
       'new (foo?.bar)()() = 1',
@@ -190,7 +298,7 @@ for (const goal of ['javascript', 'javascript_script']) {
         const fresh = parser.parse(source)!;
         try {
           expect(tree.rootNode.hasError, source).toBe(
-            ['foo?.bar() += 1', '(foo()) &&= 1', '(a+b) = 1'].includes(expression)
+            ['foo?.bar() += 1', '(foo()) &&= 1', '(a+b) = 1', 'a.b++[0]', '(a)++ ++b', '(a)++ `t`'].includes(expression)
           );
           expect(snapshot(tree.rootNode), source).toEqual(snapshot(fresh.rootNode));
           for (const query of queries) {

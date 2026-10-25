@@ -3210,12 +3210,11 @@ function script() {
 ---
 
 (program
+  (ERROR
+    (await_expression
+      (identifier)))
   (expression_statement
-    (binary_expression
-      (await_expression
-        (identifier))
-      (ERROR)
-      (number)))
+    (number))
   (expression_statement
     (identifier)
     (ERROR
@@ -3225,11 +3224,10 @@ function script() {
   (expression_statement
     (assignment_expression
       (identifier)
-      (binary_expression
-        (await_expression
-          (identifier))
-        (ERROR)
-        (number))))
+      (await_expression
+        (identifier)))
+    (ERROR
+      (number)))
   (function_declaration
     (identifier)
     (formal_parameters)

@@ -2098,8 +2098,13 @@
                             "value": "parenthesized_expression"
                           },
                           {
-                            "type": "SYMBOL",
-                            "name": "_classic_call_target"
+                            "type": "ALIAS",
+                            "content": {
+                              "type": "SYMBOL",
+                              "name": "_parenthesized_call_target"
+                            },
+                            "named": true,
+                            "value": "parenthesized_expression"
                           }
                         ]
                       }
@@ -6880,27 +6885,8 @@
       "value": "primary_expression"
     },
     "_call_target_primary": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_assignment_call"
-          },
-          "named": true,
-          "value": "call_expression"
-        },
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_parenthesized_call_target"
-          },
-          "named": true,
-          "value": "parenthesized_expression"
-        }
-      ]
+      "type": "SYMBOL",
+      "name": "_classic_call_target"
     },
     "_parenthesized_call_target": {
       "type": "SEQ",
@@ -8459,114 +8445,87 @@
         ]
       }
     },
-    "_update_target": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_simple_target_primary"
-          },
-          "named": true,
-          "value": "primary_expression"
-        },
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_call_target_primary"
-          },
-          "named": true,
-          "value": "primary_expression"
-        }
-      ]
-    },
     "update_expression": {
-      "type": "PREC_DYNAMIC",
-      "value": 1,
+      "type": "PREC_LEFT",
+      "value": 0,
       "content": {
-        "type": "PREC_LEFT",
-        "value": 0,
-        "content": {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "FIELD",
-                  "name": "argument",
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "FIELD",
+                "name": "argument",
+                "content": {
+                  "type": "ALIAS",
                   "content": {
-                    "type": "ALIAS",
-                    "content": {
-                      "type": "SYMBOL",
-                      "name": "_update_target"
-                    },
-                    "named": true,
-                    "value": "expression"
-                  }
-                },
-                {
-                  "type": "FIELD",
-                  "name": "operator",
-                  "content": {
-                    "type": "CHOICE",
-                    "members": [
-                      {
-                        "type": "STRING",
-                        "value": "++"
-                      },
-                      {
-                        "type": "STRING",
-                        "value": "--"
-                      }
-                    ]
-                  }
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "_postfix_update_end"
+                    "type": "SYMBOL",
+                    "name": "_unary_operand"
+                  },
+                  "named": true,
+                  "value": "expression"
                 }
-              ]
-            },
-            {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "FIELD",
-                  "name": "operator",
-                  "content": {
-                    "type": "CHOICE",
-                    "members": [
-                      {
-                        "type": "STRING",
-                        "value": "++"
-                      },
-                      {
-                        "type": "STRING",
-                        "value": "--"
-                      }
-                    ]
-                  }
-                },
-                {
-                  "type": "FIELD",
-                  "name": "argument",
-                  "content": {
-                    "type": "ALIAS",
-                    "content": {
-                      "type": "SYMBOL",
-                      "name": "_update_target"
+              },
+              {
+                "type": "FIELD",
+                "name": "operator",
+                "content": {
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "STRING",
+                      "value": "++"
                     },
-                    "named": true,
-                    "value": "expression"
-                  }
+                    {
+                      "type": "STRING",
+                      "value": "--"
+                    }
+                  ]
                 }
-              ]
-            }
-          ]
-        }
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_postfix_update_end"
+              }
+            ]
+          },
+          {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "FIELD",
+                "name": "operator",
+                "content": {
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "STRING",
+                      "value": "++"
+                    },
+                    {
+                      "type": "STRING",
+                      "value": "--"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "FIELD",
+                "name": "argument",
+                "content": {
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_unary_operand"
+                  },
+                  "named": true,
+                  "value": "expression"
+                }
+              }
+            ]
+          }
+        ]
       }
     },
     "sequence_expression": {
@@ -11099,20 +11058,12 @@
   ],
   "conflicts": [
     [
-      "for_in_clause",
-      "_simple_target_primary"
-    ],
-    [
       "_primary_atom",
       "_simple_target_primary"
     ],
     [
       "_simple_target_primary",
       "pattern"
-    ],
-    [
-      "_simple_target_primary",
-      "await_expression"
     ],
     [
       "_primary_atom",
@@ -11654,8 +11605,7 @@
     "_simple_target_expression",
     "_simple_target_primary",
     "_call_target_expression",
-    "_call_target_primary",
-    "_update_target"
+    "_call_target_primary"
   ],
   "reserved": {
     "global": [

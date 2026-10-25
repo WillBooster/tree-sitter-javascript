@@ -1392,10 +1392,6 @@
             "named": true
           },
           {
-            "type": "call_expression",
-            "named": true
-          },
-          {
             "type": "identifier",
             "named": true
           },

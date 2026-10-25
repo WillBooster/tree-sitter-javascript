@@ -156,7 +156,6 @@ module.exports = grammar({
     $._simple_target_primary,
     $._call_target_expression,
     $._call_target_primary,
-    $._update_target,
   ],
 
   inline: ($) => [
@@ -214,10 +213,8 @@ module.exports = grammar({
   ],
 
   conflicts: ($) => [
-    [$.for_in_clause, $._simple_target_primary],
     [$._primary_atom, $._simple_target_primary],
     [$._simple_target_primary, $.pattern],
-    [$._simple_target_primary, $.await_expression],
     [$._primary_atom, $._simple_target_primary, $.pattern],
     [$._call_callee, $.call_expression],
     [$.for_in_clause, $._primary_atom],
@@ -531,7 +528,7 @@ module.exports = grammar({
                 choice(
                   $._lhs_expression,
                   alias($._parenthesized_simple_target, $.parenthesized_expression),
-                  $._classic_call_target
+                  alias($._parenthesized_call_target, $.parenthesized_expression)
                 )
               ),
               seq(
@@ -1272,11 +1269,7 @@ module.exports = grammar({
 
     _call_target_expression: ($) => alias($._call_target_primary, $.primary_expression),
 
-    _call_target_primary: ($) =>
-      choice(
-        alias($._assignment_call, $.call_expression),
-        alias($._parenthesized_call_target, $.parenthesized_expression)
-      ),
+    _call_target_primary: ($) => $._classic_call_target,
 
     _parenthesized_call_target: ($) => seq('(', alias($._call_target_expression, $.expression), ')'),
 
@@ -1400,24 +1393,15 @@ module.exports = grammar({
         )
       ),
 
-    _update_target: ($) =>
-      choice(
-        alias($._simple_target_primary, $.primary_expression),
-        alias($._call_target_primary, $.primary_expression)
-      ),
-
     update_expression: ($) =>
-      prec.dynamic(
-        1,
-        prec.left(
-          choice(
-            seq(
-              field('argument', alias($._update_target, $.expression)),
-              field('operator', choice('++', '--')),
-              sym('_postfix_update_end')
-            ),
-            seq(field('operator', choice('++', '--')), field('argument', alias($._update_target, $.expression)))
-          )
+      prec.left(
+        choice(
+          seq(
+            field('argument', alias($._unary_operand, $.expression)),
+            field('operator', choice('++', '--')),
+            sym('_postfix_update_end')
+          ),
+          seq(field('operator', choice('++', '--')), field('argument', alias($._unary_operand, $.expression)))
         )
       ),
 
