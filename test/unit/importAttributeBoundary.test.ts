@@ -69,6 +69,99 @@ test('preserves import attributes and requires explicit separation before with s
   }
 });
 
+test('ends module declarations before following expression statements across comment and ordinary line breaks', async () => {
+  await Parser.init();
+  const parser = new Parser().setLanguage(
+    await Language.load(path.join(import.meta.dirname, '../../tree-sitter-javascript.wasm'))
+  );
+  try {
+    for (const declaration of [
+      'export { a }',
+      'export { a as b }',
+      'export {}',
+      'import x from "y" with { type: "json" }',
+      'import "y" with {}',
+      'export { a } from "y" with { type: "json" }',
+      'export * from "y" with {}',
+      'export * as ns from "y" with {}',
+    ]) {
+      for (const suffix of ['(z);', '[z];', '`tag`;']) {
+        const invalid = parser.parse(`const a = 1; ${declaration} ${suffix}`)!;
+        try {
+          expect(invalid.rootNode.hasError, `${declaration} ${suffix}`).toBe(true);
+        } finally {
+          invalid.delete();
+        }
+        for (const separator of ['\n', '//c\n', '/*c\n*/', '\r', '\r\n', '\u2028', '\u2029']) {
+          checkModuleBoundary(parser, declaration, separator, suffix);
+        }
+      }
+    }
+    for (const separator of ['\n', '//c\n', '/*c\n*/', '\r', '\r\n', '\u2028', '\u2029']) {
+      const source = `const a = 1; export {a}${separator}from "y"; import "y"${separator}from(z);`;
+      const tree = parser.parse(source)!;
+      try {
+        expect(tree.rootNode.hasError, source).toBe(false);
+        expect(tree.rootNode.descendantsOfType('export_statement')[0]?.childForFieldName('source')?.text).toBe('"y"');
+        expect(tree.rootNode.lastNamedChild!.text, source).toBe('from(z);');
+        expect(tree.rootNode.lastNamedChild!.firstNamedChild!.type, source).toBe('call_expression');
+      } finally {
+        tree.delete();
+      }
+    }
+  } finally {
+    parser.delete();
+  }
+});
+
+function checkModuleBoundary(parser: Parser, declaration: string, separator: string, suffix: string): void {
+  const prefix = `const a = 1; ${declaration}`;
+  let previousSemicolon = ';';
+  let source = `${prefix}${previousSemicolon}${separator}${suffix}`;
+  let tree = parser.parse(source)!;
+  try {
+    for (const semicolon of ['', ';', '']) {
+      const next = `${prefix}${semicolon}${separator}${suffix}`;
+      tree.edit(
+        new Edit({
+          startIndex: prefix.length,
+          oldEndIndex: prefix.length + previousSemicolon.length,
+          newEndIndex: prefix.length + semicolon.length,
+          startPosition: position(source, prefix.length),
+          oldEndPosition: position(source, prefix.length + previousSemicolon.length),
+          newEndPosition: position(next, prefix.length + semicolon.length),
+        })
+      );
+      const previous = tree;
+      tree = parser.parse(next, previous)!;
+      previous.delete();
+      source = next;
+      previousSemicolon = semicolon;
+      const fresh = parser.parse(source)!;
+      try {
+        expect(tree.rootNode.hasError, source).toBe(false);
+        expect(tree.rootNode.toString(), source).toBe(fresh.rootNode.toString());
+        const statements = tree.rootNode.namedChildren.filter((node) => node.type !== 'comment');
+        expect(
+          statements.map((node) => node.type),
+          source
+        ).toEqual([
+          'lexical_declaration',
+          declaration.startsWith('import') ? 'import_statement' : 'export_statement',
+          'expression_statement',
+        ]);
+        expect(statements[2]!.text, source).toBe(suffix);
+        expect(statements[1]!.startIndex, source).toBe(fresh.rootNode.namedChildren[1]!.startIndex);
+        expect(statements[1]!.endIndex, source).toBe(fresh.rootNode.namedChildren[1]!.endIndex);
+      } finally {
+        fresh.delete();
+      }
+    }
+  } finally {
+    tree.delete();
+  }
+}
+
 function position(source: string, index: number): { row: number; column: number } {
   const lines = source.slice(0, index).split('\n');
   return { row: lines.length - 1, column: lines.at(-1)!.length };

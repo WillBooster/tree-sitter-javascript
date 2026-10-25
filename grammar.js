@@ -127,6 +127,7 @@ module.exports = grammar({
     sym('_async_function_signature_start'),
     sym('_call_arguments_context'),
     sym('_async_keyword'),
+    sym('_line_break_before_from'),
   ],
 
   extras: ($) => [$.comment, sym('html_comment'), /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -253,12 +254,8 @@ module.exports = grammar({
         seq(
           'export',
           choice(
-            seq(
-              choice('*', $.namespace_export, $.export_clause),
-              $._from_clause,
-              optional(choice($.import_attribute, sym('_line_break_before_attributes')))
-            ),
-            alias($._local_export_clause, $.export_clause)
+            seq(choice('*', $.namespace_export, $.export_clause), $._from_clause, optional($._import_attributes)),
+            seq(alias($._local_export_clause, $.export_clause), optional(sym('_line_break_before_from')))
           ),
           $._semicolon
         ),
@@ -336,7 +333,7 @@ module.exports = grammar({
       seq(
         'import',
         choice(seq($.import_clause, $._from_clause), field('source', $.string)),
-        optional(choice($.import_attribute, sym('_line_break_before_attributes'))),
+        optional($._import_attributes),
         $._semicolon
       ),
 
@@ -357,6 +354,12 @@ module.exports = grammar({
       choice(
         field('name', $.identifier),
         seq(field('name', $._module_export_name), 'as', field('alias', $.identifier))
+      ),
+
+    _import_attributes: ($) =>
+      choice(
+        seq($.import_attribute, optional(sym('_line_break_ends_statement'))),
+        sym('_line_break_before_attributes')
       ),
 
     import_attribute: ($) => seq('with', $.object),

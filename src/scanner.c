@@ -55,6 +55,7 @@ enum TokenType {
     ASYNC_FUNCTION_SIGNATURE_START,
     CALL_ARGUMENTS_CONTEXT,
     ASYNC_KEYWORD,
+    LINE_BREAK_BEFORE_FROM,
 };
 
 static bool scan_let(TSLexer *lexer);
@@ -257,6 +258,7 @@ typedef enum {
     LINE_BREAK_AFTER_ACCESSOR_WORD,
     // After the source of an import or re-export: only the `with` of its attributes continues it.
     LINE_BREAK_BEFORE_IMPORT_ATTRIBUTES,
+    LINE_BREAK_BEFORE_FROM_CLAUSE,
     LINE_BREAK_AFTER_AWAIT_KEYWORD,
     LINE_BREAK_AWAIT_OPERAND,
 } LineBreakRule;
@@ -457,8 +459,9 @@ static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBr
             return before_slash || (lexer->lookahead != '=' && lexer->lookahead != '(');
         case LINE_BREAK_AFTER_MODIFIER_WORD:
             return !before_slash && (lexer->lookahead == '}' || lexer->lookahead == '@' || lexer->eof(lexer));
+        case LINE_BREAK_BEFORE_FROM_CLAUSE:
         case LINE_BREAK_BEFORE_IMPORT_ATTRIBUTES:
-            return before_slash || !scan_word(lexer, "with");
+            return before_slash || !scan_word(lexer, rule == LINE_BREAK_BEFORE_FROM_CLAUSE ? "from" : "with");
         case LINE_BREAK_AFTER_ACCESSOR_WORD:
             return !before_slash && (lexer->lookahead == '}' || lexer->lookahead == '@' || lexer->lookahead == '*' ||
                                      lexer->eof(lexer));
@@ -1211,6 +1214,8 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
             rule = LINE_BREAK_AFTER_FIELD_NAME;
         } else if (valid_symbols[LINE_BREAK_BEFORE_ATTRIBUTES]) {
             rule = LINE_BREAK_BEFORE_IMPORT_ATTRIBUTES;
+        } else if (valid_symbols[LINE_BREAK_BEFORE_FROM]) {
+            rule = LINE_BREAK_BEFORE_FROM_CLAUSE;
         }
         bool ret = scan_automatic_semicolon(lexer, false, rule, &scanned_content, NULL);
         if (ret && valid_symbols[STATEMENT_BOUNDARY] && lexer->result_symbol == AUTOMATIC_SEMICOLON) {
