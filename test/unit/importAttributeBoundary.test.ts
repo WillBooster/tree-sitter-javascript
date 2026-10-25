@@ -85,7 +85,7 @@ test('ends module declarations before following expression statements across com
       'export * from "y" with {}',
       'export * as ns from "y" with {}',
     ]) {
-      for (const suffix of ['(z);', '[z];', '`tag`;']) {
+      for (const suffix of ['(z);', '[z];', '`tag`;', 'foo();', '+z;', '-z;', '++z;', '!z;', '~z;']) {
         const invalid = parser.parse(`const a = 1; ${declaration} ${suffix}`)!;
         try {
           expect(invalid.rootNode.hasError, `${declaration} ${suffix}`).toBe(true);
@@ -151,6 +151,10 @@ function checkModuleBoundary(parser: Parser, declaration: string, separator: str
           'expression_statement',
         ]);
         expect(statements[2]!.text, source).toBe(suffix);
+        expect(statements[1]!.endIndex, source).toBe(prefix.length + semicolon.length);
+        for (const comment of tree.rootNode.descendantsOfType('comment')) {
+          expect(comment.parent?.type, source).toBe('program');
+        }
         expect(statements[1]!.startIndex, source).toBe(fresh.rootNode.namedChildren[1]!.startIndex);
         expect(statements[1]!.endIndex, source).toBe(fresh.rootNode.namedChildren[1]!.endIndex);
       } finally {

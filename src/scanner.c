@@ -825,10 +825,11 @@ static bool scan_expression_end(Scanner *scanner, TSLexer *lexer, bool after_pos
     switch (lexer->lookahead) {
         case '(':
         case '[':
-        case '`':
+        case '`': {
             bool statement_end = after_postfix && saw_newline;
             scanner->automatic_semicolon_pending |= statement_end;
             return statement_end;
+        }
         case '?':
             skip(lexer);
             return lexer->lookahead != '.';
