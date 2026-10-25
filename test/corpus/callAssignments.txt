@@ -1,0 +1,40 @@
+=======================================
+Classic call assignments preserve chains
+=======================================
+
+foo() = one;
+foo().bar() += two;
+(foo?.bar)() = three;
+new (foo?.bar)()() **= four;
+
+---
+
+(program
+  (expression_statement
+    (assignment_expression
+      (call_expression (identifier) (arguments))
+      (identifier)))
+  (expression_statement
+    (augmented_assignment_expression
+      (call_expression
+        (member_expression
+          (call_expression (identifier) (arguments))
+          (property_identifier))
+        (arguments))
+      (identifier)))
+  (expression_statement
+    (assignment_expression
+      (call_expression
+        (parenthesized_expression
+          (member_expression (identifier) (optional_chain) (property_identifier)))
+        (arguments))
+      (identifier)))
+  (expression_statement
+    (augmented_assignment_expression
+      (call_expression
+        (new_expression
+          (parenthesized_expression
+            (member_expression (identifier) (optional_chain) (property_identifier)))
+          (arguments))
+        (arguments))
+      (identifier))))

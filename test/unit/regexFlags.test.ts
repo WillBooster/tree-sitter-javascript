@@ -82,3 +82,56 @@ test('restores regex boundaries after incremental flag edits', () => {
     parser.delete();
   }
 });
+
+test.each(['//c\n', '/*c\n*/'])('restores infix operators after a regex comment %j', (comment) => {
+  const parser = new Parser().setLanguage(language);
+  try {
+    for (const operator of ['in', 'instanceof']) {
+      const prefix = `/x/${comment}`;
+      const original = `${prefix}${operator} value;`;
+      let source = original;
+      let tree = parser.parse(source)!;
+      try {
+        for (const next of [`${prefix}i\n`, original, `${prefix}i\n`, original]) {
+          tree.edit(
+            new Edit({
+              startIndex: prefix.length,
+              oldEndIndex: source.length,
+              newEndIndex: next.length,
+              startPosition: endPoint(prefix),
+              oldEndPosition: endPoint(source),
+              newEndPosition: endPoint(next),
+            })
+          );
+          const previous = tree;
+          tree = parser.parse(next, previous)!;
+          previous.delete();
+          source = next;
+          const fresh = parser.parse(source)!;
+          try {
+            expect(tree.rootNode.hasError, source).toBe(false);
+            expect(tree.rootNode.toString(), source).toBe(fresh.rootNode.toString());
+            expect(tree.rootNode.descendantsOfType('regex')[0]?.text, source).toBe('/x/');
+            expect(
+              tree.rootNode
+                .descendantsOfType('binary_expression')
+                .map((node) => node.childForFieldName('operator')?.text),
+              source
+            ).toEqual(source === original ? [operator] : []);
+          } finally {
+            fresh.delete();
+          }
+        }
+      } finally {
+        tree.delete();
+      }
+    }
+  } finally {
+    parser.delete();
+  }
+});
+
+function endPoint(source: string): { row: number; column: number } {
+  const lines = source.split('\n');
+  return { row: lines.length - 1, column: lines.at(-1)!.length };
+}
