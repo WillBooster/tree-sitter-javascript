@@ -6,6 +6,9 @@ import { expect, test } from 'vitest';
 const Operators = ['=', '+=', '-=', '*=', '/=', '%=', '**=', '<<=', '>>=', '>>>=', '&=', '|=', '^='];
 const Targets = [
   'foo()',
+  '(foo())',
+  '((foo()))',
+  '((foo?.())())',
   'foo().bar()',
   'foo()[key]()',
   '(foo?.bar)()',
@@ -65,6 +68,16 @@ for (const goal of ['javascript', 'javascript_script']) {
         'foo()?.bar() += 1',
         'new foo?.bar()() = 1',
         'foo`tag` = 1',
+        ...['(a+b)', '((a+b))', '(a,b)', '(a=1)', '({a})', '([a])', '(foo?.())', '((foo?.bar))'].map(
+          (target) => `${target} = 1`
+        ),
+        ...['&&=', '||=', '??='].flatMap((operator) => [`(foo()) ${operator} 1`, `((foo())) ${operator} 1`]),
+        '[...(a,b)] = value',
+        '({ a: (a+b) } = value)',
+        '[(foo())] = value',
+        '[(a+b) = 1] = value',
+        '(a+b)++',
+        '++(foo?.())',
         'import("x") = 1',
         ...['&&=', '||=', '??='].map((operator) => `foo() ${operator} 1`),
         ...['!', '~', 'typeof ', 'void ', 'delete ', '+', '-', '1+', '1*'].map((prefix) => `${prefix}foo() = 1`),
@@ -84,6 +97,59 @@ for (const goal of ['javascript', 'javascript_script']) {
     }
   });
 
+  test(`preserves simple grouped targets across assignment consumers in ${goal}`, async () => {
+    await Parser.init();
+    const language = await Language.load(`tree-sitter-${goal}.wasm`);
+    const parser = new Parser().setLanguage(language);
+    const query = new Query(language, '(parenthesized_expression [(expression) (sequence_expression)] @inner)');
+    try {
+      for (const statement of [
+        ...['=', '+=', '&&=', '||=', '??='].flatMap((operator) => [
+          `((a)) ${operator} value;`,
+          `((foo?.()).x) ${operator} value;`,
+          `((a,b).x) ${operator} value;`,
+        ]),
+        '[(a)] = value;',
+        '[(a) = 1] = value;',
+        '[...(a)] = value;',
+        '({ a: ((b)) = 1 } = value);',
+        'for (((a)) in value) {}',
+        'for (((foo())) of value) {}',
+        '((a))++;',
+        '++((foo()));',
+      ]) {
+        const source = `${statement} ${Following}`;
+        const tree = parser.parse(source)!;
+        try {
+          expect(tree.rootNode.hasError, source).toBe(false);
+          expect(tree.rootNode.lastNamedChild!.text, source).toBe(Following);
+          const captures = query.captures(tree.rootNode);
+          for (const group of tree.rootNode.descendantsOfType('parenthesized_expression')) {
+            const inner = group.firstNamedChild!;
+            expect(
+              captures.filter(({ node }) => node.id === inner.id),
+              source
+            ).toHaveLength(1);
+            expect(source.slice(group.startIndex, group.endIndex), source).toBe(group.text);
+          }
+        } finally {
+          tree.delete();
+        }
+      }
+      for (const source of ['for ((a+b) in value) {}', 'for ((foo?.()) of value) {}']) {
+        const tree = parser.parse(source)!;
+        try {
+          expect(tree.rootNode.hasError, source).toBe(true);
+        } finally {
+          tree.delete();
+        }
+      }
+    } finally {
+      query.delete();
+      parser.delete();
+    }
+  });
+
   test(`preserves grouping and all public query results through call assignment edits in ${goal}`, async () => {
     await Parser.init();
     const language = await Language.load(`tree-sitter-${goal}.wasm`);
@@ -93,6 +159,16 @@ for (const goal of ['javascript', 'javascript_script']) {
     );
     const expressions = [
       'foo().bar() += 1',
+      '((foo())) += 1',
+      '(foo()) &&= 1',
+      '(a+b) = 1',
+      '((a)) ||= 1',
+      '[(a)] = value',
+      'for ((foo()) of value) {}',
+      '((a))++',
+      'a !== (get)++\n\nx=>1',
+      '(a)\n++b',
+      '(a)+ +b',
       'foo?.bar() += 1',
       '(foo?.bar)() += 1',
       'new (foo?.bar)()() = 1',
@@ -113,7 +189,9 @@ for (const goal of ['javascript', 'javascript_script']) {
         source = next;
         const fresh = parser.parse(source)!;
         try {
-          expect(tree.rootNode.hasError, source).toBe(expression === 'foo?.bar() += 1');
+          expect(tree.rootNode.hasError, source).toBe(
+            ['foo?.bar() += 1', '(foo()) &&= 1', '(a+b) = 1'].includes(expression)
+          );
           expect(snapshot(tree.rootNode), source).toEqual(snapshot(fresh.rootNode));
           for (const query of queries) {
             expect(
@@ -122,6 +200,18 @@ for (const goal of ['javascript', 'javascript_script']) {
             ).toEqual(query.captures(fresh.rootNode).map(({ name, node }) => [name, snapshot(node)]));
           }
           expect(tree.rootNode.lastNamedChild!.text, source).toBe(Following);
+          if (expression.includes('(get)++')) {
+            expect(tree.rootNode.namedChildren, source).toHaveLength(3);
+            const binary = tree.rootNode.firstNamedChild!.firstNamedChild!;
+            expect(binary.childForFieldName('right')?.type, source).toBe('update_expression');
+            expect(binary.childForFieldName('right')?.childForFieldName('operator')?.text, source).toBe('++');
+          }
+          if (expression === '(a)\n++b') {
+            expect(tree.rootNode.namedChildren, source).toHaveLength(3);
+            const update = tree.rootNode.namedChildren[1]!.firstNamedChild!;
+            expect(update.type, source).toBe('update_expression');
+            expect(update.childForFieldName('argument')?.text, source).toBe('b');
+          }
           if (expression.startsWith('!')) {
             const unary = tree.rootNode.firstNamedChild!.firstNamedChild!;
             expect(unary.type).toBe('unary_expression');

@@ -152,6 +152,11 @@ module.exports = grammar({
     $._assignment_call_callee,
     $._call_callee,
     $._assignment_call_primary,
+    $._simple_target_expression,
+    $._simple_target_primary,
+    $._call_target_expression,
+    $._call_target_primary,
+    $._update_target,
   ],
 
   inline: ($) => [
@@ -209,6 +214,11 @@ module.exports = grammar({
   ],
 
   conflicts: ($) => [
+    [$.for_in_clause, $._simple_target_primary],
+    [$._primary_atom, $._simple_target_primary],
+    [$._simple_target_primary, $.pattern],
+    [$._simple_target_primary, $.await_expression],
+    [$._primary_atom, $._simple_target_primary, $.pattern],
     [$._call_callee, $.call_expression],
     [$.for_in_clause, $._primary_atom],
     [$._primary_atom, $.rest_pattern],
@@ -516,7 +526,14 @@ module.exports = grammar({
         choice(
           seq(
             choice(
-              field('left', choice($._lhs_expression, $.parenthesized_expression)),
+              field(
+                'left',
+                choice(
+                  $._lhs_expression,
+                  alias($._parenthesized_simple_target, $.parenthesized_expression),
+                  $._classic_call_target
+                )
+              ),
               seq(
                 field('kind', 'var'),
                 field('left', choice($.identifier, alias('of', $.identifier), $._destructuring_pattern)),
@@ -1239,13 +1256,47 @@ module.exports = grammar({
         $._destructuring_pattern
       ),
 
+    _simple_target_expression: ($) => alias($._simple_target_primary, $.primary_expression),
+
+    _simple_target_primary: ($) =>
+      choice(
+        $._identifier,
+        alias(sym('_await_yield_identifier'), $.identifier),
+        aliasWithAsyncKeyword($._reserved_identifier, $.identifier),
+        alias($._assignment_member, $.member_expression),
+        alias($._assignment_subscript, $.subscript_expression),
+        alias($._parenthesized_simple_target, $.parenthesized_expression)
+      ),
+
+    _parenthesized_simple_target: ($) => seq('(', alias($._simple_target_expression, $.expression), ')'),
+
+    _call_target_expression: ($) => alias($._call_target_primary, $.primary_expression),
+
+    _call_target_primary: ($) =>
+      choice(
+        alias($._assignment_call, $.call_expression),
+        alias($._parenthesized_call_target, $.parenthesized_expression)
+      ),
+
+    _parenthesized_call_target: ($) => seq('(', alias($._call_target_expression, $.expression), ')'),
+
+    _classic_call_target: ($) =>
+      choice(
+        alias($._assignment_call, $.call_expression),
+        alias($._parenthesized_call_target, $.parenthesized_expression)
+      ),
+
     assignment_expression: ($) =>
       prec.right(
         'assign',
         seq(
           field(
             'left',
-            choice($.parenthesized_expression, $._lhs_expression, alias($._assignment_call, $.call_expression))
+            choice(
+              alias($._parenthesized_simple_target, $.parenthesized_expression),
+              $._lhs_expression,
+              $._classic_call_target
+            )
           ),
           '=',
           field('right', $.expression)
@@ -1258,7 +1309,7 @@ module.exports = grammar({
         $.subscript_expression,
         aliasWithAsyncKeyword($._reserved_identifier, $.identifier),
         $._identifier,
-        $.parenthesized_expression
+        alias($._parenthesized_simple_target, $.parenthesized_expression)
       ),
 
     augmented_assignment_expression: ($) =>
@@ -1270,10 +1321,7 @@ module.exports = grammar({
               field('left', $._augmented_assignment_lhs),
               field('operator', choice(...CLASSIC_ASSIGNMENT_OPERATORS, '&&=', '||=', '??='))
             ),
-            seq(
-              field('left', alias($._assignment_call, $.call_expression)),
-              field('operator', choice(...CLASSIC_ASSIGNMENT_OPERATORS))
-            )
+            seq(field('left', $._classic_call_target), field('operator', choice(...CLASSIC_ASSIGNMENT_OPERATORS)))
           ),
           field('right', $.expression)
         )
@@ -1352,15 +1400,24 @@ module.exports = grammar({
         )
       ),
 
+    _update_target: ($) =>
+      choice(
+        alias($._simple_target_primary, $.primary_expression),
+        alias($._call_target_primary, $.primary_expression)
+      ),
+
     update_expression: ($) =>
-      prec.left(
-        choice(
-          seq(
-            field('argument', alias($._unary_operand, $.expression)),
-            field('operator', choice('++', '--')),
-            sym('_postfix_update_end')
-          ),
-          seq(field('operator', choice('++', '--')), field('argument', alias($._unary_operand, $.expression)))
+      prec.dynamic(
+        1,
+        prec.left(
+          choice(
+            seq(
+              field('argument', alias($._update_target, $.expression)),
+              field('operator', choice('++', '--')),
+              sym('_postfix_update_end')
+            ),
+            seq(field('operator', choice('++', '--')), field('argument', alias($._update_target, $.expression)))
+          )
         )
       ),
 
@@ -1628,9 +1685,16 @@ module.exports = grammar({
     // This negative dynamic precedence ensures that during error recovery,
     // unfinished constructs are generally treated as literal expressions,
     // not patterns.
-    pattern: ($) => prec.dynamic(-1, choice($._lhs_expression, $.parenthesized_expression, $.rest_pattern)),
+    pattern: ($) =>
+      prec.dynamic(
+        -1,
+        choice($._lhs_expression, alias($._parenthesized_simple_target, $.parenthesized_expression), $.rest_pattern)
+      ),
 
-    rest_pattern: ($) => prec.right(seq('...', choice($._lhs_expression, $.parenthesized_expression))),
+    rest_pattern: ($) =>
+      prec.right(
+        seq('...', choice($._lhs_expression, alias($._parenthesized_simple_target, $.parenthesized_expression)))
+      ),
 
     method_definition: ($) =>
       functionContext((async) =>
