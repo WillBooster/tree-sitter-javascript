@@ -1,0 +1,55 @@
+==================
+Local exports end before following expressions
+==================
+
+let a;
+export {a} // boundary
+(z);
+export {a as b} /* boundary
+*/ `tag`;
+export {}
+[z];
+
+---
+
+(program
+  (lexical_declaration (variable_declarator (identifier)))
+  (export_statement (export_clause (export_specifier (identifier))))
+  (comment)
+  (expression_statement (parenthesized_expression (identifier)))
+  (export_statement (export_clause (export_specifier (identifier) (identifier))))
+  (comment)
+  (expression_statement (template_string (string_fragment)))
+  (export_statement (export_clause))
+  (expression_statement (array (identifier))))
+
+==================
+Import attributes end before following expressions
+==================
+
+import x from "y" with { type: "json" } // boundary
+(z);
+import "y" with {} /* boundary
+*/ `tag`;
+export {a} from "y" with { type: "json" }
+[z];
+
+---
+
+(program
+  (import_statement
+    (import_clause (identifier))
+    (string (string_fragment))
+    (import_attribute (object (pair (property_identifier) (string (string_fragment))))))
+  (comment)
+  (expression_statement (parenthesized_expression (identifier)))
+  (import_statement
+    (string (string_fragment))
+    (import_attribute (object)))
+  (comment)
+  (expression_statement (template_string (string_fragment)))
+  (export_statement
+    (export_clause (export_specifier (identifier)))
+    (string (string_fragment))
+    (import_attribute (object (pair (property_identifier) (string (string_fragment))))))
+  (expression_statement (array (identifier))))

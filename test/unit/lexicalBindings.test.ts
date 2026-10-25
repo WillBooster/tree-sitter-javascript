@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Edit, Language, type Node, Parser, Query } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -89,3 +89,95 @@ test('preserves contextual identifiers in values, var bindings, and lexical bind
     parser.delete();
   }
 });
+
+test.each(['javascript', 'javascript_script'])(
+  'restores uninitialized declaration boundaries through edits in %s',
+  async (goal) => {
+    const selected = await Language.load(`tree-sitter-${goal}.wasm`);
+    const parser = new Parser().setLanguage(selected);
+    const query = new Query(selected, '(variable_declarator) @declarator (comment) @comment');
+    try {
+      for (const declaration of ['var e', 'let e', 'var e = 1, f', 'let e = 1, f']) {
+        for (const newline of ['\n', '\r']) {
+          for (const prefix of ['', 'function outer(){']) {
+            checkDeclarationEdits(parser, query, declaration, newline, prefix);
+          }
+        }
+      }
+    } finally {
+      query.delete();
+      parser.delete();
+    }
+  }
+);
+
+function checkDeclarationEdits(
+  parser: Parser,
+  query: Query,
+  declaration: string,
+  newline: string,
+  prefix: string
+): void {
+  const suffix = ` // comment${newline}(value);${prefix ? '}' : ''}`;
+  let replacement = '';
+  let source = prefix + declaration + suffix;
+  let tree = parser.parse(source)!;
+  const start = prefix.length + declaration.length;
+  try {
+    for (const nextReplacement of [';', '', ' = value', ';', '']) {
+      const next = prefix + declaration + nextReplacement + suffix;
+      tree.edit(
+        new Edit({
+          startIndex: start,
+          oldEndIndex: start + replacement.length,
+          newEndIndex: start + nextReplacement.length,
+          startPosition: declarationPoint(source, start),
+          oldEndPosition: declarationPoint(source, start + replacement.length),
+          newEndPosition: declarationPoint(next, start + nextReplacement.length),
+        })
+      );
+      const previous = tree;
+      tree = parser.parse(next, previous)!;
+      previous.delete();
+      replacement = nextReplacement;
+      source = next;
+      const fresh = parser.parse(source)!;
+      try {
+        expect(tree.rootNode.hasError, source).toBe(false);
+        expect(tree.rootNode.toString(), source).toBe(fresh.rootNode.toString());
+        expect(declarationRanges(query, tree.rootNode), source).toEqual(declarationRanges(query, fresh.rootNode));
+        const last = tree.rootNode.descendantsOfType('variable_declarator').at(-1)!;
+        expect(last.childForFieldName('value')?.type, source).toBe(
+          replacement === ' = value' ? 'call_expression' : undefined
+        );
+        if (replacement !== ' = value') {
+          expect(tree.rootNode.descendantsOfType('comment')[0]!.parent!.type, source).toBe(
+            prefix ? 'statement_block' : 'program'
+          );
+        }
+      } finally {
+        fresh.delete();
+      }
+    }
+  } finally {
+    tree.delete();
+  }
+}
+
+function declarationPoint(source: string, index: number): { row: number; column: number } {
+  const lines = source.slice(0, index).split('\n');
+  return { row: lines.length - 1, column: lines.at(-1)!.length };
+}
+
+function declarationRanges(query: Query, node: Node): unknown {
+  return query
+    .captures(node)
+    .map(({ name, node: captured }) => [
+      name,
+      captured.type,
+      captured.text,
+      captured.startIndex,
+      captured.endIndex,
+      captured.parent?.type,
+    ]);
+}
