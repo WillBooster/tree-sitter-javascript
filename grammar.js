@@ -974,8 +974,9 @@ module.exports = grammar({
         )
       ),
 
-    // Override
     _call_signature: ($) => field('parameters', $.formal_parameters),
+
+    /** Ordinary, comma-permitted parameters. Overrides must exclude rest forms. */
     _formal_parameter: ($) => choice(alias($._non_rest_pattern, $.pattern), $.assignment_pattern),
 
     _call_callee: ($) => $.primary_expression,
@@ -1667,8 +1668,13 @@ module.exports = grammar({
 
     class_static_block: ($) => seq('static', field('body', alias($._class_member_body, $.statement_block))),
 
+    /**
+     * Canonical pattern supertype. Extend `_non_rest_pattern` for non-rest forms and
+     * `rest_pattern` for rest syntax; overriding only `pattern` does not extend ordinary slots.
+     */
     pattern: ($) => choice(alias($._non_rest_pattern, $.pattern), alias($._rest_pattern, $.pattern)),
 
+    // Prefer expression forms over both pattern routes during ambiguous error recovery.
     _non_rest_pattern: ($) =>
       prec.dynamic(-1, choice($._lhs_expression, alias($._parenthesized_simple_target, $.parenthesized_expression))),
 
