@@ -147,6 +147,8 @@ module.exports = grammar({
     $._unary_operand,
     $.primary_expression,
     $.pattern,
+    $._non_rest_pattern,
+    $._rest_pattern,
     $._constructor,
     $._constructor_chain_base,
     $._assignment_call_callee,
@@ -214,23 +216,23 @@ module.exports = grammar({
 
   conflicts: ($) => [
     [$._primary_atom, $._simple_target_primary],
-    [$._simple_target_primary, $.pattern],
-    [$._primary_atom, $._simple_target_primary, $.pattern],
+    [$._simple_target_primary, $._non_rest_pattern],
+    [$._primary_atom, $._simple_target_primary, $._non_rest_pattern],
     [$._call_callee, $.call_expression],
     [$.for_in_clause, $._primary_atom],
     [$._primary_atom, $.rest_pattern],
-    [$._primary_atom, $.pattern],
+    [$._primary_atom, $._non_rest_pattern],
     [$.arrow_function, $._primary_atom],
     [$._primary_atom, $.await_expression],
     [$.call_expression, $._constructor_import],
     [$.primary_expression, $._assignment_call_primary],
     [$._local_export_specifier, $._module_export_name],
     [$.primary_expression, $.rest_pattern],
-    [$.primary_expression, $.pattern],
+    [$.primary_expression, $._non_rest_pattern],
     [$.primary_expression, $.for_in_clause],
     [$.array, $.array_pattern],
     [$.object, $.object_pattern],
-    [$.assignment_expression, $.pattern],
+    [$.assignment_expression, $._non_rest_pattern],
   ],
 
   word: ($) => $.identifier,
@@ -700,29 +702,23 @@ module.exports = grammar({
         )
       ),
 
-    object_pattern: ($) =>
-      prec(
-        'object',
-        seq(
-          '{',
-          commaSep(
-            optional(
-              choice(
-                $.pair_pattern,
-                $.rest_pattern,
-                $.object_assignment_pattern,
-                aliasWithAsyncKeyword(
-                  choice($.identifier, $._reserved_identifier),
-                  sym('shorthand_property_identifier_pattern')
-                )
-              )
-            )
-          ),
-          '}'
+    object_pattern: ($) => {
+      const property = choice(
+        $.pair_pattern,
+        $.object_assignment_pattern,
+        aliasWithAsyncKeyword(
+          choice($.identifier, $._reserved_identifier),
+          sym('shorthand_property_identifier_pattern')
         )
-      ),
+      );
+      return prec(
+        'object',
+        seq('{', repeat(seq(optional(property), ',')), optional(choice(property, $.rest_pattern)), '}')
+      );
+    },
 
-    assignment_pattern: ($) => seq(field('left', $.pattern), '=', field('right', $.expression)),
+    assignment_pattern: ($) =>
+      seq(field('left', alias($._non_rest_pattern, $.pattern)), '=', field('right', $.expression)),
 
     object_assignment_pattern: ($) =>
       seq(
@@ -742,7 +738,13 @@ module.exports = grammar({
 
     array: ($) => seq('[', commaSep(optional(choice($.expression, $.spread_element))), ']'),
 
-    array_pattern: ($) => seq('[', commaSep(optional(choice($.pattern, $.assignment_pattern))), ']'),
+    array_pattern: ($) =>
+      seq(
+        '[',
+        repeat(seq(optional(choice(alias($._non_rest_pattern, $.pattern), $.assignment_pattern)), ',')),
+        optional(choice($.pattern, $.assignment_pattern)),
+        ']'
+      ),
 
     _jsx_element: ($) => choice($.jsx_element, $.jsx_self_closing_element),
 
@@ -974,7 +976,7 @@ module.exports = grammar({
 
     // Override
     _call_signature: ($) => field('parameters', $.formal_parameters),
-    _formal_parameter: ($) => choice($.pattern, $.assignment_pattern),
+    _formal_parameter: ($) => choice(alias($._non_rest_pattern, $.pattern), $.assignment_pattern),
 
     _call_callee: ($) => $.primary_expression,
 
@@ -1655,18 +1657,22 @@ module.exports = grammar({
     _field_initializer: ($) =>
       seq('=', sym('_sync_function_start'), field('value', $.expression), sym('_arrow_context_end')),
 
-    formal_parameters: ($) => seq('(', optional(seq(commaSep1($._formal_parameter), optional(','))), ')'),
+    formal_parameters: ($) =>
+      seq(
+        '(',
+        repeat(seq($._formal_parameter, ',')),
+        optional(choice($._formal_parameter, alias($._rest_pattern, $.pattern))),
+        ')'
+      ),
 
     class_static_block: ($) => seq('static', field('body', alias($._class_member_body, $.statement_block))),
 
-    // This negative dynamic precedence ensures that during error recovery,
-    // unfinished constructs are generally treated as literal expressions,
-    // not patterns.
-    pattern: ($) =>
-      prec.dynamic(
-        -1,
-        choice($._lhs_expression, alias($._parenthesized_simple_target, $.parenthesized_expression), $.rest_pattern)
-      ),
+    pattern: ($) => choice(alias($._non_rest_pattern, $.pattern), alias($._rest_pattern, $.pattern)),
+
+    _non_rest_pattern: ($) =>
+      prec.dynamic(-1, choice($._lhs_expression, alias($._parenthesized_simple_target, $.parenthesized_expression))),
+
+    _rest_pattern: ($) => prec.dynamic(-1, $.rest_pattern),
 
     rest_pattern: ($) =>
       prec.right(
