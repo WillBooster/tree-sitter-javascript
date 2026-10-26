@@ -586,35 +586,36 @@ Objects with reserved words for keys
 ---
 
 (program
-  (expression_statement
-    (object
-      (method_definition
-        (property_identifier)
-        (formal_parameters)
-        (statement_block))
-      (method_definition
-        (property_identifier)
-        (formal_parameters)
-        (statement_block))
-      (pair
-        (property_identifier)
-        (function_expression
-          (formal_parameters)
-          (statement_block)))
-      (pair
-        (property_identifier)
-        (function_expression
-          (formal_parameters)
-          (statement_block)))
-      (pair
-        (property_identifier)
-        (true))
-      (pair
-        (property_identifier)
-        (true))
-      (pair
-        (property_identifier)
-        (true)))))
+  (statement_block
+    (ERROR
+      (formal_parameters))
+    (statement_block)
+    (ERROR
+      (formal_parameters))
+    (statement_block)
+    (ERROR)
+    (labeled_statement
+      (statement_identifier)
+      (expression_statement
+        (sequence_expression
+          (function_expression
+            (formal_parameters)
+            (statement_block))
+          (ERROR)
+          (function_expression
+            (formal_parameters)
+            (statement_block))
+          (identifier)
+          (ERROR
+            (true))
+          (identifier)
+          (ERROR
+            (true))
+          (await_expression
+            (ERROR)
+            (true)))
+        (ERROR)))
+    (MISSING "}")))
 
 ============================================
 Classes
@@ -1642,12 +1643,12 @@ async function* foo() { yield 1; }
     (identifier)
     (formal_parameters)
     (statement_block))
-  (expression_statement
-    (object
-      (method_definition
-        (property_identifier)
-        (formal_parameters)
-        (statement_block))))
+  (statement_block
+    (ERROR
+      (ERROR
+        (identifier))
+      (formal_parameters))
+    (statement_block))
   (class_declaration
     (identifier)
     (class_body

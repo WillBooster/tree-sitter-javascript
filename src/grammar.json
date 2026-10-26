@@ -1578,8 +1578,15 @@
         "type": "SEQ",
         "members": [
           {
-            "type": "STRING",
-            "value": "{"
+            "type": "TOKEN",
+            "content": {
+              "type": "PREC",
+              "value": 1,
+              "content": {
+                "type": "STRING",
+                "value": "{"
+              }
+            }
           },
           {
             "type": "REPEAT",
@@ -11087,29 +11094,6 @@
     ],
     [
       "arrow_function",
-      "_primary_atom",
-      "_property_name"
-    ],
-    [
-      "_primary_atom",
-      "method_definition"
-    ],
-    [
-      "_primary_atom",
-      "_property_name"
-    ],
-    [
-      "_primary_atom",
-      "await_expression",
-      "_property_name"
-    ],
-    [
-      "object",
-      "object_pattern",
-      "_primary_atom"
-    ],
-    [
-      "arrow_function",
       "_primary_atom"
     ],
     [
@@ -11151,14 +11135,6 @@
     [
       "assignment_expression",
       "pattern"
-    ],
-    [
-      "assignment_expression",
-      "object_assignment_pattern"
-    ],
-    [
-      "computed_property_name",
-      "array"
     ]
   ],
   "precedences": [
