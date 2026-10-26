@@ -220,11 +220,6 @@ module.exports = grammar({
     [$.for_in_clause, $._primary_atom],
     [$._primary_atom, $.rest_pattern],
     [$._primary_atom, $.pattern],
-    [$.arrow_function, $._primary_atom, $._property_name],
-    [$._primary_atom, $.method_definition],
-    [$._primary_atom, $._property_name],
-    [$._primary_atom, $.await_expression, $._property_name],
-    [$.object, $.object_pattern, $._primary_atom],
     [$.arrow_function, $._primary_atom],
     [$._primary_atom, $.await_expression],
     [$.call_expression, $._constructor_import],
@@ -236,8 +231,6 @@ module.exports = grammar({
     [$.array, $.array_pattern],
     [$.object, $.object_pattern],
     [$.assignment_expression, $.pattern],
-    [$.assignment_expression, $.object_assignment_pattern],
-    [$.computed_property_name, $.array],
   ],
 
   word: ($) => $.identifier,
@@ -449,7 +442,7 @@ module.exports = grammar({
         optional($._initializer)
       ),
 
-    statement_block: ($) => prec.right(seq('{', repeat($._statement), '}')),
+    statement_block: ($) => prec.right(seq(token(prec(1, '{')), repeat($._statement), '}')),
 
     else_clause: ($) => seq('else', $._single_statement),
 
