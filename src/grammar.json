@@ -2088,8 +2088,22 @@
                             "name": "_lhs_expression"
                           },
                           {
-                            "type": "SYMBOL",
-                            "name": "parenthesized_expression"
+                            "type": "ALIAS",
+                            "content": {
+                              "type": "SYMBOL",
+                              "name": "_parenthesized_simple_target"
+                            },
+                            "named": true,
+                            "value": "parenthesized_expression"
+                          },
+                          {
+                            "type": "ALIAS",
+                            "content": {
+                              "type": "SYMBOL",
+                              "name": "_parenthesized_call_target"
+                            },
+                            "named": true,
+                            "value": "parenthesized_expression"
                           }
                         ]
                       }
@@ -6761,6 +6775,163 @@
         }
       ]
     },
+    "_simple_target_expression": {
+      "type": "ALIAS",
+      "content": {
+        "type": "SYMBOL",
+        "name": "_simple_target_primary"
+      },
+      "named": true,
+      "value": "primary_expression"
+    },
+    "_simple_target_primary": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_identifier"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_await_yield_identifier"
+          },
+          "named": true,
+          "value": "identifier"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_reserved_identifier"
+              },
+              "named": true,
+              "value": "identifier"
+            },
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_async_keyword"
+              },
+              "named": true,
+              "value": "identifier"
+            }
+          ]
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_assignment_member"
+          },
+          "named": true,
+          "value": "member_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_assignment_subscript"
+          },
+          "named": true,
+          "value": "subscript_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_parenthesized_simple_target"
+          },
+          "named": true,
+          "value": "parenthesized_expression"
+        }
+      ]
+    },
+    "_parenthesized_simple_target": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_simple_target_expression"
+          },
+          "named": true,
+          "value": "expression"
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        }
+      ]
+    },
+    "_call_target_expression": {
+      "type": "ALIAS",
+      "content": {
+        "type": "SYMBOL",
+        "name": "_call_target_primary"
+      },
+      "named": true,
+      "value": "primary_expression"
+    },
+    "_call_target_primary": {
+      "type": "SYMBOL",
+      "name": "_classic_call_target"
+    },
+    "_parenthesized_call_target": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_call_target_expression"
+          },
+          "named": true,
+          "value": "expression"
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        }
+      ]
+    },
+    "_classic_call_target": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_assignment_call"
+          },
+          "named": true,
+          "value": "call_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_parenthesized_call_target"
+          },
+          "named": true,
+          "value": "parenthesized_expression"
+        }
+      ]
+    },
     "assignment_expression": {
       "type": "PREC_RIGHT",
       "value": "assign",
@@ -6774,21 +6945,21 @@
               "type": "CHOICE",
               "members": [
                 {
-                  "type": "SYMBOL",
-                  "name": "parenthesized_expression"
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_parenthesized_simple_target"
+                  },
+                  "named": true,
+                  "value": "parenthesized_expression"
                 },
                 {
                   "type": "SYMBOL",
                   "name": "_lhs_expression"
                 },
                 {
-                  "type": "ALIAS",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "_assignment_call"
-                  },
-                  "named": true,
-                  "value": "call_expression"
+                  "type": "SYMBOL",
+                  "name": "_classic_call_target"
                 }
               ]
             }
@@ -6847,8 +7018,13 @@
           "name": "_identifier"
         },
         {
-          "type": "SYMBOL",
-          "name": "parenthesized_expression"
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_parenthesized_simple_target"
+          },
+          "named": true,
+          "value": "parenthesized_expression"
         }
       ]
     },
@@ -6950,13 +7126,8 @@
                     "type": "FIELD",
                     "name": "left",
                     "content": {
-                      "type": "ALIAS",
-                      "content": {
-                        "type": "SYMBOL",
-                        "name": "_assignment_call"
-                      },
-                      "named": true,
-                      "value": "call_expression"
+                      "type": "SYMBOL",
+                      "name": "_classic_call_target"
                     }
                   },
                   {
@@ -10023,8 +10194,13 @@
             "name": "_lhs_expression"
           },
           {
-            "type": "SYMBOL",
-            "name": "parenthesized_expression"
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_parenthesized_simple_target"
+            },
+            "named": true,
+            "value": "parenthesized_expression"
           },
           {
             "type": "SYMBOL",
@@ -10051,8 +10227,13 @@
                 "name": "_lhs_expression"
               },
               {
-                "type": "SYMBOL",
-                "name": "parenthesized_expression"
+                "type": "ALIAS",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_parenthesized_simple_target"
+                },
+                "named": true,
+                "value": "parenthesized_expression"
               }
             ]
           }
@@ -10876,6 +11057,19 @@
   ],
   "conflicts": [
     [
+      "_primary_atom",
+      "_simple_target_primary"
+    ],
+    [
+      "_simple_target_primary",
+      "pattern"
+    ],
+    [
+      "_primary_atom",
+      "_simple_target_primary",
+      "pattern"
+    ],
+    [
       "_call_callee",
       "call_expression"
     ],
@@ -11406,7 +11600,11 @@
     "_constructor_chain_base",
     "_assignment_call_callee",
     "_call_callee",
-    "_assignment_call_primary"
+    "_assignment_call_primary",
+    "_simple_target_expression",
+    "_simple_target_primary",
+    "_call_target_expression",
+    "_call_target_primary"
   ],
   "reserved": {
     "global": [
