@@ -175,6 +175,7 @@ module.exports = grammar({
     $._jsx_attribute_value,
     $._jsx_identifier,
     $._lhs_expression,
+    $._non_destructuring_lhs,
   ],
 
   precedences: ($) => [
@@ -1240,13 +1241,14 @@ module.exports = grammar({
         )
       ),
 
-    _lhs_expression: ($) =>
+    _lhs_expression: ($) => choice($._non_destructuring_lhs, $._destructuring_pattern),
+
+    _non_destructuring_lhs: ($) =>
       choice(
         $.member_expression,
         $.subscript_expression,
         $._identifier,
-        aliasWithAsyncKeyword($._reserved_identifier, $.identifier),
-        $._destructuring_pattern
+        aliasWithAsyncKeyword($._reserved_identifier, $.identifier)
       ),
 
     _simple_target_expression: ($) => alias($._simple_target_primary, $.primary_expression),
@@ -1678,12 +1680,15 @@ module.exports = grammar({
     _non_rest_pattern: ($) =>
       prec.dynamic(-1, choice($._lhs_expression, alias($._parenthesized_simple_target, $.parenthesized_expression))),
 
-    _rest_pattern: ($) => prec.dynamic(-1, $.rest_pattern),
+    _rest_pattern: ($) =>
+      prec.dynamic(-1, choice($.rest_pattern, alias($._destructuring_rest_pattern, $.rest_pattern))),
 
     rest_pattern: ($) =>
       prec.right(
-        seq('...', choice($._lhs_expression, alias($._parenthesized_simple_target, $.parenthesized_expression)))
+        seq('...', choice($._non_destructuring_lhs, alias($._parenthesized_simple_target, $.parenthesized_expression)))
       ),
+
+    _destructuring_rest_pattern: ($) => prec.right(seq('...', $._destructuring_pattern)),
 
     method_definition: ($) =>
       functionContext((async) =>

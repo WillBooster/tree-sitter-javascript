@@ -6734,6 +6734,19 @@
       "members": [
         {
           "type": "SYMBOL",
+          "name": "_non_destructuring_lhs"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_destructuring_pattern"
+        }
+      ]
+    },
+    "_non_destructuring_lhs": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
           "name": "member_expression"
         },
         {
@@ -6766,10 +6779,6 @@
               "value": "identifier"
             }
           ]
-        },
-        {
-          "type": "SYMBOL",
-          "name": "_destructuring_pattern"
         }
       ]
     },
@@ -10222,8 +10231,22 @@
       "type": "PREC_DYNAMIC",
       "value": -1,
       "content": {
-        "type": "SYMBOL",
-        "name": "rest_pattern"
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "SYMBOL",
+            "name": "rest_pattern"
+          },
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_destructuring_rest_pattern"
+            },
+            "named": true,
+            "value": "rest_pattern"
+          }
+        ]
       }
     },
     "rest_pattern": {
@@ -10241,7 +10264,7 @@
             "members": [
               {
                 "type": "SYMBOL",
-                "name": "_lhs_expression"
+                "name": "_non_destructuring_lhs"
               },
               {
                 "type": "ALIAS",
@@ -10253,6 +10276,23 @@
                 "value": "parenthesized_expression"
               }
             ]
+          }
+        ]
+      }
+    },
+    "_destructuring_rest_pattern": {
+      "type": "PREC_RIGHT",
+      "value": 0,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "..."
+          },
+          {
+            "type": "SYMBOL",
+            "name": "_destructuring_pattern"
           }
         ]
       }
@@ -11576,7 +11616,8 @@
     "_jsx_attribute_name",
     "_jsx_attribute_value",
     "_jsx_identifier",
-    "_lhs_expression"
+    "_lhs_expression",
+    "_non_destructuring_lhs"
   ],
   "supertypes": [
     "statement",
