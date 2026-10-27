@@ -10805,8 +10805,13 @@
             "type": "CHOICE",
             "members": [
               {
-                "type": "SYMBOL",
-                "name": "pattern"
+                "type": "ALIAS",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_non_rest_pattern"
+                },
+                "named": true,
+                "value": "pattern"
               },
               {
                 "type": "SYMBOL",
