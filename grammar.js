@@ -7,6 +7,8 @@
 
 // @ts-check
 
+/** @import {GrammarSymbols, RuleOrLiteral} from '@willbooster/web-tree-sitter/dsl' */
+
 // The CLI injects the DSL before loading this CommonJS grammar.
 const { grammar, alias, choice, field, optional, prec, repeat, repeat1, seq, sym, token, reserved } =
   /** @type {typeof globalThis & import('@willbooster/web-tree-sitter/dsl').DSL} */ (globalThis);
@@ -51,7 +53,6 @@ const RESERVED_WORDS = [
 ];
 const NAMED_RESERVED_WORDS = new Set(['this', 'super', 'true', 'false', 'null']);
 
-// Words that are keywords only in some positions and identifiers elsewhere.
 const MEMBER_MODIFIERS = ['get', 'set', 'static'];
 const CONTEXTUAL_KEYWORDS = ['async', 'await', 'let', 'of', 'using'];
 const CLASSIC_ASSIGNMENT_OPERATORS = ['+=', '-=', '*=', '/=', '%=', '^=', '&=', '|=', '>>=', '>>>=', '<<=', '**='];
@@ -128,6 +129,9 @@ module.exports = grammar({
     sym('_call_arguments_context'),
     sym('_async_keyword'),
     sym('_line_break_before_from'),
+    sym('_class_heritage_end'),
+    sym('_class_heritage_yield_identifier'),
+    sym('_class_heritage_await_identifier'),
   ],
 
   extras: ($) => [$.comment, sym('html_comment'), /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -146,6 +150,8 @@ module.exports = grammar({
     $._binary_operand,
     $._unary_operand,
     $.primary_expression,
+    $._class_heritage_expression,
+    $._class_heritage_primary,
     $.pattern,
     $._non_rest_pattern,
     $._rest_pattern,
@@ -167,6 +173,7 @@ module.exports = grammar({
     $._semicolon,
     $._identifier,
     $._reserved_identifier,
+    $._expression_identifier,
     $._jsx_attribute,
     $._jsx_element_name,
     $._jsx_child,
@@ -220,6 +227,7 @@ module.exports = grammar({
     [$._simple_target_primary, $._non_rest_pattern],
     [$._primary_atom, $._simple_target_primary, $._non_rest_pattern],
     [$._call_callee, $.call_expression],
+    [$._class_heritage_expression, $._class_heritage_call],
     [$.for_in_clause, $._primary_atom],
     [$._primary_atom, $.rest_pattern],
     [$._primary_atom, $._object_rest_pattern],
@@ -248,10 +256,6 @@ module.exports = grammar({
     _single_statement: ($) => seq(optional(sym('_single_statement_context')), $._statement),
 
     hash_bang_line: () => /#![^\n\r\u2028\u2029]*/,
-
-    //
-    // Export declarations
-    //
 
     export_statement: ($) =>
       choice(
@@ -327,10 +331,6 @@ module.exports = grammar({
         $.using_declaration
       ),
 
-    //
-    // Import declarations
-    //
-
     import: () => token('import'),
 
     import_statement: ($) =>
@@ -362,10 +362,6 @@ module.exports = grammar({
       ),
 
     import_attribute: ($) => seq('with', $.object),
-
-    //
-    // Statements
-    //
 
     statement: ($) =>
       choice(
@@ -620,10 +616,6 @@ module.exports = grammar({
         field('body', $._single_statement)
       ),
 
-    //
-    // Statement components
-    //
-
     switch_body: ($) => seq('{', repeat(choice($.switch_case, $.switch_default)), '}'),
 
     switch_case: ($) => seq('case', field('value', $._expressions), ':', field('body', repeat($._statement))),
@@ -641,9 +633,6 @@ module.exports = grammar({
 
     parenthesized_expression: ($) => seq('(', $._expressions, ')'),
 
-    //
-    // Expressions
-    //
     _expressions: ($) => choice($.expression, $.sequence_expression),
 
     expression: ($) =>
@@ -664,16 +653,7 @@ module.exports = grammar({
 
     _unary_operand: ($) => choice($.primary_expression, $.await_expression, $.unary_expression, $.update_expression),
 
-    primary_expression: ($) =>
-      choice(
-        $._primary_atom,
-        $.subscript_expression,
-        $.member_expression,
-        $.call_expression,
-        $.new_expression,
-        alias($._argumentless_new_expression, $.new_expression),
-        $.arrow_function
-      ),
+    primary_expression: ($) => choice(leftHandSideExpression($), $.arrow_function),
 
     yield_expression: ($) =>
       prec.right(
@@ -759,9 +739,6 @@ module.exports = grammar({
     jsx_element: ($) =>
       seq(field('open_tag', $.jsx_opening_element), repeat($._jsx_child), field('close_tag', $.jsx_closing_element)),
 
-    // An entity can be named, numeric (decimal), or numeric (hexadecimal). The
-    // longest entity name is 29 characters long, and the HTML spec says that
-    // no more will ever be added.
     html_character_reference: () => /&(#([xX][0-9a-fA-F]{1,6}|[0-9]{1,5})|[A-Za-z]{1,30});/,
 
     jsx_expression: ($) => seq('{', optional(choice($.expression, $.sequence_expression, $.spread_element)), '}'),
@@ -833,13 +810,8 @@ module.exports = grammar({
         )
       ),
 
-    // Workaround to https://github.com/tree-sitter/tree-sitter/issues/1156
-    // We give names to the token() constructs containing a regexp
-    // so as to obtain a node in the CST.
-    //
     unescaped_double_jsx_string_fragment: () => token.immediate(prec(1, /([^"&]|&[^#A-Za-z"&])+/)),
 
-    // same here
     unescaped_single_jsx_string_fragment: () => token.immediate(prec(1, /([^'&]|&[^#A-Za-z'&])+/)),
 
     // An `&` that does not start a complete html_character_reference is a literal character, as in HTML. The lexer
@@ -878,7 +850,31 @@ module.exports = grammar({
         )
       ),
 
-    class_heritage: ($) => seq('extends', $.expression),
+    class_heritage: ($) =>
+      seq('extends', alias($._class_heritage_expression, $.expression), sym('_class_heritage_end')),
+
+    _class_heritage_expression: ($) => alias($._class_heritage_primary, $.primary_expression),
+
+    _class_heritage_primary: ($) =>
+      leftHandSideExpression($, {
+        atom: $._class_heritage_atom,
+        call: alias($._class_heritage_call, $.call_expression),
+        member: alias($._class_heritage_member, $.member_expression),
+        subscript: alias($._class_heritage_subscript, $.subscript_expression),
+      }),
+
+    _class_heritage_atom: ($) => primaryAtom($, $._expression_identifier),
+
+    _class_heritage_call: ($) =>
+      callExpression(
+        $,
+        alias($._class_heritage_expression, $.expression),
+        alias($._class_heritage_primary, $.primary_expression)
+      ),
+
+    _class_heritage_member: ($) => memberExpression($, alias($._class_heritage_expression, $.expression)),
+
+    _class_heritage_subscript: ($) => subscriptExpression($, alias($._class_heritage_expression, $.expression)),
 
     function_expression: ($) =>
       prec(
@@ -991,46 +987,9 @@ module.exports = grammar({
 
     optional_chain: () => '?.',
 
-    call_expression: ($) =>
-      choice(
-        prec(
-          'call',
-          seq(field('function', choice(alias($._call_callee, $.expression), $.import)), field('arguments', $.arguments))
-        ),
-        prec('template_call', seq(field('function', $.primary_expression), field('arguments', $.template_string))),
-        prec(
-          'member',
-          seq(
-            field('function', $.primary_expression),
-            field('optional_chain', $.optional_chain),
-            field('arguments', $.arguments)
-          )
-        )
-      ),
+    call_expression: ($) => callExpression($, alias($._call_callee, $.expression), $.primary_expression),
 
-    _primary_atom: ($) =>
-      choice(
-        $._jsx_element,
-        $.parenthesized_expression,
-        $._identifier,
-        alias(sym('_await_yield_identifier'), $.identifier),
-        aliasWithAsyncKeyword($._reserved_identifier, $.identifier),
-        $.this,
-        $.super,
-        $.number,
-        $.string,
-        $.template_string,
-        $.regex,
-        $.true,
-        $.false,
-        $.null,
-        $.object,
-        $.array,
-        $.function_expression,
-        $.generator_function,
-        $.class,
-        $.meta_property
-      ),
+    _primary_atom: ($) => primaryAtom($, $._reserved_identifier),
 
     _assignment_call: ($) =>
       prec(
@@ -1220,33 +1179,9 @@ module.exports = grammar({
         )
       ),
 
-    member_expression: ($) =>
-      prec(
-        'member',
-        seq(
-          field('object', choice(alias($._call_callee, $.expression), $.import)),
-          choice('.', field('optional_chain', $.optional_chain)),
-          field(
-            'property',
-            choice(
-              $.private_property_identifier,
-              reserved('properties', alias($.identifier, sym('property_identifier')))
-            )
-          )
-        )
-      ),
+    member_expression: ($) => memberExpression($, alias($._call_callee, $.expression)),
 
-    subscript_expression: ($) =>
-      prec.right(
-        'member',
-        seq(
-          field('object', alias($._call_callee, $.expression)),
-          optional(field('optional_chain', $.optional_chain)),
-          '[',
-          field('index', $._expressions),
-          ']'
-        )
-      ),
+    subscript_expression: ($) => subscriptExpression($, alias($._call_callee, $.expression)),
 
     _lhs_expression: ($) =>
       choice(
@@ -1411,10 +1346,6 @@ module.exports = grammar({
 
     sequence_expression: ($) => prec.right(commaSep1($.expression)),
 
-    //
-    // Primitives
-    //
-
     string: ($) =>
       choice(
         seq(
@@ -1429,13 +1360,8 @@ module.exports = grammar({
         )
       ),
 
-    // Workaround to https://github.com/tree-sitter/tree-sitter/issues/1156
-    // We give names to the token() constructs containing a regexp
-    // so as to obtain a node in the CST.
-    //
     unescaped_double_string_fragment: () => token.immediate(prec(1, /[^"\\\r\n]+/)),
 
-    // same here
     unescaped_single_string_fragment: () => token.immediate(prec(1, /[^'\\\r\n]+/)),
 
     escape_sequence: () =>
@@ -1483,19 +1409,10 @@ module.exports = grammar({
           -1,
           repeat1(
             choice(
-              seq(
-                '[',
-                repeat(
-                  choice(
-                    seq('\\', /[^\n\r\u2028\u2029]/), // escaped character
-                    /[^\]\\\n\r\u2028\u2029]/ // any character besides ']', '\', or a line terminator
-                  )
-                ),
-                ']'
-              ), // square-bracket-delimited character class
-              seq('\\', /[^\n\r\u2028\u2029]/), // escaped character
+              seq('[', repeat(choice(seq('\\', /[^\n\r\u2028\u2029]/), /[^\]\\\n\r\u2028\u2029]/)), ']'),
+              seq('\\', /[^\n\r\u2028\u2029]/),
               // oxlint-disable-next-line no-useless-escape -- tree-sitter's regex parser rejects an unescaped `[` in a character class.
-              /[^/\\\[\n\r\u2028\u2029]/ // any character besides '[', '\', '/', or a line terminator
+              /[^/\\\[\n\r\u2028\u2029]/
             )
           )
         )
@@ -1568,10 +1485,6 @@ module.exports = grammar({
     false: () => 'false',
     null: () => 'null',
     undefined: () => 'undefined',
-
-    //
-    // Expression components
-    //
 
     arguments: ($) =>
       seq(choice('(', sym('_call_arguments_context')), commaSep(optional(choice($.expression, $.spread_element))), ')'),
@@ -1793,15 +1706,9 @@ module.exports = grammar({
 
     computed_property_name: ($) => seq('[', $.expression, ']'),
 
-    _reserved_identifier: ($) =>
-      choice(
-        sym('_yield_identifier'),
-        ...MEMBER_MODIFIERS,
-        $._escaped_let,
-        ...CONTEXTUAL_KEYWORDS.map((word) =>
-          word === 'await' ? choice(sym('_await_keyword'), sym('_await_identifier')) : word
-        )
-      ),
+    _reserved_identifier: ($) => contextualIdentifier($, false),
+
+    _expression_identifier: ($) => contextualIdentifier($, true),
 
     _semicolon: () =>
       choice(
@@ -1814,6 +1721,118 @@ module.exports = grammar({
 });
 
 /**
+ * @param {GrammarSymbols<'_primary_atom' | 'subscript_expression' | 'member_expression' | 'call_expression' | 'new_expression' | '_argumentless_new_expression'>} $
+ * @param {{atom?: RuleOrLiteral, subscript?: RuleOrLiteral, member?: RuleOrLiteral, call?: RuleOrLiteral}} [forms]
+ */
+function leftHandSideExpression($, forms = {}) {
+  return choice(
+    forms.atom ?? $._primary_atom,
+    forms.subscript ?? $.subscript_expression,
+    forms.member ?? $.member_expression,
+    forms.call ?? $.call_expression,
+    $.new_expression,
+    alias($._argumentless_new_expression, $.new_expression)
+  );
+}
+
+/**
+ * @param {import('@willbooster/web-tree-sitter/dsl').GrammarSymbols<'_escaped_let'>} $
+ * @param {boolean} heritage
+ */
+function contextualIdentifier($, heritage) {
+  const yieldWord = heritage ? sym('_class_heritage_yield_identifier') : sym('_yield_identifier');
+  const awaitWord = heritage
+    ? sym('_class_heritage_await_identifier')
+    : choice(sym('_await_keyword'), sym('_await_identifier'));
+  return choice(
+    yieldWord,
+    ...MEMBER_MODIFIERS,
+    $._escaped_let,
+    ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? awaitWord : word))
+  );
+}
+
+/**
+ * @param {GrammarSymbols<'import' | 'arguments' | 'template_string' | 'optional_chain'>} $
+ * @param {RuleOrLiteral} callee
+ * @param {RuleOrLiteral} primary
+ */
+function callExpression($, callee, primary) {
+  return choice(
+    prec('call', seq(field('function', choice(callee, $.import)), field('arguments', $.arguments))),
+    prec('template_call', seq(field('function', primary), field('arguments', $.template_string))),
+    prec(
+      'member',
+      seq(field('function', primary), field('optional_chain', $.optional_chain), field('arguments', $.arguments))
+    )
+  );
+}
+
+/**
+ * @param {GrammarSymbols<'_jsx_element' | 'parenthesized_expression' | '_identifier' | 'identifier' | 'this' | 'super' | 'number' | 'string' | 'template_string' | 'regex' | 'true' | 'false' | 'null' | 'object' | 'array' | 'function_expression' | 'generator_function' | 'class' | 'meta_property'>} $
+ * @param {RuleOrLiteral} identifier
+ */
+function primaryAtom($, identifier) {
+  return choice(
+    $._jsx_element,
+    $.parenthesized_expression,
+    $._identifier,
+    alias(sym('_await_yield_identifier'), $.identifier),
+    aliasWithAsyncKeyword(identifier, $.identifier),
+    $.this,
+    $.super,
+    $.number,
+    $.string,
+    $.template_string,
+    $.regex,
+    $.true,
+    $.false,
+    $.null,
+    $.object,
+    $.array,
+    $.function_expression,
+    $.generator_function,
+    $.class,
+    $.meta_property
+  );
+}
+
+/**
+ * @param {GrammarSymbols<'import' | 'optional_chain' | 'private_property_identifier' | 'identifier'>} $
+ * @param {RuleOrLiteral} object
+ */
+function memberExpression($, object) {
+  return prec(
+    'member',
+    seq(
+      field('object', choice(object, $.import)),
+      choice('.', field('optional_chain', $.optional_chain)),
+      field(
+        'property',
+        choice($.private_property_identifier, reserved('properties', alias($.identifier, sym('property_identifier'))))
+      )
+    )
+  );
+}
+
+/**
+ * @param {GrammarSymbols<'optional_chain' | '_expressions'>} $
+ * @param {RuleOrLiteral} object
+ */
+function subscriptExpression($, object) {
+  return prec.right(
+    'member',
+    seq(
+      field('object', object),
+      optional(field('optional_chain', $.optional_chain)),
+      '[',
+      field('index', $._expressions),
+      ']'
+    )
+  );
+}
+
+/**
  * @param {import('@willbooster/web-tree-sitter/dsl').RuleOrLiteral} rule
  * @param {import('@willbooster/web-tree-sitter/dsl').SymbolRule<string>} symbol
  */
@@ -1822,8 +1841,6 @@ function aliasWithAsyncKeyword(rule, symbol) {
 }
 
 /**
- * Creates a rule to match one or more of the rules separated by a comma
- *
  * @param {import('@willbooster/web-tree-sitter/dsl').RuleOrLiteral} rule
  *
  * @returns {import('@willbooster/web-tree-sitter/dsl').SeqRule}
@@ -1833,8 +1850,6 @@ function commaSep1(rule) {
 }
 
 /**
- * Creates a rule to optionally match one or more of the rules separated by a comma
- *
  * @param {import('@willbooster/web-tree-sitter/dsl').RuleOrLiteral} rule
  *
  * @returns {import('@willbooster/web-tree-sitter/dsl').ChoiceRule}
