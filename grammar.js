@@ -51,7 +51,6 @@ const RESERVED_WORDS = [
 ];
 const NAMED_RESERVED_WORDS = new Set(['this', 'super', 'true', 'false', 'null']);
 
-// Words that are keywords only in some positions and identifiers elsewhere.
 const MEMBER_MODIFIERS = ['get', 'set', 'static'];
 const CONTEXTUAL_KEYWORDS = ['async', 'await', 'let', 'of', 'using'];
 const CLASSIC_ASSIGNMENT_OPERATORS = ['+=', '-=', '*=', '/=', '%=', '^=', '&=', '|=', '>>=', '>>>=', '<<=', '**='];
@@ -128,6 +127,7 @@ module.exports = grammar({
     sym('_call_arguments_context'),
     sym('_async_keyword'),
     sym('_line_break_before_from'),
+    sym('_class_heritage_end'),
   ],
 
   extras: ($) => [$.comment, sym('html_comment'), /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -146,6 +146,8 @@ module.exports = grammar({
     $._binary_operand,
     $._unary_operand,
     $.primary_expression,
+    $._class_heritage_expression,
+    $._class_heritage_primary,
     $.pattern,
     $._non_rest_pattern,
     $._rest_pattern,
@@ -246,10 +248,6 @@ module.exports = grammar({
 
     hash_bang_line: () => /#![^\n\r\u2028\u2029]*/,
 
-    //
-    // Export declarations
-    //
-
     export_statement: ($) =>
       choice(
         field('declaration', alias($._decorated_export_declaration, $.declaration)),
@@ -324,10 +322,6 @@ module.exports = grammar({
         $.using_declaration
       ),
 
-    //
-    // Import declarations
-    //
-
     import: () => token('import'),
 
     import_statement: ($) =>
@@ -359,10 +353,6 @@ module.exports = grammar({
       ),
 
     import_attribute: ($) => seq('with', $.object),
-
-    //
-    // Statements
-    //
 
     statement: ($) =>
       choice(
@@ -617,10 +607,6 @@ module.exports = grammar({
         field('body', $._single_statement)
       ),
 
-    //
-    // Statement components
-    //
-
     switch_body: ($) => seq('{', repeat(choice($.switch_case, $.switch_default)), '}'),
 
     switch_case: ($) => seq('case', field('value', $._expressions), ':', field('body', repeat($._statement))),
@@ -638,9 +624,6 @@ module.exports = grammar({
 
     parenthesized_expression: ($) => seq('(', $._expressions, ')'),
 
-    //
-    // Expressions
-    //
     _expressions: ($) => choice($.expression, $.sequence_expression),
 
     expression: ($) =>
@@ -661,16 +644,7 @@ module.exports = grammar({
 
     _unary_operand: ($) => choice($.primary_expression, $.await_expression, $.unary_expression, $.update_expression),
 
-    primary_expression: ($) =>
-      choice(
-        $._primary_atom,
-        $.subscript_expression,
-        $.member_expression,
-        $.call_expression,
-        $.new_expression,
-        alias($._argumentless_new_expression, $.new_expression),
-        $.arrow_function
-      ),
+    primary_expression: ($) => choice(leftHandSideExpression($), $.arrow_function),
 
     yield_expression: ($) =>
       prec.right(
@@ -751,9 +725,6 @@ module.exports = grammar({
     jsx_element: ($) =>
       seq(field('open_tag', $.jsx_opening_element), repeat($._jsx_child), field('close_tag', $.jsx_closing_element)),
 
-    // An entity can be named, numeric (decimal), or numeric (hexadecimal). The
-    // longest entity name is 29 characters long, and the HTML spec says that
-    // no more will ever be added.
     html_character_reference: () => /&(#([xX][0-9a-fA-F]{1,6}|[0-9]{1,5})|[A-Za-z]{1,30});/,
 
     jsx_expression: ($) => seq('{', optional(choice($.expression, $.sequence_expression, $.spread_element)), '}'),
@@ -825,13 +796,8 @@ module.exports = grammar({
         )
       ),
 
-    // Workaround to https://github.com/tree-sitter/tree-sitter/issues/1156
-    // We give names to the token() constructs containing a regexp
-    // so as to obtain a node in the CST.
-    //
     unescaped_double_jsx_string_fragment: () => token.immediate(prec(1, /([^"&]|&[^#A-Za-z"&])+/)),
 
-    // same here
     unescaped_single_jsx_string_fragment: () => token.immediate(prec(1, /([^'&]|&[^#A-Za-z'&])+/)),
 
     // An `&` that does not start a complete html_character_reference is a literal character, as in HTML. The lexer
@@ -870,7 +836,12 @@ module.exports = grammar({
         )
       ),
 
-    class_heritage: ($) => seq('extends', $.expression),
+    class_heritage: ($) =>
+      seq('extends', alias($._class_heritage_expression, $.expression), sym('_class_heritage_end')),
+
+    _class_heritage_expression: ($) => alias($._class_heritage_primary, $.primary_expression),
+
+    _class_heritage_primary: ($) => leftHandSideExpression($),
 
     function_expression: ($) =>
       prec(
@@ -1403,10 +1374,6 @@ module.exports = grammar({
 
     sequence_expression: ($) => prec.right(commaSep1($.expression)),
 
-    //
-    // Primitives
-    //
-
     string: ($) =>
       choice(
         seq(
@@ -1421,13 +1388,8 @@ module.exports = grammar({
         )
       ),
 
-    // Workaround to https://github.com/tree-sitter/tree-sitter/issues/1156
-    // We give names to the token() constructs containing a regexp
-    // so as to obtain a node in the CST.
-    //
     unescaped_double_string_fragment: () => token.immediate(prec(1, /[^"\\\r\n]+/)),
 
-    // same here
     unescaped_single_string_fragment: () => token.immediate(prec(1, /[^'\\\r\n]+/)),
 
     escape_sequence: () =>
@@ -1475,19 +1437,10 @@ module.exports = grammar({
           -1,
           repeat1(
             choice(
-              seq(
-                '[',
-                repeat(
-                  choice(
-                    seq('\\', /[^\n\r\u2028\u2029]/), // escaped character
-                    /[^\]\\\n\r\u2028\u2029]/ // any character besides ']', '\', or a line terminator
-                  )
-                ),
-                ']'
-              ), // square-bracket-delimited character class
-              seq('\\', /[^\n\r\u2028\u2029]/), // escaped character
+              seq('[', repeat(choice(seq('\\', /[^\n\r\u2028\u2029]/), /[^\]\\\n\r\u2028\u2029]/)), ']'),
+              seq('\\', /[^\n\r\u2028\u2029]/),
               // oxlint-disable-next-line no-useless-escape -- tree-sitter's regex parser rejects an unescaped `[` in a character class.
-              /[^/\\\[\n\r\u2028\u2029]/ // any character besides '[', '\', '/', or a line terminator
+              /[^/\\\[\n\r\u2028\u2029]/
             )
           )
         )
@@ -1560,10 +1513,6 @@ module.exports = grammar({
     false: () => 'false',
     null: () => 'null',
     undefined: () => 'undefined',
-
-    //
-    // Expression components
-    //
 
     arguments: ($) =>
       seq(choice('(', sym('_call_arguments_context')), commaSep(optional(choice($.expression, $.spread_element))), ')'),
@@ -1788,6 +1737,18 @@ module.exports = grammar({
   },
 });
 
+/** @param {import('@willbooster/web-tree-sitter/dsl').GrammarSymbols<'_primary_atom' | 'subscript_expression' | 'member_expression' | 'call_expression' | 'new_expression' | '_argumentless_new_expression'>} $ */
+function leftHandSideExpression($) {
+  return choice(
+    $._primary_atom,
+    $.subscript_expression,
+    $.member_expression,
+    $.call_expression,
+    $.new_expression,
+    alias($._argumentless_new_expression, $.new_expression)
+  );
+}
+
 /**
  * @param {import('@willbooster/web-tree-sitter/dsl').RuleOrLiteral} rule
  * @param {import('@willbooster/web-tree-sitter/dsl').SymbolRule<string>} symbol
@@ -1797,8 +1758,6 @@ function aliasWithAsyncKeyword(rule, symbol) {
 }
 
 /**
- * Creates a rule to match one or more of the rules separated by a comma
- *
  * @param {import('@willbooster/web-tree-sitter/dsl').RuleOrLiteral} rule
  *
  * @returns {import('@willbooster/web-tree-sitter/dsl').SeqRule}
@@ -1808,8 +1767,6 @@ function commaSep1(rule) {
 }
 
 /**
- * Creates a rule to optionally match one or more of the rules separated by a comma
- *
  * @param {import('@willbooster/web-tree-sitter/dsl').RuleOrLiteral} rule
  *
  * @returns {import('@willbooster/web-tree-sitter/dsl').ChoiceRule}

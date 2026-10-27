@@ -56,9 +56,11 @@ enum TokenType {
     CALL_ARGUMENTS_CONTEXT,
     ASYNC_KEYWORD,
     LINE_BREAK_BEFORE_FROM,
+    CLASS_HERITAGE_END,
 };
 
 static bool scan_let(TSLexer *lexer);
+static bool scan_class_heritage_end(TSLexer *lexer);
 static bool is_reserved_word(const char *name);
 static bool scan_expression_trivia(TSLexer *lexer, bool *saw_newline, bool *scanned_comment, bool skip_contents);
 
@@ -1092,6 +1094,10 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
         }
     }
 
+    if (valid_symbols[CLASS_HERITAGE_END] && !(valid_symbols[TEMPLATE_CHARS] && valid_symbols[AUTOMATIC_SEMICOLON])) {
+        return scan_class_heritage_end(lexer);
+    }
+
     if (valid_symbols[LINE_BREAK_AFTER_BINDING] &&
         !(valid_symbols[TEMPLATE_CHARS] && valid_symbols[AUTOMATIC_SEMICOLON])) {
         return scan_binding_end(scanner, lexer);
@@ -1403,4 +1409,18 @@ static bool scan_default_trivia(TSLexer *lexer, bool allow_line_breaks) {
         }
         while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) advance(lexer);
     }
+}
+
+static bool scan_class_heritage_end(TSLexer *lexer) {
+    lexer->mark_end(lexer);
+    bool saw_newline = false;
+    if (!scan_expression_trivia(lexer, &saw_newline, NULL, true)) return false;
+    int32_t c = lexer->lookahead;
+    if (c == '.' || c == '[' || c == '(' || c == '`') return false;
+    if (c == '?') {
+        advance(lexer);
+        if (lexer->lookahead == '.') return false;
+    }
+    lexer->result_symbol = CLASS_HERITAGE_END;
+    return true;
 }

@@ -3007,33 +3007,38 @@
       "type": "CHOICE",
       "members": [
         {
-          "type": "SYMBOL",
-          "name": "_primary_atom"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "subscript_expression"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "member_expression"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "call_expression"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "new_expression"
-        },
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_argumentless_new_expression"
-          },
-          "named": true,
-          "value": "new_expression"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_primary_atom"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "subscript_expression"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "member_expression"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "call_expression"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "new_expression"
+            },
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_argumentless_new_expression"
+              },
+              "named": true,
+              "value": "new_expression"
+            }
+          ]
         },
         {
           "type": "SYMBOL",
@@ -4345,8 +4350,60 @@
           "value": "extends"
         },
         {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_class_heritage_expression"
+          },
+          "named": true,
+          "value": "expression"
+        },
+        {
           "type": "SYMBOL",
-          "name": "expression"
+          "name": "_class_heritage_end"
+        }
+      ]
+    },
+    "_class_heritage_expression": {
+      "type": "ALIAS",
+      "content": {
+        "type": "SYMBOL",
+        "name": "_class_heritage_primary"
+      },
+      "named": true,
+      "value": "primary_expression"
+    },
+    "_class_heritage_primary": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_primary_atom"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "subscript_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "member_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "call_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "new_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_argumentless_new_expression"
+          },
+          "named": true,
+          "value": "new_expression"
         }
       ]
     },
@@ -11559,6 +11616,10 @@
     {
       "type": "SYMBOL",
       "name": "_line_break_before_from"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_class_heritage_end"
     }
   ],
   "inline": [
@@ -11585,6 +11646,8 @@
     "_binary_operand",
     "_unary_operand",
     "primary_expression",
+    "_class_heritage_expression",
+    "_class_heritage_primary",
     "pattern",
     "_non_rest_pattern",
     "_rest_pattern",
