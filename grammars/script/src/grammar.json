@@ -11537,7 +11537,7 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "_yield_identifier"
+          "name": "_class_heritage_yield_identifier"
         },
         {
           "type": "STRING",
@@ -11561,7 +11561,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "_await_identifier"
+          "name": "_class_heritage_await_identifier"
         },
         {
           "type": "STRING",
@@ -12113,6 +12113,14 @@
     {
       "type": "SYMBOL",
       "name": "_class_heritage_end"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_class_heritage_yield_identifier"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_class_heritage_await_identifier"
     }
   ],
   "inline": [

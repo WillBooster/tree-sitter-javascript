@@ -57,6 +57,8 @@ enum TokenType {
     ASYNC_KEYWORD,
     LINE_BREAK_BEFORE_FROM,
     CLASS_HERITAGE_END,
+    CLASS_HERITAGE_YIELD_IDENTIFIER,
+    CLASS_HERITAGE_AWAIT_IDENTIFIER,
 };
 
 static bool scan_let(TSLexer *lexer);
@@ -927,8 +929,9 @@ static bool scan_yield(Scanner *scanner, TSLexer *lexer, const bool *valid_symbo
     }
     if (is_identifier_part(lexer->lookahead)) return false;
     bool identifier = (scanner->functions.depth || JAVASCRIPT_SCRIPT_GOAL) && !function_context_generator(&scanner->functions);
-    TSSymbol symbol = await_operand ? AWAIT_YIELD_IDENTIFIER : identifier ? YIELD_IDENTIFIER : YIELD_KEYWORD;
-    bool forbidden_identifier = symbol == YIELD_KEYWORD && valid_symbols[YIELD_IDENTIFIER];
+    TSSymbol identifier_symbol = valid_symbols[CLASS_HERITAGE_YIELD_IDENTIFIER] ? CLASS_HERITAGE_YIELD_IDENTIFIER : YIELD_IDENTIFIER;
+    TSSymbol symbol = await_operand ? AWAIT_YIELD_IDENTIFIER : identifier ? identifier_symbol : YIELD_KEYWORD;
+    bool forbidden_identifier = symbol == YIELD_KEYWORD && valid_symbols[CLASS_HERITAGE_YIELD_IDENTIFIER];
     if (!valid_symbols[symbol] && !forbidden_identifier) return false;
     lexer->mark_end(lexer);
     lexer->result_symbol = symbol;
@@ -942,8 +945,9 @@ static bool scan_await_or_async(Scanner *scanner, TSLexer *lexer, const bool *va
     if (strcmp(keyword, "async") == 0) return scan_async_start(lexer, keyword, sizeof(keyword), valid_symbols);
     if (strcmp(keyword, "await") != 0) return false;
     bool identifier = await_is_identifier(scanner);
-    TSSymbol symbol = identifier ? AWAIT_IDENTIFIER : AWAIT_KEYWORD;
-    bool forbidden_identifier = !identifier && valid_symbols[AWAIT_IDENTIFIER];
+    TSSymbol identifier_symbol = valid_symbols[CLASS_HERITAGE_AWAIT_IDENTIFIER] ? CLASS_HERITAGE_AWAIT_IDENTIFIER : AWAIT_IDENTIFIER;
+    TSSymbol symbol = identifier ? identifier_symbol : AWAIT_KEYWORD;
+    bool forbidden_identifier = !identifier && valid_symbols[CLASS_HERITAGE_AWAIT_IDENTIFIER];
     if (!valid_symbols[symbol] && !forbidden_identifier) return false;
     lexer->mark_end(lexer);
     // Record the operand decision on both keyword and identifier tokens so restored nodes cannot keep stale roles.
@@ -975,10 +979,10 @@ static bool scan_async_start(TSLexer *lexer, char *keyword, unsigned capacity, c
 }
 
 static bool scan_contextual_keyword(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
-    if ((valid_symbols[AWAIT_KEYWORD] || valid_symbols[AWAIT_IDENTIFIER] || valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START] || valid_symbols[ASYNC_KEYWORD]) && lexer->lookahead == 'a') {
+    if ((valid_symbols[AWAIT_KEYWORD] || valid_symbols[AWAIT_IDENTIFIER] || valid_symbols[CLASS_HERITAGE_AWAIT_IDENTIFIER] || valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START] || valid_symbols[ASYNC_KEYWORD]) && lexer->lookahead == 'a') {
         return scan_await_or_async(scanner, lexer, valid_symbols);
     }
-    if ((valid_symbols[YIELD_KEYWORD] || valid_symbols[YIELD_IDENTIFIER]) && lexer->lookahead == 'y') {
+    if ((valid_symbols[YIELD_KEYWORD] || valid_symbols[YIELD_IDENTIFIER] || valid_symbols[CLASS_HERITAGE_YIELD_IDENTIFIER]) && lexer->lookahead == 'y') {
         return scan_yield(scanner, lexer, valid_symbols, false);
     }
     if (valid_symbols[LET] && !valid_symbols[SINGLE_STATEMENT_CONTEXT] && lexer->lookahead == 'l') {
@@ -1425,7 +1429,7 @@ static bool scan_class_heritage_end(TSLexer *lexer, bool allow_html_comment) {
     switch (c) {
         case '<':
         case '-':
-            if (allow_html_comment && (c == '<' || saw_newline) && scan_html_comment(lexer)) return true;
+            if (allow_html_comment && scan_html_comment(lexer)) return true;
             break;
         case '/':
             advance(lexer);

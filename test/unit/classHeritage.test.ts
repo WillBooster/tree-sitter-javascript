@@ -210,6 +210,25 @@ for (const goal of ['javascript', 'javascript_script']) {
           result.delete();
         }
       }
+      for (const body of [
+        '({yield: 1});',
+        '({yield(){}});',
+        '({get yield(){}});',
+        '({async yield(){}});',
+        '({*yield(){}});',
+        'class K { yield(){} static yield = 1; }',
+        'let {yield: a} = b;',
+        '({await: 1}); class K { await(){} }',
+      ]) {
+        for (const source of [body, `function* g() { ${body} }`, `async function g() { ${body} }`]) {
+          const tree = parser.parse(source)!;
+          try {
+            expect(tree.rootNode.hasError, source).toBe(false);
+          } finally {
+            tree.delete();
+          }
+        }
+      }
       const control = parser.parse('function* g() { class C extends B.yield {} yield result; }')!;
       try {
         expect(control.rootNode.hasError).toBe(false);
@@ -234,7 +253,13 @@ test('preserves Script HTML comments between heritage continuations', async () =
   await Parser.init();
   const parser = new Parser().setLanguage(await Language.load('tree-sitter-javascript_script.wasm'));
   try {
-    for (const trivia of [' <!-- comment\n', '\n--> comment\n', ' /* normal */ <!-- comment\n']) {
+    for (const trivia of [
+      ' <!-- comment\n',
+      '\n--> comment\n',
+      ' /* normal */ <!-- comment\n',
+      '\n/* normal */ --> comment\n',
+      ' /*\nnormal */ --> comment\n',
+    ]) {
       const tree = parser.parse(`class C extends B${trivia}.x {}\nconst after = 1;`)!;
       try {
         expect(tree.rootNode.hasError, trivia).toBe(false);

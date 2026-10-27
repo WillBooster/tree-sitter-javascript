@@ -130,6 +130,8 @@ module.exports = grammar({
     sym('_async_keyword'),
     sym('_line_break_before_from'),
     sym('_class_heritage_end'),
+    sym('_class_heritage_yield_identifier'),
+    sym('_class_heritage_await_identifier'),
   ],
 
   extras: ($) => [$.comment, sym('html_comment'), /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -1704,9 +1706,9 @@ module.exports = grammar({
 
     computed_property_name: ($) => seq('[', $.expression, ']'),
 
-    _reserved_identifier: ($) => contextualIdentifier($, true),
+    _reserved_identifier: ($) => contextualIdentifier($, false),
 
-    _expression_identifier: ($) => contextualIdentifier($, false),
+    _expression_identifier: ($) => contextualIdentifier($, true),
 
     _semicolon: () =>
       choice(
@@ -1735,14 +1737,15 @@ function leftHandSideExpression($, forms = {}) {
 
 /**
  * @param {import('@willbooster/web-tree-sitter/dsl').GrammarSymbols<'_escaped_let'>} $
- * @param {boolean} allowAwaitKeyword
+ * @param {boolean} heritage
  */
-function contextualIdentifier($, allowAwaitKeyword) {
-  const awaitWord = allowAwaitKeyword
-    ? choice(sym('_await_keyword'), sym('_await_identifier'))
-    : sym('_await_identifier');
+function contextualIdentifier($, heritage) {
+  const yieldWord = heritage ? sym('_class_heritage_yield_identifier') : sym('_yield_identifier');
+  const awaitWord = heritage
+    ? sym('_class_heritage_await_identifier')
+    : choice(sym('_await_keyword'), sym('_await_identifier'));
   return choice(
-    sym('_yield_identifier'),
+    yieldWord,
     ...MEMBER_MODIFIERS,
     $._escaped_let,
     ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? awaitWord : word))
