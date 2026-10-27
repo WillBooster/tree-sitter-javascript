@@ -3377,8 +3377,13 @@
                     ]
                   },
                   {
-                    "type": "SYMBOL",
-                    "name": "rest_pattern"
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "_object_rest_pattern"
+                    },
+                    "named": true,
+                    "value": "rest_pattern"
                   }
                 ]
               },
@@ -6734,19 +6739,6 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "_non_destructuring_lhs"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "_destructuring_pattern"
-        }
-      ]
-    },
-    "_non_destructuring_lhs": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "SYMBOL",
           "name": "member_expression"
         },
         {
@@ -6779,6 +6771,10 @@
               "value": "identifier"
             }
           ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_destructuring_pattern"
         }
       ]
     },
@@ -10231,22 +10227,8 @@
       "type": "PREC_DYNAMIC",
       "value": -1,
       "content": {
-        "type": "CHOICE",
-        "members": [
-          {
-            "type": "SYMBOL",
-            "name": "rest_pattern"
-          },
-          {
-            "type": "ALIAS",
-            "content": {
-              "type": "SYMBOL",
-              "name": "_destructuring_rest_pattern"
-            },
-            "named": true,
-            "value": "rest_pattern"
-          }
-        ]
+        "type": "SYMBOL",
+        "name": "rest_pattern"
       }
     },
     "rest_pattern": {
@@ -10264,7 +10246,7 @@
             "members": [
               {
                 "type": "SYMBOL",
-                "name": "_non_destructuring_lhs"
+                "name": "_lhs_expression"
               },
               {
                 "type": "ALIAS",
@@ -10280,7 +10262,7 @@
         ]
       }
     },
-    "_destructuring_rest_pattern": {
+    "_object_rest_pattern": {
       "type": "PREC_RIGHT",
       "value": 0,
       "content": {
@@ -10292,10 +10274,59 @@
           },
           {
             "type": "SYMBOL",
-            "name": "_destructuring_pattern"
+            "name": "_object_rest_target"
           }
         ]
       }
+    },
+    "_object_rest_target": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "member_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "subscript_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_identifier"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_reserved_identifier"
+              },
+              "named": true,
+              "value": "identifier"
+            },
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_async_keyword"
+              },
+              "named": true,
+              "value": "identifier"
+            }
+          ]
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_parenthesized_simple_target"
+          },
+          "named": true,
+          "value": "parenthesized_expression"
+        }
+      ]
     },
     "method_definition": {
       "type": "CHOICE",
@@ -11145,6 +11176,10 @@
     ],
     [
       "_primary_atom",
+      "_object_rest_pattern"
+    ],
+    [
+      "_primary_atom",
       "_non_rest_pattern"
     ],
     [
@@ -11170,6 +11205,10 @@
     [
       "primary_expression",
       "rest_pattern"
+    ],
+    [
+      "primary_expression",
+      "_object_rest_pattern"
     ],
     [
       "primary_expression",
@@ -11617,7 +11656,7 @@
     "_jsx_attribute_value",
     "_jsx_identifier",
     "_lhs_expression",
-    "_non_destructuring_lhs"
+    "_object_rest_target"
   ],
   "supertypes": [
     "statement",
