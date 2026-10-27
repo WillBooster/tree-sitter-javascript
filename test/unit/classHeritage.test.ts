@@ -16,6 +16,7 @@ const valid = [
   'B?.[x]',
   'tag`x`',
   '(a => a)',
+  '(() => B)()',
   'null',
   'class {}',
   'function() {}',
@@ -30,7 +31,7 @@ const valid = [
   'tag /* boundary */ `x`',
   'B /* boundary */ [x]',
 ];
-const invalid = ['B < 1', 'B + D', 'B = D', 'B ? D : E', '!B', 'B++', 'a => a', 'async a => a', 'await B'];
+const invalid = ['B < 1', 'B + D', 'B = D', 'B ? D : E', '!B', 'B++', 'a => a', 'async a => a', 'await B', 'a => {}()'];
 
 for (const goal of ['javascript', 'javascript_script']) {
   test(`restricts class heritage to left-hand-side expressions in ${goal}`, async () => {
@@ -58,6 +59,8 @@ for (const goal of ['javascript', 'javascript_script']) {
         const tree = parser.parse(prefix + expression + suffix)!;
         try {
           expect(tree.rootNode.hasError, expression).toBe(true);
+          expect(tree.rootNode.lastNamedChild?.text, expression).toBe('const sentinel = 1;');
+          expect(tree.rootNode.lastNamedChild?.hasError, expression).toBe(false);
         } finally {
           tree.delete();
         }
@@ -98,6 +101,7 @@ for (const goal of ['javascript', 'javascript_script']) {
           expect(tree.rootNode.toString(), next).toBe(fresh.rootNode.toString());
           expect(captures(query, tree.rootNode), next).toEqual(captures(query, fresh.rootNode));
           expect(tree.rootNode.hasError, next).toBe(invalid.includes(next));
+          expect(tree.rootNode.lastNamedChild?.text, next).toBe('const sentinel = 1;');
         } finally {
           fresh.delete();
         }
