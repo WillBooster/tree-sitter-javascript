@@ -7,6 +7,8 @@
 
 // @ts-check
 
+/** @import {GrammarSymbols, RuleOrLiteral} from '@willbooster/web-tree-sitter/dsl' */
+
 // The CLI injects the DSL before loading this CommonJS grammar.
 const { grammar, alias, choice, field, optional, prec, repeat, repeat1, seq, sym, token, reserved } =
   /** @type {typeof globalThis & import('@willbooster/web-tree-sitter/dsl').DSL} */ (globalThis);
@@ -169,6 +171,7 @@ module.exports = grammar({
     $._semicolon,
     $._identifier,
     $._reserved_identifier,
+    $._expression_identifier,
     $._jsx_attribute,
     $._jsx_element_name,
     $._jsx_child,
@@ -222,6 +225,7 @@ module.exports = grammar({
     [$._simple_target_primary, $._non_rest_pattern],
     [$._primary_atom, $._simple_target_primary, $._non_rest_pattern],
     [$._call_callee, $.call_expression],
+    [$._class_heritage_expression, $._class_heritage_call],
     [$.for_in_clause, $._primary_atom],
     [$._primary_atom, $.rest_pattern],
     [$._primary_atom, $._object_rest_pattern],
@@ -849,7 +853,26 @@ module.exports = grammar({
 
     _class_heritage_expression: ($) => alias($._class_heritage_primary, $.primary_expression),
 
-    _class_heritage_primary: ($) => leftHandSideExpression($),
+    _class_heritage_primary: ($) =>
+      leftHandSideExpression($, {
+        atom: $._class_heritage_atom,
+        call: alias($._class_heritage_call, $.call_expression),
+        member: alias($._class_heritage_member, $.member_expression),
+        subscript: alias($._class_heritage_subscript, $.subscript_expression),
+      }),
+
+    _class_heritage_atom: ($) => primaryAtom($, $._expression_identifier),
+
+    _class_heritage_call: ($) =>
+      callExpression(
+        $,
+        alias($._class_heritage_expression, $.expression),
+        alias($._class_heritage_primary, $.primary_expression)
+      ),
+
+    _class_heritage_member: ($) => memberExpression($, alias($._class_heritage_expression, $.expression)),
+
+    _class_heritage_subscript: ($) => subscriptExpression($, alias($._class_heritage_expression, $.expression)),
 
     function_expression: ($) =>
       prec(
@@ -962,46 +985,9 @@ module.exports = grammar({
 
     optional_chain: () => '?.',
 
-    call_expression: ($) =>
-      choice(
-        prec(
-          'call',
-          seq(field('function', choice(alias($._call_callee, $.expression), $.import)), field('arguments', $.arguments))
-        ),
-        prec('template_call', seq(field('function', $.primary_expression), field('arguments', $.template_string))),
-        prec(
-          'member',
-          seq(
-            field('function', $.primary_expression),
-            field('optional_chain', $.optional_chain),
-            field('arguments', $.arguments)
-          )
-        )
-      ),
+    call_expression: ($) => callExpression($, alias($._call_callee, $.expression), $.primary_expression),
 
-    _primary_atom: ($) =>
-      choice(
-        $._jsx_element,
-        $.parenthesized_expression,
-        $._identifier,
-        alias(sym('_await_yield_identifier'), $.identifier),
-        aliasWithAsyncKeyword($._reserved_identifier, $.identifier),
-        $.this,
-        $.super,
-        $.number,
-        $.string,
-        $.template_string,
-        $.regex,
-        $.true,
-        $.false,
-        $.null,
-        $.object,
-        $.array,
-        $.function_expression,
-        $.generator_function,
-        $.class,
-        $.meta_property
-      ),
+    _primary_atom: ($) => primaryAtom($, $._reserved_identifier),
 
     _assignment_call: ($) =>
       prec(
@@ -1191,33 +1177,9 @@ module.exports = grammar({
         )
       ),
 
-    member_expression: ($) =>
-      prec(
-        'member',
-        seq(
-          field('object', choice(alias($._call_callee, $.expression), $.import)),
-          choice('.', field('optional_chain', $.optional_chain)),
-          field(
-            'property',
-            choice(
-              $.private_property_identifier,
-              reserved('properties', alias($.identifier, sym('property_identifier')))
-            )
-          )
-        )
-      ),
+    member_expression: ($) => memberExpression($, alias($._call_callee, $.expression)),
 
-    subscript_expression: ($) =>
-      prec.right(
-        'member',
-        seq(
-          field('object', alias($._call_callee, $.expression)),
-          optional(field('optional_chain', $.optional_chain)),
-          '[',
-          field('index', $._expressions),
-          ']'
-        )
-      ),
+    subscript_expression: ($) => subscriptExpression($, alias($._call_callee, $.expression)),
 
     _lhs_expression: ($) =>
       choice(
@@ -1742,15 +1704,9 @@ module.exports = grammar({
 
     computed_property_name: ($) => seq('[', $.expression, ']'),
 
-    _reserved_identifier: ($) =>
-      choice(
-        sym('_yield_identifier'),
-        ...MEMBER_MODIFIERS,
-        $._escaped_let,
-        ...CONTEXTUAL_KEYWORDS.map((word) =>
-          word === 'await' ? choice(sym('_await_keyword'), sym('_await_identifier')) : word
-        )
-      ),
+    _reserved_identifier: ($) => contextualIdentifier($, true),
+
+    _expression_identifier: ($) => contextualIdentifier($, false),
 
     _semicolon: () =>
       choice(
@@ -1762,15 +1718,114 @@ module.exports = grammar({
   },
 });
 
-/** @param {import('@willbooster/web-tree-sitter/dsl').GrammarSymbols<'_primary_atom' | 'subscript_expression' | 'member_expression' | 'call_expression' | 'new_expression' | '_argumentless_new_expression'>} $ */
-function leftHandSideExpression($) {
+/**
+ * @param {GrammarSymbols<'_primary_atom' | 'subscript_expression' | 'member_expression' | 'call_expression' | 'new_expression' | '_argumentless_new_expression'>} $
+ * @param {{atom?: RuleOrLiteral, subscript?: RuleOrLiteral, member?: RuleOrLiteral, call?: RuleOrLiteral}} [forms]
+ */
+function leftHandSideExpression($, forms = {}) {
   return choice(
-    $._primary_atom,
-    $.subscript_expression,
-    $.member_expression,
-    $.call_expression,
+    forms.atom ?? $._primary_atom,
+    forms.subscript ?? $.subscript_expression,
+    forms.member ?? $.member_expression,
+    forms.call ?? $.call_expression,
     $.new_expression,
     alias($._argumentless_new_expression, $.new_expression)
+  );
+}
+
+/**
+ * @param {import('@willbooster/web-tree-sitter/dsl').GrammarSymbols<'_escaped_let'>} $
+ * @param {boolean} allowAwaitKeyword
+ */
+function contextualIdentifier($, allowAwaitKeyword) {
+  const awaitWord = allowAwaitKeyword
+    ? choice(sym('_await_keyword'), sym('_await_identifier'))
+    : sym('_await_identifier');
+  return choice(
+    sym('_yield_identifier'),
+    ...MEMBER_MODIFIERS,
+    $._escaped_let,
+    ...CONTEXTUAL_KEYWORDS.map((word) => (word === 'await' ? awaitWord : word))
+  );
+}
+
+/**
+ * @param {GrammarSymbols<'import' | 'arguments' | 'template_string' | 'optional_chain'>} $
+ * @param {RuleOrLiteral} callee
+ * @param {RuleOrLiteral} primary
+ */
+function callExpression($, callee, primary) {
+  return choice(
+    prec('call', seq(field('function', choice(callee, $.import)), field('arguments', $.arguments))),
+    prec('template_call', seq(field('function', primary), field('arguments', $.template_string))),
+    prec(
+      'member',
+      seq(field('function', primary), field('optional_chain', $.optional_chain), field('arguments', $.arguments))
+    )
+  );
+}
+
+/**
+ * @param {GrammarSymbols<'_jsx_element' | 'parenthesized_expression' | '_identifier' | 'identifier' | 'this' | 'super' | 'number' | 'string' | 'template_string' | 'regex' | 'true' | 'false' | 'null' | 'object' | 'array' | 'function_expression' | 'generator_function' | 'class' | 'meta_property'>} $
+ * @param {RuleOrLiteral} identifier
+ */
+function primaryAtom($, identifier) {
+  return choice(
+    $._jsx_element,
+    $.parenthesized_expression,
+    $._identifier,
+    alias(sym('_await_yield_identifier'), $.identifier),
+    aliasWithAsyncKeyword(identifier, $.identifier),
+    $.this,
+    $.super,
+    $.number,
+    $.string,
+    $.template_string,
+    $.regex,
+    $.true,
+    $.false,
+    $.null,
+    $.object,
+    $.array,
+    $.function_expression,
+    $.generator_function,
+    $.class,
+    $.meta_property
+  );
+}
+
+/**
+ * @param {GrammarSymbols<'import' | 'optional_chain' | 'private_property_identifier' | 'identifier'>} $
+ * @param {RuleOrLiteral} object
+ */
+function memberExpression($, object) {
+  return prec(
+    'member',
+    seq(
+      field('object', choice(object, $.import)),
+      choice('.', field('optional_chain', $.optional_chain)),
+      field(
+        'property',
+        choice($.private_property_identifier, reserved('properties', alias($.identifier, sym('property_identifier'))))
+      )
+    )
+  );
+}
+
+/**
+ * @param {GrammarSymbols<'optional_chain' | '_expressions'>} $
+ * @param {RuleOrLiteral} object
+ */
+function subscriptExpression($, object) {
+  return prec.right(
+    'member',
+    seq(
+      field('object', object),
+      optional(field('optional_chain', $.optional_chain)),
+      '[',
+      field('index', $._expressions),
+      ']'
+    )
   );
 }
 

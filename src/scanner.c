@@ -60,7 +60,7 @@ enum TokenType {
 };
 
 static bool scan_let(TSLexer *lexer);
-static bool scan_class_heritage_end(TSLexer *lexer);
+static bool scan_class_heritage_end(TSLexer *lexer, bool allow_html_comment);
 static bool is_reserved_word(const char *name);
 static bool scan_expression_trivia(TSLexer *lexer, bool *saw_newline, bool *scanned_comment, bool skip_contents);
 
@@ -928,7 +928,8 @@ static bool scan_yield(Scanner *scanner, TSLexer *lexer, const bool *valid_symbo
     if (is_identifier_part(lexer->lookahead)) return false;
     bool identifier = (scanner->functions.depth || JAVASCRIPT_SCRIPT_GOAL) && !function_context_generator(&scanner->functions);
     TSSymbol symbol = await_operand ? AWAIT_YIELD_IDENTIFIER : identifier ? YIELD_IDENTIFIER : YIELD_KEYWORD;
-    if (!valid_symbols[symbol]) return false;
+    bool forbidden_identifier = symbol == YIELD_KEYWORD && valid_symbols[YIELD_IDENTIFIER];
+    if (!valid_symbols[symbol] && !forbidden_identifier) return false;
     lexer->mark_end(lexer);
     lexer->result_symbol = symbol;
     return true;
@@ -941,7 +942,9 @@ static bool scan_await_or_async(Scanner *scanner, TSLexer *lexer, const bool *va
     if (strcmp(keyword, "async") == 0) return scan_async_start(lexer, keyword, sizeof(keyword), valid_symbols);
     if (strcmp(keyword, "await") != 0) return false;
     bool identifier = await_is_identifier(scanner);
-    if (identifier ? !valid_symbols[AWAIT_IDENTIFIER] : !valid_symbols[AWAIT_KEYWORD]) return false;
+    TSSymbol symbol = identifier ? AWAIT_IDENTIFIER : AWAIT_KEYWORD;
+    bool forbidden_identifier = !identifier && valid_symbols[AWAIT_IDENTIFIER];
+    if (!valid_symbols[symbol] && !forbidden_identifier) return false;
     lexer->mark_end(lexer);
     // Record the operand decision on both keyword and identifier tokens so restored nodes cannot keep stale roles.
     // Advancing without skipping after mark_end preserves the consuming keyword's start across probed comments.
@@ -954,7 +957,7 @@ static bool scan_await_or_async(Scanner *scanner, TSLexer *lexer, const bool *va
         char word[16] = {0};
         scan_identifier(lexer, word, sizeof(word), false);
     }
-    lexer->result_symbol = identifier ? AWAIT_IDENTIFIER : AWAIT_KEYWORD;
+    lexer->result_symbol = symbol;
     return true;
 }
 
@@ -1095,7 +1098,7 @@ bool tree_sitter_javascript_external_scanner_scan(void *payload, TSLexer *lexer,
     }
 
     if (valid_symbols[CLASS_HERITAGE_END] && !(valid_symbols[TEMPLATE_CHARS] && valid_symbols[AUTOMATIC_SEMICOLON])) {
-        return scan_class_heritage_end(lexer);
+        return scan_class_heritage_end(lexer, valid_symbols[HTML_COMMENT]);
     }
 
     if (valid_symbols[LINE_BREAK_AFTER_BINDING] &&
@@ -1411,15 +1414,34 @@ static bool scan_default_trivia(TSLexer *lexer, bool allow_line_breaks) {
     }
 }
 
-static bool scan_class_heritage_end(TSLexer *lexer) {
+static bool scan_class_heritage_end(TSLexer *lexer, bool allow_html_comment) {
     lexer->mark_end(lexer);
     bool saw_newline = false;
-    if (!scan_expression_trivia(lexer, &saw_newline, NULL, true)) return false;
+    while (is_whitespace(lexer->lookahead)) {
+        saw_newline |= is_line_terminator(lexer->lookahead);
+        skip(lexer);
+    }
     int32_t c = lexer->lookahead;
-    if (c == '.' || c == '[' || c == '(' || c == '`') return false;
-    if (c == '?') {
-        advance(lexer);
-        if (lexer->lookahead == '.') return false;
+    switch (c) {
+        case '<':
+        case '-':
+            if (allow_html_comment && (c == '<' || saw_newline) && scan_html_comment(lexer)) return true;
+            break;
+        case '/':
+            advance(lexer);
+            if (lexer->lookahead == '/' || lexer->lookahead == '*') return false;
+            break;
+        case 'f':
+            if (!saw_newline && scan_word(lexer, "function")) return false;
+            break;
+        case '.': case '[': case '(': case '`':
+            return false;
+        case '?':
+            advance(lexer);
+            if (lexer->lookahead == '.') return false;
+            break;
+        default:
+            break;
     }
     lexer->result_symbol = CLASS_HERITAGE_END;
     return true;
