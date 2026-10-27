@@ -175,6 +175,7 @@ module.exports = grammar({
     $._jsx_attribute_value,
     $._jsx_identifier,
     $._lhs_expression,
+    $._object_rest_target,
   ],
 
   precedences: ($) => [
@@ -221,6 +222,7 @@ module.exports = grammar({
     [$._call_callee, $.call_expression],
     [$.for_in_clause, $._primary_atom],
     [$._primary_atom, $.rest_pattern],
+    [$._primary_atom, $._object_rest_pattern],
     [$._primary_atom, $._non_rest_pattern],
     [$.arrow_function, $._primary_atom],
     [$._primary_atom, $.await_expression],
@@ -228,6 +230,7 @@ module.exports = grammar({
     [$.primary_expression, $._assignment_call_primary],
     [$._local_export_specifier, $._module_export_name],
     [$.primary_expression, $.rest_pattern],
+    [$.primary_expression, $._object_rest_pattern],
     [$.primary_expression, $._non_rest_pattern],
     [$.primary_expression, $.for_in_clause],
     [$.array, $.array_pattern],
@@ -713,7 +716,12 @@ module.exports = grammar({
       );
       return prec(
         'object',
-        seq('{', repeat(seq(optional(property), ',')), optional(choice(property, $.rest_pattern)), '}')
+        seq(
+          '{',
+          repeat(seq(optional(property), ',')),
+          optional(choice(property, alias($._object_rest_pattern, $.rest_pattern))),
+          '}'
+        )
       );
     },
 
@@ -1669,8 +1677,8 @@ module.exports = grammar({
     class_static_block: ($) => seq('static', field('body', alias($._class_member_body, $.statement_block))),
 
     /**
-     * Canonical pattern supertype. Extend `_non_rest_pattern` for non-rest forms and
-     * `rest_pattern` for rest syntax; overriding only `pattern` does not extend ordinary slots.
+     * Canonical pattern supertype. Extend `_non_rest_pattern` for non-rest forms;
+     * overriding only `pattern` does not extend ordinary slots.
      */
     pattern: ($) => choice(alias($._non_rest_pattern, $.pattern), alias($._rest_pattern, $.pattern)),
 
@@ -1680,9 +1688,26 @@ module.exports = grammar({
 
     _rest_pattern: ($) => prec.dynamic(-1, $.rest_pattern),
 
+    /** Array-pattern and formal-parameter rest syntax; object rest uses `_object_rest_pattern`. */
     rest_pattern: ($) =>
       prec.right(
         seq('...', choice($._lhs_expression, alias($._parenthesized_simple_target, $.parenthesized_expression)))
+      ),
+
+    /**
+     * Object-rest syntax, aliased to public `rest_pattern`. Extend `_object_rest_target`
+     * for target forms; `rest_pattern` and `_lhs_expression` overrides do not extend object rest.
+     */
+    _object_rest_pattern: ($) => prec.right(seq('...', $._object_rest_target)),
+
+    /** Object-rest reference targets, excluding nested destructuring patterns. */
+    _object_rest_target: ($) =>
+      choice(
+        $.member_expression,
+        $.subscript_expression,
+        $._identifier,
+        aliasWithAsyncKeyword($._reserved_identifier, $.identifier),
+        alias($._parenthesized_simple_target, $.parenthesized_expression)
       ),
 
     method_definition: ($) =>

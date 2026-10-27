@@ -10,6 +10,154 @@ const PatternQuery =
   '(parenthesized_expression (primary_expression) @primary)';
 
 for (const goal of ['javascript', 'javascript_script']) {
+  test(`rejects nested destructuring targets for object rest in ${goal}`, async () => {
+    await Parser.init();
+    const parser = new Parser();
+    try {
+      parser.setLanguage(await Language.load(`tree-sitter-${goal}.wasm`));
+      for (const target of [
+        '[]',
+        '{}',
+        '[rest]',
+        '{rest}',
+        '{key: rest}',
+        '[...rest]',
+        '{...rest}',
+        '([])',
+        '({})',
+        '([rest])',
+        '({rest})',
+        '(([rest]))',
+      ]) {
+        for (const statement of [
+          `({...${target}} = values);`,
+          `({first, ...${target}} = values);`,
+          `const {...${target}} = values;`,
+          `let {first, ...${target}} = values;`,
+          `var {...${target}} = values;`,
+          `function f({...${target}}) {}`,
+          `const f = ({...${target}}) => {};`,
+          `async function f({...${target}}) {}`,
+          `function* f({...${target}}) {}`,
+          `function f(...[{...${target}}]) {}`,
+          `for ({...${target}} of values) {}`,
+          `for (const {...${target}} of values) {}`,
+          `for (var {...${target}} in values) {}`,
+          `try {} catch ({...${target}}) {}`,
+          `({outer: {... /* rest */ ${target}}} = values);`,
+        ]) {
+          const tree = parser.parse(`${statement}\n${Following}`)!;
+          try {
+            expect(tree.rootNode.hasError, statement).toBe(true);
+            expect(tree.rootNode.lastNamedChild!.text, statement).toBe(Following);
+            expect(tree.rootNode.lastNamedChild!.hasError, statement).toBe(false);
+          } finally {
+            tree.delete();
+          }
+        }
+      }
+    } finally {
+      parser.delete();
+    }
+  });
+
+  test(`preserves distinct object and array rest targets through edits in ${goal}`, async () => {
+    await Parser.init();
+    const language = await Language.load(`tree-sitter-${goal}.wasm`);
+    const parser = new Parser();
+    const queries: Query[] = [];
+    try {
+      parser.setLanguage(language);
+      queries.push(new Query(language, '(rest_pattern (_) @target) @rest'));
+      for (const name of ['highlights', 'highlights-jsx', 'highlights-params', 'locals', 'tags', 'injections']) {
+        queries.push(new Query(language, fs.readFileSync(`queries/${name}.scm`, 'utf8')));
+      }
+      for (const [source, expected] of [
+        [
+          '({...target.member} = values);',
+          [
+            ['rest', '...target.member', 2, 18],
+            ['target', 'target.member', 5, 18],
+          ],
+        ],
+        [
+          '({...((target[key]))} = values);',
+          [
+            ['rest', '...((target[key]))', 2, 20],
+            ['target', '((target[key]))', 5, 20],
+          ],
+        ],
+        [
+          'function f(...[first,,...rest]) {}',
+          [
+            ['rest', '...[first,,...rest]', 11, 30],
+            ['target', '[first,,...rest]', 14, 30],
+            ['rest', '...rest', 22, 29],
+            ['target', 'rest', 25, 29],
+          ],
+        ],
+      ] as const) {
+        const tree = parser.parse(source)!;
+        try {
+          expect(tree.rootNode.hasError, source).toBe(false);
+          expect(
+            queries[0]!
+              .captures(tree.rootNode)
+              .map(({ name, node }) => [name, node.text, node.startIndex, node.endIndex]),
+            source
+          ).toEqual(expected);
+        } finally {
+          tree.delete();
+        }
+      }
+      for (const statement of [
+        '({...rest} = values);',
+        'const {first, ...rest} = values;',
+        'function f({first, ...rest}) {}',
+        'for ({...rest} of values) {}',
+        'function f(...[{first, ...rest}]) {}',
+      ]) {
+        const initial = `const before = 0;\n${statement}\n${Following}`;
+        let source = initial;
+        let tree = parser.parse(source)!;
+        const original = snapshot(tree.rootNode);
+        try {
+          for (const [next, invalid] of [
+            [initial.replace('before = 0', 'before = 1000'), false],
+            [initial.replace('...rest', '...[rest]'), true],
+            [initial.replace('...rest', '...{rest}'), true],
+            [initial.replace('...rest', '... /* rest */ rest'), false],
+            [initial, false],
+          ] as const) {
+            tree = reparse(parser, tree, source, next);
+            source = next;
+            const fresh = parser.parse(source)!;
+            try {
+              expect(tree.rootNode.hasError, source).toBe(invalid);
+              expect(snapshot(tree.rootNode), source).toEqual(snapshot(fresh.rootNode));
+              for (const query of queries) {
+                expect(
+                  query.captures(tree.rootNode).map(({ name, node }) => [name, snapshot(node)]),
+                  source
+                ).toEqual(query.captures(fresh.rootNode).map(({ name, node }) => [name, snapshot(node)]));
+              }
+              expect(tree.rootNode.lastNamedChild!.text, source).toBe(Following);
+              expect(tree.rootNode.lastNamedChild!.hasError, source).toBe(false);
+            } finally {
+              fresh.delete();
+            }
+          }
+          expect(snapshot(tree.rootNode)).toEqual(original);
+        } finally {
+          tree.delete();
+        }
+      }
+    } finally {
+      for (const query of queries) query.delete();
+      parser.delete();
+    }
+  });
+
   test(`rejects rest syntax as an object-pattern property value in ${goal}`, async () => {
     await Parser.init();
     const parser = new Parser().setLanguage(await Language.load(`tree-sitter-${goal}.wasm`));
