@@ -4,7 +4,7 @@ import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 const Root = path.join(import.meta.dirname, '../..');
-const Gaps = [' ', '  ', '\t', '\n', '\r\n', ' ', ' ', ' '];
+const Gaps = [' ', '  ', '\t', '\n', '\r\n', '\u00A0', '\u2028', '\u2029'];
 const Entities = ['&amp;', '&#32;', '&#x20;'];
 
 for (const goal of ['javascript', 'javascript_script']) {
