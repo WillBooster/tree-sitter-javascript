@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Edit, Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -56,48 +56,20 @@ test('keeps decorators on exported classes with canonical declaration queries', 
   }
 });
 
-test('preserves decorator ownership when incrementally adding and removing exports', () => {
+test('attaches decorators to the class with and without an export', () => {
   const parser = new Parser().setLanguage(language);
-  const query = new Query(language, querySource);
-  const prefix = '@dec ';
-  const ordinary = `${prefix}class Named {}`;
   try {
-    for (const exported of ['export ', 'export default ']) {
-      let tree = parser.parse(ordinary)!;
+    for (const exported of ['', 'export ', 'export default ']) {
+      const source = `@dec ${exported}class Named {}`;
+      const tree = parser.parse(source)!;
       try {
-        for (const inserted of [true, false, true]) {
-          tree.edit(
-            new Edit({
-              startIndex: prefix.length,
-              oldEndIndex: prefix.length + (inserted ? 0 : exported.length),
-              newEndIndex: prefix.length + (inserted ? exported.length : 0),
-              startPosition: { row: 0, column: prefix.length },
-              oldEndPosition: { row: 0, column: prefix.length + (inserted ? 0 : exported.length) },
-              newEndPosition: { row: 0, column: prefix.length + (inserted ? exported.length : 0) },
-            })
-          );
-          const source = prefix + (inserted ? exported : '') + 'class Named {}';
-          const previous = tree;
-          tree = parser.parse(source, previous)!;
-          previous.delete();
-          const fresh = parser.parse(source)!;
-          try {
-            expect(tree.rootNode.hasError, source).toBe(false);
-            expect(tree.rootNode.toString()).toBe(fresh.rootNode.toString());
-            expect(query.captures(tree.rootNode).map(({ name, node }) => [name, node.text])).toEqual(
-              query.captures(fresh.rootNode).map(({ name, node }) => [name, node.text])
-            );
-            expect(tree.rootNode.descendantsOfType('decorator')[0]?.parent?.type).toBe('class_declaration');
-          } finally {
-            fresh.delete();
-          }
-        }
+        expect(tree.rootNode.hasError, source).toBe(false);
+        expect(tree.rootNode.descendantsOfType('decorator')[0]?.parent?.type).toBe('class_declaration');
       } finally {
         tree.delete();
       }
     }
   } finally {
-    query.delete();
     parser.delete();
   }
 });

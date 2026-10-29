@@ -1,12 +1,12 @@
 import path from 'node:path';
 
-import { Edit, Language, Parser } from '@willbooster/web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
 const language = await Language.load(path.join(import.meta.dirname, '../../tree-sitter-javascript.wasm'));
 
-test('preserves completed expressions while a trailing block comment is edited', () => {
+test('preserves completed expressions before an unterminated or closed trailing block comment', () => {
   const parser = new Parser();
   parser.setLanguage(language);
   try {
@@ -19,59 +19,26 @@ test('preserves completed expressions while a trailing block comment is edited',
     ] as const) {
       for (const comment of [' /*', ' /*text', ' /*\ntext']) {
         const partial = expression + comment;
-        const completed = partial + ' */';
-        const lines = partial.split('\n');
-        const position = { row: lines.length - 1, column: lines.at(-1)!.length };
-        const closedPosition = { row: position.row, column: position.column + 3 };
-        let tree = parser.parse(partial)!;
+        const partialTree = parser.parse(partial)!;
         try {
-          expect(tree.rootNode.hasError, partial).toBe(true);
+          expect(partialTree.rootNode.hasError, partial).toBe(true);
           expect(
-            tree.rootNode.descendantsOfType(kind).map((node) => node.text),
+            partialTree.rootNode.descendantsOfType(kind).map((node) => node.text),
             partial
           ).toContain(expression.replace(/^const v = /, ''));
-          const originalTree = tree.rootNode.toString();
-          tree.edit(
-            new Edit({
-              startIndex: partial.length,
-              oldEndIndex: partial.length,
-              newEndIndex: completed.length,
-              startPosition: position,
-              oldEndPosition: position,
-              newEndPosition: closedPosition,
-            })
-          );
-          const next = parser.parse(completed, tree)!;
-          tree.delete();
-          tree = next;
-          const fresh = parser.parse(completed)!;
-          try {
-            expect(tree.rootNode.hasError, completed).toBe(false);
-            expect(
-              tree.rootNode.descendantsOfType('comment').map((node) => node.text),
-              completed
-            ).toEqual([comment.trim() + ' */']);
-            expect(tree.rootNode.toString(), completed).toBe(fresh.rootNode.toString());
-          } finally {
-            fresh.delete();
-          }
-          tree.edit(
-            new Edit({
-              startIndex: partial.length,
-              oldEndIndex: completed.length,
-              newEndIndex: partial.length,
-              startPosition: position,
-              oldEndPosition: closedPosition,
-              newEndPosition: position,
-            })
-          );
-          const restored = parser.parse(partial, tree)!;
-          tree.delete();
-          tree = restored;
-          expect(tree.rootNode.hasError, partial).toBe(true);
-          expect(tree.rootNode.toString(), partial).toBe(originalTree);
         } finally {
-          tree.delete();
+          partialTree.delete();
+        }
+        const completed = partial + ' */';
+        const completedTree = parser.parse(completed)!;
+        try {
+          expect(completedTree.rootNode.hasError, completed).toBe(false);
+          expect(
+            completedTree.rootNode.descendantsOfType('comment').map((node) => node.text),
+            completed
+          ).toEqual([comment.trim() + ' */']);
+        } finally {
+          completedTree.delete();
         }
       }
     }

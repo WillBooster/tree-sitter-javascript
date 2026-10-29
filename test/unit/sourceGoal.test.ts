@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Edit, Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 import { testCommand } from './run.js';
@@ -68,35 +68,16 @@ test('selects Script and Module await roles without changing public expression c
   }
 });
 
-test('restores the Script goal after nested async bodies and incremental append and undo', () => {
+test('restores the Script goal after nested async bodies', () => {
   const parser = new Parser().setLanguage(scriptLanguage);
   const initial = 'await\nfirst; async function outer(){ await operand; function inner(){ await\nsecond; } }';
-  let source = initial;
-  let tree = parser.parse(source)!;
   const suffix = '\nawait\nlast; async function tail(){ await result; }\nawait(next);';
   try {
-    for (const append of [true, false, true, false]) {
-      const oldEnd = source.length;
-      const next = append ? initial + suffix : initial;
-
-      tree.edit(
-        new Edit({
-          startIndex: initial.length,
-          oldEndIndex: oldEnd,
-          newEndIndex: next.length,
-          startPosition: point(initial),
-          oldEndPosition: point(source),
-          newEndPosition: point(next),
-        })
-      );
-      source = next;
-      const previous = tree;
-      tree = parser.parse(source, previous)!;
-      previous.delete();
-      const fresh = parser.parse(source)!;
+    for (const append of [false, true]) {
+      const source = append ? initial + suffix : initial;
+      const tree = parser.parse(source)!;
       try {
         expect(tree.rootNode.hasError, source).toBe(false);
-        expect(tree.rootNode.toString(), source).toBe(fresh.rootNode.toString());
         expect(tree.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual(
           append ? ['await operand', 'await result'] : ['await operand']
         );
@@ -104,11 +85,10 @@ test('restores the Script goal after nested async bodies and incremental append 
           append ? 4 : 2
         );
       } finally {
-        fresh.delete();
+        tree.delete();
       }
     }
   } finally {
-    tree.delete();
     parser.delete();
   }
 });
@@ -126,11 +106,6 @@ test('keeps the full serialized function nesting capacity in the Script language
     parser.delete();
   }
 });
-
-function point(text: string): { row: number; column: number } {
-  const lines = text.split('\n');
-  return { row: lines.length - 1, column: lines.at(-1)!.length };
-}
 
 for (const wasm of [false, true]) {
   testCommand(

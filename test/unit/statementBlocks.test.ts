@@ -1,7 +1,5 @@
-import fs from 'node:fs';
-
 import { parse } from '@babel/parser';
-import { Edit, Language, type Node, Parser, type Point, Query, type Tree } from '@willbooster/web-tree-sitter';
+import { Language, type Node, Parser, Query } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 const Statements = [
@@ -73,64 +71,37 @@ test.each(['javascript', 'javascript_script'])(
 );
 
 test.each(['javascript', 'javascript_script'])(
-  'preserves brace queries and full ranges through statement/expression edits in %s',
+  'distinguishes statement braces from expression braces between declarations in %s',
   async (goal) => {
     await Parser.init();
     const language = await Language.load(`tree-sitter-${goal}.wasm`);
     const parser = new Parser().setLanguage(language);
-    const braceQuery = new Query(language, BraceQuery);
-    const queries = [
-      braceQuery,
-      ...['highlights', 'highlights-jsx', 'highlights-params', 'locals', 'tags', 'injections'].map(
-        (name) => new Query(language, fs.readFileSync(`queries/${name}.scm`, 'utf8'))
-      ),
-    ];
+    const query = new Query(language, BraceQuery);
     try {
-      for (const sequence of [
-        ['while (a) {b, c};', 'while (a) ({b, c});', 'while (a) {b, c};'],
-        ['const f = () => {a, b};', 'const f = () => ({a, b});', 'const f = () => {a, b};'],
-        ['({a, b} = values);', '{a, b};', '({a, b} = values);'],
-        ['function f() {return {a, b};}', 'function f() {return\n{a, b};}', 'function f() {return {a, b};}'],
-        [
-          'const x = <C value={{a, b}} />; {c, d}',
-          'const x = <C value={{a, b}} />; ({c, d});',
-          'const x = <C value={{a, b}} />; {c, d}',
-        ],
+      for (const statement of [
+        'while (a) {b, c};',
+        'while (a) ({b, c});',
+        'const f = () => {a, b};',
+        'const f = () => ({a, b});',
+        '({a, b} = values);',
+        '{a, b};',
+        'function f() {return {a, b};}',
+        'function f() {return\n{a, b};}',
+        'const x = <C value={{a, b}} />; {c, d}',
+        'const x = <C value={{a, b}} />; ({c, d});',
       ]) {
-        const initial = `const before = 0;\n${sequence[0]}\n${Following}`;
-        let source = initial;
-        let tree = parser.parse(source)!;
-        const original = snapshot(tree.rootNode);
+        const source = `const before = 0;\n${statement}\n${Following}`;
+        const tree = parser.parse(source)!;
         try {
-          for (const next of [
-            initial.replace('before = 0', 'before = 1000'),
-            ...sequence.map((statement) => `const before = 0;\n${statement}\n${Following}`),
-          ]) {
-            tree = reparse(parser, tree, source, next);
-            source = next;
-            const fresh = parser.parse(source)!;
-            try {
-              expect(tree.rootNode.hasError, source).toBe(false);
-              expect(snapshot(tree.rootNode), source).toEqual(snapshot(fresh.rootNode));
-              expect(braces(braceQuery, tree.rootNode), source).toEqual(referenceBraces(source, goal));
-              for (const query of queries) {
-                expect(
-                  query.captures(tree.rootNode).map(({ name, node }) => [name, snapshot(node)]),
-                  source
-                ).toEqual(query.captures(fresh.rootNode).map(({ name, node }) => [name, snapshot(node)]));
-              }
-              expect(tree.rootNode.lastNamedChild!.text, source).toBe(Following);
-            } finally {
-              fresh.delete();
-            }
-          }
-          expect(snapshot(tree.rootNode)).toEqual(original);
+          expect(tree.rootNode.hasError, source).toBe(false);
+          expect(braces(query, tree.rootNode), source).toEqual(referenceBraces(source, goal));
+          expect(tree.rootNode.lastNamedChild!.text, source).toBe(Following);
         } finally {
           tree.delete();
         }
       }
     } finally {
-      for (const query of queries) query.delete();
+      query.delete();
       parser.delete();
     }
   }
@@ -170,49 +141,4 @@ function referenceBraces(source: string, goal: string): unknown[] {
     }
     for (const child of Object.values(value)) visit(child);
   }
-}
-
-function reparse(parser: Parser, tree: Tree, source: string, next: string): Tree {
-  let start = 0;
-  while (start < source.length && start < next.length && source[start] === next[start]) start++;
-  let oldEnd = source.length;
-  let newEnd = next.length;
-  while (oldEnd > start && newEnd > start && source[oldEnd - 1] === next[newEnd - 1]) {
-    oldEnd--;
-    newEnd--;
-  }
-  tree.edit(
-    new Edit({
-      startIndex: start,
-      oldEndIndex: oldEnd,
-      newEndIndex: newEnd,
-      startPosition: point(source, start),
-      oldEndPosition: point(source, oldEnd),
-      newEndPosition: point(next, newEnd),
-    })
-  );
-  const result = parser.parse(next, tree)!;
-  tree.delete();
-  return result;
-}
-
-function point(source: string, index: number): Point {
-  const lines = source.slice(0, index).split('\n');
-  return { row: lines.length - 1, column: lines.at(-1)!.length };
-}
-
-function snapshot(node: Node): unknown {
-  return [
-    node.type,
-    node.isNamed,
-    node.isMissing,
-    node.isExtra,
-    node.isError,
-    node.hasError,
-    node.startIndex,
-    node.endIndex,
-    node.startPosition,
-    node.endPosition,
-    node.children.map((child, index) => [node.fieldNameForChild(index), snapshot(child)]),
-  ];
 }

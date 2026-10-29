@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { Edit, Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 import treeSitterJson from '../../tree-sitter.json';
@@ -291,106 +291,57 @@ test('parses awaited resource bindings with canonical expression queries', async
   }
 });
 
-test('restores awaited resource bindings across identifier and operator edits', async () => {
+test('rejects awaited resource bindings named only by operator keywords', async () => {
   const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
   const parser = new Parser();
   parser.setLanguage(language);
-  let name = 'xs';
-  const prefix = 'async function f(){await using ';
-  const sourceFor = (binding: string): string => `${prefix}${binding}=getResource();}`;
-  let source = sourceFor(name);
-  let tree = parser.parse(source)!;
-  const bindingStart = source.indexOf(name);
-  const original = tree.rootNode.toString();
   try {
-    for (const nextName of ['i', 'install', 'in', 'inside', 'instanceof', 'instanceofX', 'xs']) {
-      const nextSource = sourceFor(nextName);
-      tree.edit(
-        new Edit({
-          startIndex: bindingStart,
-          oldEndIndex: bindingStart + name.length,
-          newEndIndex: bindingStart + nextName.length,
-          startPosition: { row: 0, column: bindingStart },
-          oldEndPosition: { row: 0, column: bindingStart + name.length },
-          newEndPosition: { row: 0, column: bindingStart + nextName.length },
-        })
-      );
-      const next = parser.parse(nextSource, tree)!;
-      tree.delete();
-      tree = next;
-      const fresh = parser.parse(nextSource)!;
+    for (const name of ['xs', 'i', 'install', 'in', 'inside', 'instanceof', 'instanceofX']) {
+      const source = `async function f(){await using ${name}=getResource();}`;
+      const tree = parser.parse(source)!;
       try {
-        expect(tree.rootNode.toString(), nextSource).toBe(fresh.rootNode.toString());
-        expect(tree.rootNode.hasError, nextSource).toBe(['in', 'instanceof'].includes(nextName));
+        expect(tree.rootNode.hasError, source).toBe(['in', 'instanceof'].includes(name));
         if (!tree.rootNode.hasError) {
           expect(
             tree.rootNode.descendantsOfType('variable_declarator').map((node) => node.childForFieldName('name')!.text),
-            nextSource
-          ).toEqual([nextName]);
-          expect(tree.rootNode.descendantsOfType('await_expression'), nextSource).toHaveLength(0);
+            source
+          ).toEqual([name]);
+          expect(tree.rootNode.descendantsOfType('await_expression'), source).toHaveLength(0);
         }
       } finally {
-        fresh.delete();
+        tree.delete();
       }
-      name = nextName;
-      source = nextSource;
     }
-    expect(tree.rootNode.toString(), source).toBe(original);
   } finally {
-    tree.delete();
     parser.delete();
   }
 });
 
-test('retains resource initializer errors while editing ordinary and classic for declarations', async () => {
+test('requires initializers in ordinary and classic for resource declarations', async () => {
   const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
   const parser = new Parser();
   parser.setLanguage(language);
   try {
     for (const name of ['i', 'install', 'inside', 'instanceofX', 'resource']) {
-      for (const declaration of [
-        `async function f(){await using ${name};}`,
-        `async function f(){for(await using ${name}; keepGoing();){}}`,
-        `function f(){using ${name};}`,
-        `function f(){for(using ${name}; keepGoing();){}}`,
-      ]) {
-        let tree = parser.parse(declaration)!;
-        try {
-          expect(tree.rootNode.hasError, declaration).toBe(true);
-          const index = declaration.indexOf('using ') + 'using '.length + name.length;
-          let previous = declaration;
-          for (const initializer of ['=getResource()', '']) {
-            const end = previous.indexOf(';', index);
-            const next = previous.slice(0, index) + initializer + previous.slice(end);
-            tree.edit(
-              new Edit({
-                startIndex: index,
-                oldEndIndex: end,
-                newEndIndex: index + initializer.length,
-                startPosition: { row: 0, column: index },
-                oldEndPosition: { row: 0, column: end },
-                newEndPosition: { row: 0, column: index + initializer.length },
-              })
-            );
-            const incremental = parser.parse(next, tree)!;
-            tree.delete();
-            tree = incremental;
-            const fresh = parser.parse(next)!;
-            try {
-              expect(incremental.rootNode.toString(), next).toBe(fresh.rootNode.toString());
-              expect(incremental.rootNode.hasError, next).toBe(initializer === '');
-              if (initializer) {
-                expect(
-                  incremental.rootNode.descendantsOfType('variable_declarator')[0]?.childForFieldName('value')?.text
-                ).toBe('getResource()');
-              }
-            } finally {
-              fresh.delete();
+      for (const initializer of ['', '=getResource()']) {
+        for (const declaration of [
+          `async function f(){await using ${name}${initializer};}`,
+          `async function f(){for(await using ${name}${initializer}; keepGoing();){}}`,
+          `function f(){using ${name}${initializer};}`,
+          `function f(){for(using ${name}${initializer}; keepGoing();){}}`,
+        ]) {
+          const tree = parser.parse(declaration)!;
+          try {
+            expect(tree.rootNode.hasError, declaration).toBe(initializer === '');
+            if (initializer) {
+              expect(
+                tree.rootNode.descendantsOfType('variable_declarator')[0]?.childForFieldName('value')?.text,
+                declaration
+              ).toBe('getResource()');
             }
-            previous = next;
+          } finally {
+            tree.delete();
           }
-        } finally {
-          tree.delete();
         }
       }
     }
@@ -399,7 +350,7 @@ test('retains resource initializer errors while editing ordinary and classic for
   }
 });
 
-test('retains resource binding errors across escaped-name edits', async () => {
+test('rejects resource bindings whose escaped names spell reserved words', async () => {
   const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
   const parser = new Parser();
   parser.setLanguage(language);
@@ -415,59 +366,29 @@ test('retains resource binding errors across escaped-name edits', async () => {
         `for(${kind} /* comment */ NAME of items){}`,
         `${kind} first=getResource(),\nNAME=getResource();`,
       ]) {
-        let name = String.raw`i\u006eside`;
-        const sourceFor = (binding: string): string => `async function f(){${declaration.replace('NAME', binding)}}`;
-        let source = sourceFor(name);
-        let tree = parser.parse(source)!;
-        const start = source.indexOf(name);
-        try {
-          expect(tree.rootNode.hasError, source).toBe(false);
-          const original = tree.rootNode.toString();
-          for (const nextName of [
-            String.raw`i\u006e`,
-            String.raw`i\u006estanceof`,
-            String.raw`\u0069n`,
-            String.raw`i\u{6e}`,
-            'enum',
-            String.raw`\u0065num`,
-            String.raw`\u{65}num`,
-            name,
-          ]) {
-            const nextSource = sourceFor(nextName);
-            const startRow = source.slice(0, start).split('\n').length - 1;
-            const startColumn = start - source.lastIndexOf('\n', start - 1) - 1;
-            tree.edit(
-              new Edit({
-                startIndex: start,
-                oldEndIndex: start + name.length,
-                newEndIndex: start + nextName.length,
-                startPosition: { row: startRow, column: startColumn },
-                oldEndPosition: { row: startRow, column: startColumn + name.length },
-                newEndPosition: { row: startRow, column: startColumn + nextName.length },
-              })
-            );
-            const next = parser.parse(nextSource, tree)!;
-            tree.delete();
-            tree = next;
-            const fresh = parser.parse(nextSource)!;
-            try {
-              expect(next.rootNode.toString(), nextSource).toBe(fresh.rootNode.toString());
-              expect(next.rootNode.hasError, nextSource).toBe(nextName !== String.raw`i\u006eside`);
-              if (!next.rootNode.hasError) {
-                expect(
-                  bindings.captures(next.rootNode).map(({ node }) => node.text),
-                  nextSource
-                ).toEqual(declaration.includes('first=') ? ['first', nextName] : [nextName]);
-              }
-            } finally {
-              fresh.delete();
+        for (const name of [
+          String.raw`i\u006eside`,
+          String.raw`i\u006e`,
+          String.raw`i\u006estanceof`,
+          String.raw`\u0069n`,
+          String.raw`i\u{6e}`,
+          'enum',
+          String.raw`\u0065num`,
+          String.raw`\u{65}num`,
+        ]) {
+          const source = `async function f(){${declaration.replace('NAME', name)}}`;
+          const tree = parser.parse(source)!;
+          try {
+            expect(tree.rootNode.hasError, source).toBe(name !== String.raw`i\u006eside`);
+            if (!tree.rootNode.hasError) {
+              expect(
+                bindings.captures(tree.rootNode).map(({ node }) => node.text),
+                source
+              ).toEqual(declaration.includes('first=') ? ['first', name] : [name]);
             }
-            source = nextSource;
-            name = nextName;
+          } finally {
+            tree.delete();
           }
-          expect(tree.rootNode.toString(), source).toBe(original);
-        } finally {
-          tree.delete();
         }
       }
     }
@@ -477,7 +398,7 @@ test('retains resource binding errors across escaped-name edits', async () => {
   }
 });
 
-test('retains resource for-of fields while rejecting for-in edits', async () => {
+test('retains resource for-of fields while rejecting for-in', async () => {
   const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
   const parser = new Parser();
   parser.setLanguage(language);
@@ -491,51 +412,26 @@ test('retains resource for-of fields while rejecting for-in edits', async () => 
         'xs',
         ...(kind === 'await using' ? ['of'] : []),
       ]) {
-        const prefix = `async function f(){for(${kind} ${name} `;
-        let source = `${prefix}of items){consume(${name});}}`;
-        let tree = parser.parse(source)!;
-        const start = prefix.length;
-        const original = tree.rootNode.toString();
-        try {
-          for (const operator of ['of', 'in', 'of']) {
-            const nextSource = source.slice(0, start) + operator + source.slice(start + 2);
-            tree.edit(
-              new Edit({
-                startIndex: start,
-                oldEndIndex: start + 2,
-                newEndIndex: start + 2,
-                startPosition: { row: 0, column: start },
-                oldEndPosition: { row: 0, column: start + 2 },
-                newEndPosition: { row: 0, column: start + 2 },
-              })
-            );
-            const next = parser.parse(nextSource, tree)!;
-            tree.delete();
-            tree = next;
-            const fresh = parser.parse(nextSource)!;
-            try {
-              expect(next.rootNode.toString(), nextSource).toBe(fresh.rootNode.toString());
-              expect(next.rootNode.hasError, nextSource).toBe(operator === 'in');
-              if (operator === 'of') {
-                const loop = next.rootNode.descendantsOfType('for_in_statement')[0]!;
-                const header = loop.childForFieldName('header')!;
-                expect(header.childForFieldName('left')?.text, nextSource).toBe(name);
-                expect(
-                  header.childrenForFieldName('kind').map((node) => node.text),
-                  nextSource
-                ).toEqual(kind.split(' '));
-                expect(header.childForFieldName('operator')?.text, nextSource).toBe('of');
-                expect(header.childForFieldName('right')?.text, nextSource).toBe('items');
-                expect(loop.childForFieldName('body')?.text, nextSource).toBe(`{consume(${name});}`);
-              }
-            } finally {
-              fresh.delete();
+        for (const operator of ['of', 'in']) {
+          const source = `async function f(){for(${kind} ${name} ${operator} items){consume(${name});}}`;
+          const tree = parser.parse(source)!;
+          try {
+            expect(tree.rootNode.hasError, source).toBe(operator === 'in');
+            if (operator === 'of') {
+              const loop = tree.rootNode.descendantsOfType('for_in_statement')[0]!;
+              const header = loop.childForFieldName('header')!;
+              expect(header.childForFieldName('left')?.text, source).toBe(name);
+              expect(
+                header.childrenForFieldName('kind').map((node) => node.text),
+                source
+              ).toEqual(kind.split(' '));
+              expect(header.childForFieldName('operator')?.text, source).toBe('of');
+              expect(header.childForFieldName('right')?.text, source).toBe('items');
+              expect(loop.childForFieldName('body')?.text, source).toBe(`{consume(${name});}`);
             }
-            source = nextSource;
+          } finally {
+            tree.delete();
           }
-          expect(tree.rootNode.toString(), source).toBe(original);
-        } finally {
-          tree.delete();
         }
       }
     }

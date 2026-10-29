@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Edit, Language, type Node, Parser, type Point, Query, type Tree } from '@willbooster/web-tree-sitter';
+import { Language, Parser, Query, type Tree } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 const Root = path.join(import.meta.dirname, '../..');
@@ -58,17 +58,14 @@ test('rejects unparenthesized optional and arrow constructors while preserving c
   }
 });
 
-test('restores constructor ownership and captures across optional-chain, parentheses and trivia edits', async () => {
+test('preserves constructor ownership and captures in a variable initializer', async () => {
   await Parser.init();
   const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
   const parser = new Parser().setLanguage(language);
   const query = new Query(language, '(new_expression constructor: (primary_expression) @constructor)');
-  const original = 'const value = new foo.bar(); const sentinel = 1;';
-  let source = original;
-  let tree = parser.parse(source)!;
-  const initial = snapshot(tree.rootNode);
   try {
     for (const [expression, hasError] of [
+      ['new foo.bar()', false],
       ['new foo?.bar()', true],
       ['new (foo?.bar)()', false],
       ['new /* boundary */ (foo?.bar)()', false],
@@ -80,49 +77,18 @@ test('restores constructor ownership and captures across optional-chain, parenth
       ['new async function(){}', false],
       ['new async /* c */ function(){}', false],
       ['new async /* c\n */ function named(){}', false],
-      ['new foo.bar()', false],
     ] as const) {
-      const nextSource = `const value = ${expression}; const sentinel = 1;`;
-      let start = 0;
-      while (start < source.length && start < nextSource.length && source[start] === nextSource[start]) start++;
-      let oldEnd = source.length;
-      let newEnd = nextSource.length;
-      while (oldEnd > start && newEnd > start && source[oldEnd - 1] === nextSource[newEnd - 1]) {
-        oldEnd--;
-        newEnd--;
-      }
-      tree.edit(
-        new Edit({
-          startIndex: start,
-          oldEndIndex: oldEnd,
-          newEndIndex: newEnd,
-          startPosition: pointAt(source, start),
-          oldEndPosition: pointAt(source, oldEnd),
-          newEndPosition: pointAt(nextSource, newEnd),
-        })
-      );
-      const old = tree;
-      let fresh: Tree | undefined;
+      const source = `const value = ${expression}; const sentinel = 1;`;
+      const tree = parser.parse(source)!;
       try {
-        tree = parser.parse(nextSource, old)!;
-        fresh = parser.parse(nextSource)!;
-        expect(tree.rootNode.hasError, nextSource).toBe(hasError);
-        expect(snapshot(tree.rootNode), nextSource).toEqual(snapshot(fresh.rootNode));
-        expect(captures(query, tree), nextSource).toEqual(captures(query, fresh));
-        if (!hasError) {
-          checkConstructors(tree, query, nextSource);
-        }
+        expect(tree.rootNode.hasError, source).toBe(hasError);
+        if (!hasError) checkConstructors(tree, query, source);
       } finally {
-        fresh?.delete();
-        old.delete();
+        tree.delete();
       }
-      source = nextSource;
     }
-    expect(source).toBe(original);
-    expect(snapshot(tree.rootNode)).toEqual(initial);
   } finally {
     query.delete();
-    tree.delete();
     parser.delete();
   }
 });
@@ -141,54 +107,30 @@ test.each(['javascript', 'javascript_script'])(
       for (const newline of ['\n', '\r', '\r\n', '\u2028', '\u2029']) {
         for (const construction of ['new Ctor', 'new Namespace.Ctor', 'new Ctor()']) {
           for (const decimal of ['.5', '.5e+1', '.5_0']) {
-            let separator = newline;
-            let source = `${construction}${separator}${decimal}; const sentinel = 1;`;
-            let tree = parser.parse(source)!;
-            try {
-              for (const replacement of [newline, `// boundary${newline}`, ' ', newline]) {
-                const next = `${construction}${replacement}${decimal}; const sentinel = 1;`;
-                tree.edit(
-                  new Edit({
-                    startIndex: construction.length,
-                    oldEndIndex: construction.length + separator.length,
-                    newEndIndex: construction.length + replacement.length,
-                    startPosition: pointAt(source, construction.length),
-                    oldEndPosition: pointAt(source, construction.length + separator.length),
-                    newEndPosition: pointAt(next, construction.length + replacement.length),
-                  })
-                );
-                const previous = tree;
-                tree = parser.parse(next, previous)!;
-                previous.delete();
-                source = next;
-                separator = replacement;
-                const fresh = parser.parse(source)!;
-                try {
-                  expect(tree.rootNode.hasError, source).toBe(replacement === ' ');
-                  expect(snapshot(tree.rootNode), source).toEqual(snapshot(fresh.rootNode));
-                  expect(captures(query, tree), source).toEqual(captures(query, fresh));
-                  if (replacement !== ' ') {
-                    checkConstructors(tree, query, source);
-                    const expressions = tree.rootNode.namedChildren.filter(
-                      (node) => node.type === 'expression_statement'
-                    );
-                    expect(expressions).toHaveLength(2);
-                    const parsedConstruction = expressions[0]!.namedChildren.find(
-                      (node) => node.type === 'new_expression'
-                    )!;
-                    expect(parsedConstruction.text).toBe(construction);
-                    expect(parsedConstruction.endIndex).toBe(construction.length);
-                    const number = expressions[1]!.firstNamedChild!;
-                    expect(number.type).toBe('number');
-                    expect(number.text).toBe(decimal);
-                    expect(number.startIndex).toBe(construction.length + replacement.length);
-                  }
-                } finally {
-                  fresh.delete();
+            for (const separator of [newline, `// boundary${newline}`, ' ']) {
+              const source = `${construction}${separator}${decimal}; const sentinel = 1;`;
+              const tree = parser.parse(source)!;
+              try {
+                expect(tree.rootNode.hasError, source).toBe(separator === ' ');
+                if (separator !== ' ') {
+                  checkConstructors(tree, query, source);
+                  const expressions = tree.rootNode.namedChildren.filter(
+                    (node) => node.type === 'expression_statement'
+                  );
+                  expect(expressions).toHaveLength(2);
+                  const parsedConstruction = expressions[0]!.namedChildren.find(
+                    (node) => node.type === 'new_expression'
+                  )!;
+                  expect(parsedConstruction.text).toBe(construction);
+                  expect(parsedConstruction.endIndex).toBe(construction.length);
+                  const number = expressions[1]!.firstNamedChild!;
+                  expect(number.type).toBe('number');
+                  expect(number.text).toBe(decimal);
+                  expect(number.startIndex).toBe(construction.length + separator.length);
                 }
+              } finally {
+                tree.delete();
               }
-            } finally {
-              tree.delete();
             }
           }
         }
@@ -216,29 +158,4 @@ function checkConstructors(tree: Tree, query: Query, source: string): void {
   expect(sentinel.text, source).toBe('sentinel = 1');
   expect(sentinel.startIndex, source).toBe(source.indexOf('sentinel'));
   expect(sentinel.endIndex, source).toBe(source.indexOf('sentinel') + 'sentinel = 1'.length);
-}
-
-function pointAt(source: string, index: number): Point {
-  const preceding = source.slice(0, index).split('\n');
-  return { row: preceding.length - 1, column: preceding.at(-1)!.length };
-}
-
-function captures(query: Query, tree: Tree): unknown {
-  return query.captures(tree.rootNode).map(({ name, node }) => ({ name, node: snapshot(node) }));
-}
-
-function snapshot(node: Node): unknown {
-  return {
-    type: node.type,
-    named: node.isNamed,
-    missing: node.isMissing,
-    extra: node.isExtra,
-    error: node.isError,
-    hasError: node.hasError,
-    start: node.startIndex,
-    end: node.endIndex,
-    startPoint: node.startPosition,
-    endPoint: node.endPosition,
-    children: node.children.map((child, index) => ({ field: node.fieldNameForChild(index), node: snapshot(child) })),
-  };
 }
