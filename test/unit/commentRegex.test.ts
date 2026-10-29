@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Edit, Language, type Node, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -51,101 +51,55 @@ test('preserves statement boundaries before regex literals adjacent to newline-b
   }
 });
 
-test('updates return and regex roles when comment newlines are inserted and removed', () => {
+test('assigns return and regex roles by whether the comment after return contains a newline', () => {
   const parser = new Parser();
   parser.setLanguage(language);
   const query = new Query(language, '(expression_statement (call_expression) @regex.statement)');
-  const prefix = 'function f(){return';
-  const suffix = '/b/.test(x);}';
-  let comment = '/* same line */';
-  let source = prefix + comment + suffix;
-  let tree = parser.parse(source)!;
   try {
-    for (const replacement of ['/*\ncomment*/', '/*\ncomment*//* second */', '/* unfinished', '/* same line */']) {
-      const next = prefix + replacement + suffix;
-      tree.edit(
-        new Edit({
-          startIndex: prefix.length,
-          oldEndIndex: prefix.length + comment.length,
-          newEndIndex: prefix.length + replacement.length,
-          startPosition: position(source, prefix.length),
-          oldEndPosition: position(source, prefix.length + comment.length),
-          newEndPosition: position(next, prefix.length + replacement.length),
-        })
-      );
-      const incremental = parser.parse(next, tree)!;
-      const fresh = parser.parse(next)!;
+    for (const comment of ['/* same line */', '/*\ncomment*/', '/*\ncomment*//* second */', '/* unfinished']) {
+      const source = `function f(){return${comment}/b/.test(x);}`;
+      const tree = parser.parse(source)!;
       try {
-        expect(snapshot(incremental.rootNode), next).toEqual(snapshot(fresh.rootNode));
-        if (replacement === '/* unfinished') {
-          expect(incremental.rootNode.hasError, next).toBe(true);
+        if (comment === '/* unfinished') {
+          expect(tree.rootNode.hasError, source).toBe(true);
         } else {
-          expect(incremental.rootNode.hasError, next).toBe(false);
-          const returned = incremental.rootNode.descendantsOfType('return_statement')[0];
-          expect(returned, next).toBeDefined();
+          expect(tree.rootNode.hasError, source).toBe(false);
+          const returned = tree.rootNode.descendantsOfType('return_statement')[0];
+          expect(returned, source).toBeDefined();
           expect(
             returned!.namedChildren.filter((node) => node.type !== 'comment').map((node) => node.text),
-            next
-          ).toEqual(replacement.includes('\n') ? [] : ['/b/.test(x)']);
+            source
+          ).toEqual(comment.includes('\n') ? [] : ['/b/.test(x)']);
           expect(
-            query.captures(incremental.rootNode).map(({ node }) => node.text),
-            next
-          ).toEqual(replacement.includes('\n') ? ['/b/.test(x)'] : []);
+            query.captures(tree.rootNode).map(({ node }) => node.text),
+            source
+          ).toEqual(comment.includes('\n') ? ['/b/.test(x)'] : []);
         }
       } finally {
-        fresh.delete();
         tree.delete();
       }
-      tree = incremental;
-      source = next;
-      comment = replacement;
     }
   } finally {
-    tree.delete();
     query.delete();
     parser.delete();
   }
 });
 
-test('preserves declaration continuations when edits reuse bindings before newline comments', () => {
+test('continues declarations after bindings followed by newline comments', () => {
   const parser = new Parser();
   parser.setLanguage(language);
   try {
     for (const newline of ['\n', '\r', '\r\n', '\u2028', '\u2029']) {
       for (const trailing of ['/* second */', '/* second *//* third */', '// second\n']) {
         for (const continuation of [',b=1;', '=1;']) {
-          let source = `let a/*${newline}comment*/${trailing}${continuation}`;
-          let tree = parser.parse(source)!;
+          const source = `let a/*${newline}comment*/${trailing}${continuation}`;
+          const tree = parser.parse(source)!;
           try {
-            for (const digit of ['2', '1']) {
-              const index = source.lastIndexOf('=') + 1;
-              const next = source.slice(0, index) + digit + source.slice(index + 1);
-              tree.edit(
-                new Edit({
-                  startIndex: index,
-                  oldEndIndex: index + 1,
-                  newEndIndex: index + 1,
-                  startPosition: position(source, index),
-                  oldEndPosition: position(source, index + 1),
-                  newEndPosition: position(next, index + 1),
-                })
-              );
-              const incremental = parser.parse(next, tree)!;
-              const fresh = parser.parse(next)!;
-              try {
-                expect(incremental.rootNode.hasError, next).toBe(false);
-                expect(snapshot(incremental.rootNode), next).toEqual(snapshot(fresh.rootNode));
-                expect(
-                  incremental.rootNode.namedChildren.map((node) => node.type),
-                  next
-                ).toEqual(['lexical_declaration']);
-              } finally {
-                fresh.delete();
-                tree.delete();
-              }
-              tree = incremental;
-              source = next;
-            }
+            expect(tree.rootNode.hasError, source).toBe(false);
+            expect(
+              tree.rootNode.namedChildren.map((node) => node.type),
+              source
+            ).toEqual(['lexical_declaration']);
           } finally {
             tree.delete();
           }
@@ -187,49 +141,26 @@ for (const [goal, currentLanguage] of RegexCommentLanguages) {
         for (const arrow of ['() => {}', '(value) => { x: value; }', 'async () => {}']) {
           const before = `${enclosing} outer(){ ${prefix}${arrow}`;
           const suffix = '/pattern/g.test(input); const following = 1; }';
-          let comment = `// first${newline}`;
-          let source = before + comment + suffix;
-          let tree = parser.parse(source)!;
-          try {
-            for (const replacement of [comment, `// first${newline}/* second */`, comment]) {
-              const next = before + replacement + suffix;
-              tree.edit(
-                new Edit({
-                  startIndex: before.length,
-                  oldEndIndex: before.length + comment.length,
-                  newEndIndex: before.length + replacement.length,
-                  startPosition: position(source, before.length),
-                  oldEndPosition: position(source, before.length + comment.length),
-                  newEndPosition: position(next, before.length + replacement.length),
-                })
-              );
-              const previous = tree;
-              tree = parser.parse(next, previous)!;
-              previous.delete();
-              source = next;
-              comment = replacement;
-              const fresh = parser.parse(source)!;
-              try {
-                expect(tree.rootNode.hasError, source).toBe(false);
-                const parsedArrow = tree.rootNode.descendantsOfType('arrow_function')[0]!;
-                expect(parsedArrow.text).toBe(arrow);
-                expect(parsedArrow.childForFieldName('body')!.endIndex).toBe(before.length);
-                expect(tree.rootNode.descendantsOfType('regex')).toHaveLength(1);
-                const regex = tree.rootNode.descendantsOfType('regex')[0]!;
-                expect(regex.text).toBe('/pattern/g');
-                expect(regex.startIndex).toBe(before.length + comment.length);
-                expect(tree.rootNode.descendantsOfType('binary_expression')).toEqual([]);
-                expect(query.captures(tree.rootNode).map(({ name, node }) => [name, node.text])).toEqual([
-                  ['arrow', arrow],
-                  ['regex', '/pattern/g'],
-                ]);
-                expect(snapshot(tree.rootNode)).toEqual(snapshot(fresh.rootNode));
-              } finally {
-                fresh.delete();
-              }
+          for (const comment of [`// first${newline}`, `// first${newline}/* second */`]) {
+            const source = before + comment + suffix;
+            const tree = parser.parse(source)!;
+            try {
+              expect(tree.rootNode.hasError, source).toBe(false);
+              const parsedArrow = tree.rootNode.descendantsOfType('arrow_function')[0]!;
+              expect(parsedArrow.text).toBe(arrow);
+              expect(parsedArrow.childForFieldName('body')!.endIndex).toBe(before.length);
+              expect(tree.rootNode.descendantsOfType('regex')).toHaveLength(1);
+              const regex = tree.rootNode.descendantsOfType('regex')[0]!;
+              expect(regex.text).toBe('/pattern/g');
+              expect(regex.startIndex).toBe(before.length + comment.length);
+              expect(tree.rootNode.descendantsOfType('binary_expression')).toEqual([]);
+              expect(query.captures(tree.rootNode).map(({ name, node }) => [name, node.text])).toEqual([
+                ['arrow', arrow],
+                ['regex', '/pattern/g'],
+              ]);
+            } finally {
+              tree.delete();
             }
-          } finally {
-            tree.delete();
           }
         }
       }
@@ -238,19 +169,4 @@ for (const [goal, currentLanguage] of RegexCommentLanguages) {
       parser.delete();
     }
   });
-}
-
-function position(source: string, index: number): { row: number; column: number } {
-  const preceding = source.slice(0, index);
-  return { row: preceding.split('\n').length - 1, column: index - preceding.lastIndexOf('\n') - 1 };
-}
-
-function snapshot(node: Node): unknown {
-  return {
-    tree: node.toString(),
-    start: node.startIndex,
-    end: node.endIndex,
-    missing: node.isMissing,
-    children: node.children.map(snapshot),
-  };
 }

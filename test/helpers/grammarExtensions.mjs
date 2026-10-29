@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { Edit, Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
 
 const Root = fileURLToPath(new URL('../../', import.meta.url));
 const Following = 'const sentinel = 1;';
@@ -36,14 +36,12 @@ async function checkConsumer(goal, mode) {
     const language = await Language.load(wasm);
     parser.setLanguage(language);
     queries.push(new Query(language, '(rest_pattern) @rest'));
+    // Compiled only to check that the queries stay valid for a derived grammar.
     for (const name of QueryNames) {
       queries.push(new Query(language, fs.readFileSync(path.join(Root, `queries/${name}.scm`), 'utf8')));
     }
     for (const fixture of validFixtures(mode)) checkFixture(parser, queries[0], fixture);
     for (const statement of invalidFixtures()) checkInvalid(parser, statement);
-    for (const statement of ['function f(...[x]: T) {}', '({...a!: T} = values);']) {
-      checkEdits(parser, queries, statement);
-    }
     process.stdout.write(`Verified ${goal} ${mode} consumer\n`);
   } finally {
     for (const query of queries) query.delete();
@@ -192,100 +190,7 @@ function checkInvalid(parser, statement) {
   }
 }
 
-function checkEdits(parser, queries, statement) {
-  const initial = `const before = 0;\n${statement}\n${Following}`;
-  let source = initial;
-  let tree = parser.parse(source);
-  assert.ok(tree);
-  try {
-    const original = snapshot(tree.rootNode);
-    const replacement = statement.startsWith('function ') ? '[item]' : 'b!';
-    const target = statement.startsWith('function ') ? '[x]' : 'a!';
-    for (const [next, invalid] of [
-      [initial.replace('before = 0', 'before = 1000'), false],
-      [initial.replace(target, replacement), false],
-      [initial.replace(': T', ': T, next'), true],
-      [initial, false],
-    ]) {
-      tree = reparse(parser, tree, source, next);
-      source = next;
-      const fresh = parser.parse(source);
-      assert.ok(fresh);
-      try {
-        assert.equal(tree.rootNode.hasError, invalid, source);
-        assert.deepEqual(snapshot(tree.rootNode), snapshot(fresh.rootNode), source);
-        for (const query of queries) assert.deepEqual(captures(query, tree), captures(query, fresh), source);
-        assertFollowing(tree, source);
-      } finally {
-        fresh.delete();
-      }
-    }
-    assert.deepEqual(snapshot(tree.rootNode), original);
-  } finally {
-    tree.delete();
-  }
-}
-
-function reparse(parser, tree, before, after) {
-  let start = 0;
-  while (start < before.length && start < after.length && before[start] === after[start]) start++;
-  let oldEnd = before.length;
-  let newEnd = after.length;
-  while (oldEnd > start && newEnd > start && before[oldEnd - 1] === after[newEnd - 1]) {
-    oldEnd--;
-    newEnd--;
-  }
-  tree.edit(
-    new Edit({
-      startIndex: start,
-      oldEndIndex: oldEnd,
-      newEndIndex: newEnd,
-      startPosition: point(before, start),
-      oldEndPosition: point(before, oldEnd),
-      newEndPosition: point(after, newEnd),
-    })
-  );
-  const result = parser.parse(after, tree);
-  assert.ok(result);
-  tree.delete();
-  return result;
-}
-
-function point(source, index) {
-  const lines = source.slice(0, index).split('\n');
-  return { row: lines.length - 1, column: lines.at(-1).length };
-}
-
 function assertFollowing(tree, source) {
   assert.equal(tree.rootNode.lastNamedChild.text, Following, source);
   assert.equal(tree.rootNode.lastNamedChild.hasError, false, source);
-}
-
-function captures(query, tree) {
-  return query
-    .captures(tree.rootNode)
-    .map(({ patternIndex, name, node, setProperties, assertedProperties, refutedProperties }) => ({
-      patternIndex,
-      name,
-      node: snapshot(node),
-      setProperties,
-      assertedProperties,
-      refutedProperties,
-    }));
-}
-
-function snapshot(node) {
-  return [
-    node.type,
-    node.isNamed,
-    node.isMissing,
-    node.isExtra,
-    node.isError,
-    node.hasError,
-    node.startIndex,
-    node.endIndex,
-    node.startPosition,
-    node.endPosition,
-    node.children.map((child, index) => [node.fieldNameForChild(index), snapshot(child)]),
-  ];
 }

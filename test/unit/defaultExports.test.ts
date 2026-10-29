@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Edit, Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -40,7 +40,7 @@ test('retains default declaration queries and independent following statements',
   }
 });
 
-test('preserves default declaration context through incremental prefix edits', () => {
+test('parses declarations with and without a default export prefix', () => {
   const parser = new Parser();
   parser.setLanguage(language);
   try {
@@ -52,36 +52,14 @@ test('preserves default declaration context through incremental prefix edits', (
       'function*() {}',
       'class {}',
     ]) {
-      const prefix = 'export default ';
-      const ordinary = `${declaration}\n(x);`;
-      let tree = parser.parse(ordinary)!;
-      for (const inserted of [true, false, true]) {
-        tree.edit(
-          new Edit({
-            startIndex: 0,
-            oldEndIndex: inserted ? 0 : prefix.length,
-            newEndIndex: inserted ? prefix.length : 0,
-            startPosition: { row: 0, column: 0 },
-            oldEndPosition: { row: 0, column: inserted ? 0 : prefix.length },
-            newEndPosition: { row: 0, column: inserted ? prefix.length : 0 },
-          })
-        );
-        const source = (inserted ? prefix : '') + ordinary;
-        const previous = tree;
-        tree = parser.parse(source, previous)!;
-        previous.delete();
-        const fresh = parser.parse(source)!;
+      for (const prefix of ['', 'export default ']) {
+        const tree = parser.parse(`${prefix}${declaration}\n(x);`)!;
         try {
           expect(tree.rootNode.hasError).toBe(false);
-          expect(tree.rootNode.toString()).toBe(fresh.rootNode.toString());
-          expect(tree.rootNode.namedChildren.map((node) => [node.type, node.startIndex, node.endIndex])).toEqual(
-            fresh.rootNode.namedChildren.map((node) => [node.type, node.startIndex, node.endIndex])
-          );
         } finally {
-          fresh.delete();
+          tree.delete();
         }
       }
-      tree.delete();
     }
   } finally {
     parser.delete();

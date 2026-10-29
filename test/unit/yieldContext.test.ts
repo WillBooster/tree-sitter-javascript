@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Edit, Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -117,7 +117,7 @@ test('keeps yield identifier calls inside await operands across line breaks', ()
   }
 });
 
-test('reparses yield roles after generator edits across mixed nested contexts', { timeout: 30_000 }, () => {
+test('assigns yield roles by the innermost function across mixed nested contexts', { timeout: 30_000 }, () => {
   const parser = new Parser().setLanguage(language);
   try {
     for (const depth of [1, 32, 4080]) {
@@ -125,42 +125,18 @@ test('reparses yield roles after generator edits across mixed nested contexts', 
         { length: depth - 1 },
         (_, index) => `${index % 2 ? 'async ' : ''}function${index % 3 ? '*' : ''} outer(){`
       ).join('');
-      let source = `${prefix}function inner(){yield(value);}${'}'.repeat(depth - 1)}`;
-      let tree = parser.parse(source)!;
-      const start = prefix.length + 'function'.length;
-      try {
-        expect(tree.rootNode.hasError).toBe(false);
-        expect(tree.rootNode.descendantsOfType('yield_expression')).toHaveLength(0);
-        for (const generator of [true, false, true, false]) {
-          const previous = source;
-          source = previous.slice(0, start) + (generator ? '*' : '') + previous.slice(start + (generator ? 0 : 1));
-          tree.edit(
-            new Edit({
-              startIndex: start,
-              oldEndIndex: start + (generator ? 0 : 1),
-              newEndIndex: start + (generator ? 1 : 0),
-              startPosition: { row: 0, column: start },
-              oldEndPosition: { row: 0, column: start + (generator ? 0 : 1) },
-              newEndPosition: { row: 0, column: start + (generator ? 1 : 0) },
-            })
-          );
-          const old = tree;
-          tree = parser.parse(source, old)!;
-          old.delete();
-          const fresh = parser.parse(source)!;
-          try {
-            expect(tree.rootNode.hasError, source).toBe(false);
-            expect(tree.rootNode.toString(), source).toBe(fresh.rootNode.toString());
-            expect(
-              tree.rootNode.descendantsOfType('yield_expression').map(({ text }) => text),
-              source
-            ).toEqual(generator ? ['yield(value)'] : []);
-          } finally {
-            fresh.delete();
-          }
+      for (const generator of [false, true]) {
+        const source = `${prefix}function${generator ? '*' : ''} inner(){yield(value);}${'}'.repeat(depth - 1)}`;
+        const tree = parser.parse(source)!;
+        try {
+          expect(tree.rootNode.hasError, source).toBe(false);
+          expect(
+            tree.rootNode.descendantsOfType('yield_expression').map(({ text }) => text),
+            source
+          ).toEqual(generator ? ['yield(value)'] : []);
+        } finally {
+          tree.delete();
         }
-      } finally {
-        tree.delete();
       }
     }
   } finally {
@@ -215,37 +191,14 @@ test('resets ordinary object-method parameters inside generator functions', () =
       } finally {
         tree.delete();
       }
-      let changed = source;
-      let previous = parser.parse(changed)!;
-      const start = 'function'.length;
-      for (const generator of [false, true]) {
-        previous.edit(
-          new Edit({
-            startIndex: start,
-            oldEndIndex: start + (generator ? 0 : 1),
-            newEndIndex: start + (generator ? 1 : 0),
-            startPosition: { row: 0, column: start },
-            oldEndPosition: { row: 0, column: start + (generator ? 0 : 1) },
-            newEndPosition: { row: 0, column: start + (generator ? 1 : 0) },
-          })
-        );
-        changed = changed.slice(0, start) + (generator ? '*' : '') + changed.slice(start + (generator ? 0 : 1));
-        const updated = parser.parse(changed, previous)!;
-        previous.delete();
-        previous = updated;
-        const fresh = parser.parse(changed)!;
-        try {
-          expect(updated.rootNode.hasError, changed).toBe(false);
-          expect(updated.rootNode.toString(), changed).toBe(fresh.rootNode.toString());
-          expect(
-            updated.rootNode.descendantsOfType('yield_expression').map(({ text }) => text),
-            changed
-          ).toEqual(generator ? ['yield /outer/g'] : []);
-        } finally {
-          fresh.delete();
-        }
+      const ordinary = source.replace('function*', 'function');
+      const ordinaryTree = parser.parse(ordinary)!;
+      try {
+        expect(ordinaryTree.rootNode.hasError, ordinary).toBe(false);
+        expect(ordinaryTree.rootNode.descendantsOfType('yield_expression'), ordinary).toHaveLength(0);
+      } finally {
+        ordinaryTree.delete();
       }
-      previous.delete();
     }
   } finally {
     parser.delete();

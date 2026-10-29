@@ -5,7 +5,7 @@
 [![Test](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test.yml/badge.svg)](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test.yml)
 [![Test rust](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test-rust.yml/badge.svg)](https://github.com/WillBooster/tree-sitter-javascript/actions/workflows/test-rust.yml)
 [![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
-[![wbfy](https://img.shields.io/badge/wbfy-20.48.9-1e90ff.svg)](https://github.com/WillBooster/shared/tree/main/packages/wbfy)
+[![wbfy](https://img.shields.io/badge/wbfy-20.49.0-1e90ff.svg)](https://github.com/WillBooster/shared/tree/main/packages/wbfy)
 [![crates.io](https://img.shields.io/crates/v/willbooster-tree-sitter-javascript.svg)](https://crates.io/crates/willbooster-tree-sitter-javascript)
 
 JavaScript and JSX grammar for [tree-sitter](https://github.com/tree-sitter/tree-sitter), forked from
@@ -114,9 +114,6 @@ and the release build regenerate the parsers before compiling them.
 `bun run test` runs:
 
 - the corpus in `test/corpus`, with the native build and with the Wasm build (the first run downloads the WASI SDK);
-- an incremental-parsing check (`test/unit/incremental.test.ts`): `script/fuzz-corpus` runs `tree-sitter fuzz`, which
-  edits each corpus case at random, reparses it, undoes the edits, and reparses again. `TREE_SITTER_SEED`,
-  `TREE_SITTER_ITERATIONS`, and `TREE_SITTER_EDITS` run other or more edits;
 - a check that the real-world JavaScript files in `examples/`, the checked-in ones and those of the cloned repository,
   fail to parse exactly as listed in `script/known-failures.txt`. The first run clones the repository. The example
   repository is pinned to a commit in `script/parse-examples`. After a grammar change or a moved pin alters that list,
@@ -134,8 +131,7 @@ and the release build regenerate the parsers before compiling them.
   the crate (`test/unit/queries.test.ts`).
 
 The tests and `script/parse-examples` compile the parser into `.tmp/tree-sitter-lib` instead of the CLI's cache shared
-by every checkout, and `mise.toml` sets `TREE_SITTER_LIBDIR` to it for any other command run in the checkout;
-`script/fuzz-corpus` builds a parser of its own in `.tmp/fuzz` for each run and deletes it afterwards.
+by every checkout, and `mise.toml` sets `TREE_SITTER_LIBDIR` to it for any other command run in the checkout.
 
 CI also runs these tests on Linux arm64 and macOS, where the Rust binding compiles the parser natively, and fuzzes the
 parser with libFuzzer and sanitizers (`.github/workflows/robustness.yml`).

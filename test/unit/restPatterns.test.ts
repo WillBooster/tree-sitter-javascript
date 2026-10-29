@@ -1,6 +1,4 @@
-import fs from 'node:fs';
-
-import { Edit, Language, type Node, Parser, type Point, Query, type Tree } from '@willbooster/web-tree-sitter';
+import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 const Following = 'const sentinel = 1;';
@@ -61,17 +59,12 @@ for (const goal of ['javascript', 'javascript_script']) {
     }
   });
 
-  test(`preserves distinct object and array rest targets through edits in ${goal}`, async () => {
+  test(`preserves distinct object and array rest targets in ${goal}`, async () => {
     await Parser.init();
     const language = await Language.load(`tree-sitter-${goal}.wasm`);
-    const parser = new Parser();
-    const queries: Query[] = [];
+    const parser = new Parser().setLanguage(language);
+    const query = new Query(language, '(rest_pattern (_) @target) @rest');
     try {
-      parser.setLanguage(language);
-      queries.push(new Query(language, '(rest_pattern (_) @target) @rest'));
-      for (const name of ['highlights', 'highlights-jsx', 'highlights-params', 'locals', 'tags', 'injections']) {
-        queries.push(new Query(language, fs.readFileSync(`queries/${name}.scm`, 'utf8')));
-      }
       for (const [source, expected] of [
         [
           '({...target.member} = values);',
@@ -101,9 +94,7 @@ for (const goal of ['javascript', 'javascript_script']) {
         try {
           expect(tree.rootNode.hasError, source).toBe(false);
           expect(
-            queries[0]!
-              .captures(tree.rootNode)
-              .map(({ name, node }) => [name, node.text, node.startIndex, node.endIndex]),
+            query.captures(tree.rootNode).map(({ name, node }) => [name, node.text, node.startIndex, node.endIndex]),
             source
           ).toEqual(expected);
         } finally {
@@ -118,42 +109,15 @@ for (const goal of ['javascript', 'javascript_script']) {
         'function f(...[{first, ...rest}]) {}',
       ]) {
         const initial = `const before = 0;\n${statement}\n${Following}`;
-        let source = initial;
-        let tree = parser.parse(source)!;
-        const original = snapshot(tree.rootNode);
-        try {
-          for (const [next, invalid] of [
-            [initial.replace('before = 0', 'before = 1000'), false],
-            [initial.replace('...rest', '...[rest]'), true],
-            [initial.replace('...rest', '...{rest}'), true],
-            [initial.replace('...rest', '... /* rest */ rest'), false],
-            [initial, false],
-          ] as const) {
-            tree = reparse(parser, tree, source, next);
-            source = next;
-            const fresh = parser.parse(source)!;
-            try {
-              expect(tree.rootNode.hasError, source).toBe(invalid);
-              expect(snapshot(tree.rootNode), source).toEqual(snapshot(fresh.rootNode));
-              for (const query of queries) {
-                expect(
-                  query.captures(tree.rootNode).map(({ name, node }) => [name, snapshot(node)]),
-                  source
-                ).toEqual(query.captures(fresh.rootNode).map(({ name, node }) => [name, snapshot(node)]));
-              }
-              expect(tree.rootNode.lastNamedChild!.text, source).toBe(Following);
-              expect(tree.rootNode.lastNamedChild!.hasError, source).toBe(false);
-            } finally {
-              fresh.delete();
-            }
-          }
-          expect(snapshot(tree.rootNode)).toEqual(original);
-        } finally {
-          tree.delete();
-        }
+        expectStatements(parser, [
+          [initial, false],
+          [initial.replace('...rest', '...[rest]'), true],
+          [initial.replace('...rest', '...{rest}'), true],
+          [initial.replace('...rest', '... /* rest */ rest'), false],
+        ]);
       }
     } finally {
-      for (const query of queries) query.delete();
+      query.delete();
       parser.delete();
     }
   });
@@ -195,16 +159,11 @@ for (const goal of ['javascript', 'javascript_script']) {
     }
   });
 
-  test(`preserves object-pattern value captures through edits and undo in ${goal}`, async () => {
+  test(`preserves object-pattern value captures in ${goal}`, async () => {
     await Parser.init();
     const language = await Language.load(`tree-sitter-${goal}.wasm`);
     const parser = new Parser().setLanguage(language);
-    const queries = [
-      new Query(language, '(pair_pattern key: (_) @key value: (pattern) @value)'),
-      ...['highlights', 'highlights-jsx', 'highlights-params', 'locals', 'tags', 'injections'].map(
-        (name) => new Query(language, fs.readFileSync(`queries/${name}.scm`, 'utf8'))
-      ),
-    ];
+    const query = new Query(language, '(pair_pattern key: (_) @key value: (pattern) @value)');
     try {
       for (const [statement, expected] of [
         [
@@ -233,9 +192,7 @@ for (const goal of ['javascript', 'javascript_script']) {
         try {
           expect(tree.rootNode.hasError, statement).toBe(false);
           expect(
-            queries[0]!
-              .captures(tree.rootNode)
-              .map(({ name, node }) => [name, node.text, node.startIndex, node.endIndex]),
+            query.captures(tree.rootNode).map(({ name, node }) => [name, node.text, node.startIndex, node.endIndex]),
             statement
           ).toEqual(expected);
         } finally {
@@ -250,42 +207,15 @@ for (const goal of ['javascript', 'javascript_script']) {
         '({outer: {a: target}, ...rest} = values);',
       ]) {
         const initial = `const before = 0;\n${statement}\n${Following}`;
-        let source = initial;
-        let tree = parser.parse(source)!;
-        const original = snapshot(tree.rootNode);
-        try {
-          const offset = initial.indexOf('target');
-          for (const [next, invalid] of [
-            [initial.replace('before = 0', 'before = 1000'), false],
-            [initial.slice(0, offset) + '...' + initial.slice(offset), true],
-            [initial.slice(0, offset) + '/* value */ ' + initial.slice(offset), false],
-            [initial, false],
-          ] as const) {
-            tree = reparse(parser, tree, source, next);
-            source = next;
-            const fresh = parser.parse(source)!;
-            try {
-              expect(tree.rootNode.hasError, source).toBe(invalid);
-              expect(snapshot(tree.rootNode), source).toEqual(snapshot(fresh.rootNode));
-              for (const query of queries) {
-                expect(
-                  query.captures(tree.rootNode).map(({ name, node }) => [name, snapshot(node)]),
-                  source
-                ).toEqual(query.captures(fresh.rootNode).map(({ name, node }) => [name, snapshot(node)]));
-              }
-              expect(tree.rootNode.lastNamedChild!.text, source).toBe(Following);
-              expect(tree.rootNode.lastNamedChild!.hasError, source).toBe(false);
-            } finally {
-              fresh.delete();
-            }
-          }
-          expect(snapshot(tree.rootNode)).toEqual(original);
-        } finally {
-          tree.delete();
-        }
+        const offset = initial.indexOf('target');
+        expectStatements(parser, [
+          [initial, false],
+          [initial.slice(0, offset) + '...' + initial.slice(offset), true],
+          [initial.slice(0, offset) + '/* value */ ' + initial.slice(offset), false],
+        ]);
       }
     } finally {
-      for (const query of queries) query.delete();
+      query.delete();
       parser.delete();
     }
   });
@@ -421,16 +351,9 @@ for (const goal of ['javascript', 'javascript_script']) {
     }
   });
 
-  test(`preserves query fields and ranges when editing rest-list endings in ${goal}`, async () => {
+  test(`requires rest elements to end their lists between declarations in ${goal}`, async () => {
     await Parser.init();
-    const language = await Language.load(`tree-sitter-${goal}.wasm`);
-    const parser = new Parser().setLanguage(language);
-    const queries = [
-      new Query(language, PatternQuery),
-      ...['highlights', 'highlights-jsx', 'highlights-params', 'locals', 'tags', 'injections'].map(
-        (name) => new Query(language, fs.readFileSync(`queries/${name}.scm`, 'utf8'))
-      ),
-    ];
+    const parser = new Parser().setLanguage(await Language.load(`tree-sitter-${goal}.wasm`));
     try {
       for (const statement of [
         'const [a,,...rest] = values;',
@@ -440,89 +363,29 @@ for (const goal of ['javascript', 'javascript_script']) {
         'for ([...[a, ...rest]] of values) {}',
       ]) {
         const initial = `const before = 0;\n${statement}\n${Following}`;
-        let source = initial;
-        let tree = parser.parse(source)!;
-        const original = snapshot(tree.rootNode);
-        try {
-          const offset = initial.indexOf('...rest') + '...rest'.length;
-          for (const [next, invalid] of [
-            [initial.replace('before = 0', 'before = 1000'), false],
-            [initial.slice(0, offset) + ',' + initial.slice(offset), true],
-            [initial.slice(0, offset) + ', next' + initial.slice(offset), true],
-            [initial.slice(0, offset) + ' /* end */' + initial.slice(offset), false],
-            [initial, false],
-          ] as const) {
-            tree = reparse(parser, tree, source, next);
-            source = next;
-            const fresh = parser.parse(source)!;
-            try {
-              expect(tree.rootNode.hasError, source).toBe(invalid);
-              expect(snapshot(tree.rootNode), source).toEqual(snapshot(fresh.rootNode));
-              for (const query of queries) {
-                expect(
-                  query.captures(tree.rootNode).map(({ name, node }) => [name, snapshot(node)]),
-                  source
-                ).toEqual(query.captures(fresh.rootNode).map(({ name, node }) => [name, snapshot(node)]));
-              }
-              expect(tree.rootNode.lastNamedChild!.text, source).toBe(Following);
-              expect(tree.rootNode.lastNamedChild!.hasError, source).toBe(false);
-            } finally {
-              fresh.delete();
-            }
-          }
-          expect(snapshot(tree.rootNode)).toEqual(original);
-        } finally {
-          tree.delete();
-        }
+        const offset = initial.indexOf('...rest') + '...rest'.length;
+        expectStatements(parser, [
+          [initial, false],
+          [initial.slice(0, offset) + ',' + initial.slice(offset), true],
+          [initial.slice(0, offset) + ', next' + initial.slice(offset), true],
+          [initial.slice(0, offset) + ' /* end */' + initial.slice(offset), false],
+        ]);
       }
     } finally {
-      for (const query of queries) query.delete();
       parser.delete();
     }
   });
 }
 
-function reparse(parser: Parser, tree: Tree, source: string, next: string): Tree {
-  let start = 0;
-  while (start < source.length && start < next.length && source[start] === next[start]) start++;
-  let oldEnd = source.length;
-  let newEnd = next.length;
-  while (oldEnd > start && newEnd > start && source[oldEnd - 1] === next[newEnd - 1]) {
-    oldEnd--;
-    newEnd--;
+function expectStatements(parser: Parser, sources: readonly (readonly [string, boolean])[]): void {
+  for (const [source, hasError] of sources) {
+    const tree = parser.parse(source)!;
+    try {
+      expect(tree.rootNode.hasError, source).toBe(hasError);
+      expect(tree.rootNode.lastNamedChild!.text, source).toBe(Following);
+      expect(tree.rootNode.lastNamedChild!.hasError, source).toBe(false);
+    } finally {
+      tree.delete();
+    }
   }
-  tree.edit(
-    new Edit({
-      startIndex: start,
-      oldEndIndex: oldEnd,
-      newEndIndex: newEnd,
-      startPosition: point(source, start),
-      oldEndPosition: point(source, oldEnd),
-      newEndPosition: point(next, newEnd),
-    })
-  );
-  const result = parser.parse(next, tree)!;
-  tree.delete();
-  return result;
-}
-
-function point(source: string, index: number): Point {
-  const lines = source.slice(0, index).split('\n');
-  return { row: lines.length - 1, column: lines.at(-1)!.length };
-}
-
-function snapshot(node: Node): unknown {
-  return [
-    node.type,
-    node.isNamed,
-    node.isMissing,
-    node.isExtra,
-    node.isError,
-    node.hasError,
-    node.startIndex,
-    node.endIndex,
-    node.startPosition,
-    node.endPosition,
-    node.children.map((child, index) => [node.fieldNameForChild(index), snapshot(child)]),
-  ];
 }

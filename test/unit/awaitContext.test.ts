@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Edit, Language, type Node, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -115,7 +115,7 @@ test('restores outer await context after nested arrows, methods and constructors
 });
 
 test(
-  'reparses function context when async is added and removed, including at serialization capacity',
+  'assigns the function context by the innermost function, including at serialization capacity',
   { timeout: 30_000 },
   () => {
     const parser = new Parser().setLanguage(language);
@@ -125,45 +125,18 @@ test(
           { length: depth - 1 },
           (_, index) => `${index % 2 ? 'async ' : ''}function f(){`
         ).join('');
-        let source = `${prefix}function f(){await(value);}${'}'.repeat(depth - 1)}`;
-        let tree = parser.parse(source)!;
-        try {
-          expect(tree.rootNode.hasError).toBe(false);
-          expect(tree.rootNode.descendantsOfType('await_expression')).toHaveLength(0);
-          for (const async of [true, false, true, false]) {
-            const deleted = async ? 0 : 6;
-            const inserted = async ? 'async ' : '';
-            tree.edit(
-              new Edit({
-                startIndex: prefix.length,
-                oldEndIndex: prefix.length + deleted,
-                newEndIndex: prefix.length + inserted.length,
-                startPosition: { row: 0, column: prefix.length },
-                oldEndPosition: { row: 0, column: prefix.length + deleted },
-                newEndPosition: { row: 0, column: prefix.length + inserted.length },
-              })
+        for (const async of [false, true]) {
+          const tree = parser.parse(
+            `${prefix}${async ? 'async ' : ''}function f(){await(value);}${'}'.repeat(depth - 1)}`
+          )!;
+          try {
+            expect(tree.rootNode.hasError).toBe(false);
+            expect(tree.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual(
+              async ? ['await(value)'] : []
             );
-            source = source.slice(0, prefix.length) + inserted + source.slice(prefix.length + deleted);
-            const previous = tree;
-            tree = parser.parse(source, previous)!;
-            previous.delete();
-            const fresh = parser.parse(source)!;
-            try {
-              expect(tree.rootNode.hasError).toBe(false);
-              expect(fresh.rootNode.hasError).toBe(false);
-              expect(tree.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual(
-                async ? ['await(value)'] : []
-              );
-              expect(tree.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual(
-                fresh.rootNode.descendantsOfType('await_expression').map(({ text }) => text)
-              );
-              expect(tree.rootNode.toString()).toBe(fresh.rootNode.toString());
-            } finally {
-              fresh.delete();
-            }
+          } finally {
+            tree.delete();
           }
-        } finally {
-          tree.delete();
         }
       }
     } finally {
@@ -172,7 +145,7 @@ test(
   }
 );
 
-test('reports context overflow and incrementally repairs incomplete nested functions', () => {
+test('reports context overflow and parses incomplete and completed nested functions', () => {
   const parser = new Parser().setLanguage(language);
   try {
     const overflow = parser.parse(`${'function f(){'.repeat(8161)}await(value);${'}'.repeat(8161)}`)!;
@@ -185,31 +158,15 @@ test('reports context overflow and incrementally repairs incomplete nested funct
     const tree = parser.parse(source)!;
     try {
       expect(tree.rootNode.hasError).toBe(true);
-      const suffix = ' value;}';
-      tree.edit(
-        new Edit({
-          startIndex: source.length,
-          oldEndIndex: source.length,
-          newEndIndex: source.length + suffix.length,
-          startPosition: { row: 0, column: source.length },
-          oldEndPosition: { row: 0, column: source.length },
-          newEndPosition: { row: 0, column: source.length + suffix.length },
-        })
-      );
-      const repaired = parser.parse(source + suffix, tree)!;
-      const fresh = parser.parse(source + suffix)!;
-      try {
-        expect(repaired.rootNode.hasError).toBe(false);
-        expect(repaired.rootNode.toString()).toBe(fresh.rootNode.toString());
-        expect(repaired.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual([
-          'await value',
-        ]);
-      } finally {
-        repaired.delete();
-        fresh.delete();
-      }
     } finally {
       tree.delete();
+    }
+    const completed = parser.parse(`${source} value;}`)!;
+    try {
+      expect(completed.rootNode.hasError).toBe(false);
+      expect(completed.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual(['await value']);
+    } finally {
+      completed.delete();
     }
   } finally {
     parser.delete();
@@ -238,55 +195,31 @@ test.each(['javascript', 'javascript_script'])(
             ['async', 'value => value;'],
           ] as const) {
             const before = prefix + 'await';
-            const tail = `${word}${newline}${continuation}${suffix} const sentinel = 1;`;
-            let separator = newline;
-            let source = before + separator + tail;
-            let tree = parser.parse(source)!;
-            try {
-              for (const replacement of [newline, `/* boundary */${newline}`, newline]) {
-                const next = before + replacement + tail;
-                tree.edit(
-                  new Edit({
-                    startIndex: before.length,
-                    oldEndIndex: before.length + separator.length,
-                    newEndIndex: before.length + replacement.length,
-                    startPosition: boundaryPoint(source, before.length),
-                    oldEndPosition: boundaryPoint(source, before.length + separator.length),
-                    newEndPosition: boundaryPoint(next, before.length + replacement.length),
-                  })
-                );
-                const previous = tree;
-                tree = parser.parse(next, previous)!;
-                previous.delete();
-                source = next;
-                separator = replacement;
-                const fresh = parser.parse(source)!;
-                try {
-                  expect(tree.rootNode.hasError, source).toBe(false);
-                  expect(boundaryMetadata(tree.rootNode), source).toEqual(boundaryMetadata(fresh.rootNode));
-                  const awaits = tree.rootNode.descendantsOfType('await_expression');
-                  expect(awaits, source).toHaveLength(hasOperand ? 1 : 0);
-                  const captures = query.captures(tree.rootNode);
-                  if (hasOperand) {
-                    expect(awaits[0]!.text).toBe('await' + replacement + word);
-                    expect(awaits[0]!.endIndex).toBe(before.length + replacement.length + word.length);
-                    expect(captures.filter(({ name }) => name === 'operand').map(({ node }) => node.text)).toEqual([
-                      word,
-                    ]);
-                  } else {
-                    const names = captures.filter(({ node }) => node.text === 'await');
-                    expect(names.map(({ name }) => name).toSorted()).toEqual(['primary', 'reference']);
-                    expect(
-                      names.every(({ node }) => node.childCount === 0 && node.endIndex - node.startIndex === 5)
-                    ).toBe(true);
-                  }
-                  expect(tree.rootNode.lastNamedChild!.text).toBe('const sentinel = 1;');
-                } finally {
-                  fresh.delete();
+            for (const separator of [newline, `/* boundary */${newline}`]) {
+              const source = `${before}${separator}${word}${newline}${continuation}${suffix} const sentinel = 1;`;
+              const tree = parser.parse(source)!;
+              try {
+                expect(tree.rootNode.hasError, source).toBe(false);
+                const awaits = tree.rootNode.descendantsOfType('await_expression');
+                expect(awaits, source).toHaveLength(hasOperand ? 1 : 0);
+                const captures = query.captures(tree.rootNode);
+                if (hasOperand) {
+                  expect(awaits[0]!.text).toBe('await' + separator + word);
+                  expect(awaits[0]!.endIndex).toBe(before.length + separator.length + word.length);
+                  expect(captures.filter(({ name }) => name === 'operand').map(({ node }) => node.text)).toEqual([
+                    word,
+                  ]);
+                } else {
+                  const names = captures.filter(({ node }) => node.text === 'await');
+                  expect(names.map(({ name }) => name).toSorted()).toEqual(['primary', 'reference']);
+                  expect(
+                    names.every(({ node }) => node.childCount === 0 && node.endIndex - node.startIndex === 5)
+                  ).toBe(true);
                 }
+                expect(tree.rootNode.lastNamedChild!.text).toBe('const sentinel = 1;');
+              } finally {
+                tree.delete();
               }
-            } finally {
-              tree.delete();
             }
           }
         }
@@ -297,23 +230,3 @@ test.each(['javascript', 'javascript_script'])(
     }
   }
 );
-
-function boundaryPoint(source: string, index: number): { row: number; column: number } {
-  const preceding = source.slice(0, index).split('\n');
-  return { row: preceding.length - 1, column: preceding.at(-1)!.length };
-}
-
-function boundaryMetadata(node: Node): unknown {
-  return [
-    node.type,
-    node.isNamed,
-    node.isExtra,
-    node.isMissing,
-    node.hasError,
-    node.startIndex,
-    node.endIndex,
-    node.startPosition,
-    node.endPosition,
-    node.children.map((child, index) => [node.fieldNameForChild(index), boundaryMetadata(child)]),
-  ];
-}

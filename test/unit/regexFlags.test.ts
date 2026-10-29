@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Edit, Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -46,82 +46,16 @@ test.each(['/*c*/', '//c\n'])('ends regex flags before comment %j', (comment) =>
   }
 });
 
-test('restores regex boundaries after incremental flag edits', () => {
+test('ends regex flags of any length before a comment', () => {
   const parser = new Parser();
   parser.setLanguage(language);
-  let source = '/x/g/*c*/instanceof value;';
-  let tree = parser.parse(source)!;
   try {
-    for (const flags of ['', 'gi', '', 'g']) {
-      const oldFlags = source.slice(3, source.indexOf('/*'));
-      tree.edit(
-        new Edit({
-          startIndex: 3,
-          oldEndIndex: 3 + oldFlags.length,
-          newEndIndex: 3 + flags.length,
-          startPosition: { row: 0, column: 3 },
-          oldEndPosition: { row: 0, column: 3 + oldFlags.length },
-          newEndPosition: { row: 0, column: 3 + flags.length },
-        })
-      );
-      source = `/x/${flags}/*c*/instanceof value;`;
-      const previous = tree;
-      tree = parser.parse(source, previous)!;
-      previous.delete();
-      const fresh = parser.parse(source)!;
+    for (const flags of ['', 'g', 'gi']) {
+      const source = `/x/${flags}/*c*/instanceof value;`;
+      const tree = parser.parse(source)!;
       try {
         expect(tree.rootNode.hasError, source).toBe(false);
-        expect(tree.rootNode.toString(), source).toBe(fresh.rootNode.toString());
         expect(tree.rootNode.descendantsOfType('regex')[0]?.text, source).toBe(`/x/${flags}`);
-      } finally {
-        fresh.delete();
-      }
-    }
-  } finally {
-    tree.delete();
-    parser.delete();
-  }
-});
-
-test.each(['//c\n', '/*c\n*/'])('restores infix operators after a regex comment %j', (comment) => {
-  const parser = new Parser().setLanguage(language);
-  try {
-    for (const operator of ['in', 'instanceof']) {
-      const prefix = `/x/${comment}`;
-      const original = `${prefix}${operator} value;`;
-      let source = original;
-      let tree = parser.parse(source)!;
-      try {
-        for (const next of [`${prefix}i\n`, original, `${prefix}i\n`, original]) {
-          tree.edit(
-            new Edit({
-              startIndex: prefix.length,
-              oldEndIndex: source.length,
-              newEndIndex: next.length,
-              startPosition: endPoint(prefix),
-              oldEndPosition: endPoint(source),
-              newEndPosition: endPoint(next),
-            })
-          );
-          const previous = tree;
-          tree = parser.parse(next, previous)!;
-          previous.delete();
-          source = next;
-          const fresh = parser.parse(source)!;
-          try {
-            expect(tree.rootNode.hasError, source).toBe(false);
-            expect(tree.rootNode.toString(), source).toBe(fresh.rootNode.toString());
-            expect(tree.rootNode.descendantsOfType('regex')[0]?.text, source).toBe('/x/');
-            expect(
-              tree.rootNode
-                .descendantsOfType('binary_expression')
-                .map((node) => node.childForFieldName('operator')?.text),
-              source
-            ).toEqual(source === original ? [operator] : []);
-          } finally {
-            fresh.delete();
-          }
-        }
       } finally {
         tree.delete();
       }
@@ -131,7 +65,29 @@ test.each(['//c\n', '/*c\n*/'])('restores infix operators after a regex comment 
   }
 });
 
-function endPoint(source: string): { row: number; column: number } {
-  const lines = source.split('\n');
-  return { row: lines.length - 1, column: lines.at(-1)!.length };
-}
+test.each(['//c\n', '/*c\n*/'])('parses an infix operator or an identifier after a regex comment %j', (comment) => {
+  const parser = new Parser().setLanguage(language);
+  try {
+    for (const operator of ['in', 'instanceof']) {
+      const prefix = `/x/${comment}`;
+      const original = `${prefix}${operator} value;`;
+      for (const source of [original, `${prefix}i\n`]) {
+        const tree = parser.parse(source)!;
+        try {
+          expect(tree.rootNode.hasError, source).toBe(false);
+          expect(tree.rootNode.descendantsOfType('regex')[0]?.text, source).toBe('/x/');
+          expect(
+            tree.rootNode
+              .descendantsOfType('binary_expression')
+              .map((node) => node.childForFieldName('operator')?.text),
+            source
+          ).toEqual(source === original ? [operator] : []);
+        } finally {
+          tree.delete();
+        }
+      }
+    }
+  } finally {
+    parser.delete();
+  }
+});

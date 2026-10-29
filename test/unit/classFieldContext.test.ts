@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Edit, Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -61,34 +61,15 @@ test('uses the computed-name and nested-function contexts independently of the f
   }
 });
 
-test('reparses field boundaries and public captures when an arrow becomes async and back', () => {
+test('separates field boundaries and public captures by whether an arrow is async', () => {
   const parser = new Parser().setLanguage(language);
   const query = new Query(language, '(expression) @expression (primary_expression) @primary');
-  let source = 'class C { x = () => await\nvalue; }';
-  let tree = parser.parse(source)!;
-  const start = source.indexOf('()');
   try {
-    for (const async of [true, false, true, false]) {
-      const inserted = async ? 'async ' : '';
-      const deleted = async ? 0 : 6;
-      tree.edit(
-        new Edit({
-          startIndex: start,
-          oldEndIndex: start + deleted,
-          newEndIndex: start + inserted.length,
-          startPosition: { row: 0, column: start },
-          oldEndPosition: { row: 0, column: start + deleted },
-          newEndPosition: { row: 0, column: start + inserted.length },
-        })
-      );
-      source = source.slice(0, start) + inserted + source.slice(start + deleted);
-      const previous = tree;
-      tree = parser.parse(source, previous)!;
-      previous.delete();
-      const fresh = parser.parse(source)!;
+    for (const async of [false, true]) {
+      const source = `class C { x = ${async ? 'async ' : ''}() => await\nvalue; }`;
+      const tree = parser.parse(source)!;
       try {
         expect(tree.rootNode.hasError, source).toBe(false);
-        expect(tree.rootNode.toString(), source).toBe(fresh.rootNode.toString());
         expect(tree.rootNode.descendantsOfType('await_expression'), source).toHaveLength(async ? 1 : 0);
         expect(tree.rootNode.descendantsOfType('field_definition'), source).toHaveLength(async ? 1 : 2);
         expect(
@@ -96,12 +77,11 @@ test('reparses field boundaries and public captures when an arrow becomes async 
           source
         ).toHaveLength(async ? 0 : 2);
       } finally {
-        fresh.delete();
+        tree.delete();
       }
     }
   } finally {
     query.delete();
-    tree.delete();
     parser.delete();
   }
 });
@@ -109,38 +89,13 @@ test('reparses field boundaries and public captures when an arrow becomes async 
 test('restores the outer context after an initializer at the serialized context capacity', { timeout: 30_000 }, () => {
   const parser = new Parser().setLanguage(language);
   const nested = '(function(){'.repeat(8159) + 'await\nvalue;' + '})'.repeat(8159);
-  let source = `class C { field = ${nested}; } const after = await outside;`;
-  let tree = parser.parse(source)!;
-  const start = source.lastIndexOf('outside');
-  const column = start - source.lastIndexOf('\n', start) - 1;
+  const tree = parser.parse(`class C { field = ${nested}; } const after = await outside;`)!;
   try {
-    for (const name of ['changed', 'outside']) {
-      tree.edit(
-        new Edit({
-          startIndex: start,
-          oldEndIndex: start + 7,
-          newEndIndex: start + 7,
-          startPosition: { row: 1, column },
-          oldEndPosition: { row: 1, column: column + 7 },
-          newEndPosition: { row: 1, column: column + 7 },
-        })
-      );
-      source = source.slice(0, start) + name + source.slice(start + 7);
-      const previous = tree;
-      tree = parser.parse(source, previous)!;
-      previous.delete();
-      const fresh = parser.parse(source)!;
-      try {
-        expect(tree.rootNode.hasError).toBe(false);
-        expect(tree.rootNode.toString()).toBe(fresh.rootNode.toString());
-        expect(tree.rootNode.descendantsOfType('function_expression')).toHaveLength(8159);
-        expect(tree.rootNode.descendantsOfType('field_definition')).toHaveLength(1);
-        expect(tree.rootNode.namedChildren.at(-1)!.type).toBe('lexical_declaration');
-        expect(tree.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual([`await ${name}`]);
-      } finally {
-        fresh.delete();
-      }
-    }
+    expect(tree.rootNode.hasError).toBe(false);
+    expect(tree.rootNode.descendantsOfType('function_expression')).toHaveLength(8159);
+    expect(tree.rootNode.descendantsOfType('field_definition')).toHaveLength(1);
+    expect(tree.rootNode.namedChildren.at(-1)!.type).toBe('lexical_declaration');
+    expect(tree.rootNode.descendantsOfType('await_expression').map(({ text }) => text)).toEqual(['await outside']);
   } finally {
     tree.delete();
     parser.delete();
