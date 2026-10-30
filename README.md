@@ -82,10 +82,9 @@ array/formal and object-rest extension hooks. The crate ships `tree-sitter.json`
 In Rust, depend on the [crate](https://crates.io/crates/willbooster-tree-sitter-javascript) and the
 [willbooster-tree-sitter](https://crates.io/crates/willbooster-tree-sitter) runtime with the matching ABI. The tested version is 15.5.4:
 
-```toml
-[dependencies]
-tree-sitter = { package = "willbooster-tree-sitter", version = "15.5.4" }
-tree-sitter-javascript = { package = "willbooster-tree-sitter-javascript", version = "16" }
+```sh
+cargo add willbooster-tree-sitter@15.5.4 --rename tree-sitter
+cargo add willbooster-tree-sitter-javascript --rename tree-sitter-javascript
 ```
 
 ```rust
