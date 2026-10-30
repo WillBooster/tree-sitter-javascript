@@ -67,8 +67,9 @@ static bool is_reserved_word(const char *name);
 static bool scan_expression_trivia(TSLexer *lexer, bool *saw_newline, bool *scanned_comment, bool skip_contents);
 
 typedef struct {
-    // Reused block arrows, postfix updates, and uninitialized bindings can bypass the boundary state.
-    // Nested await end tokens must not clear it before the enclosing statement consumes it.
+    // Set where a block arrow, postfix update, or uninitialized binding ends its statement at a line break, and
+    // cleared by the token that consumes that statement end. Nested await end tokens must not clear it before the
+    // enclosing statement consumes it.
     bool automatic_semicolon_pending;
     bool default_declaration_pending;
     FunctionContext functions;

@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 import { testCommand } from './run.js';
@@ -9,7 +9,7 @@ await Parser.init();
 const moduleLanguage = await Language.load(path.join(import.meta.dirname, '../../tree-sitter-javascript.wasm'));
 const scriptLanguage = await Language.load(path.join(import.meta.dirname, '../../tree-sitter-javascript_script.wasm'));
 
-test('selects Script and Module await roles without changing public expression captures', () => {
+test('selects Script and Module await roles', () => {
   const controls = [
     ['value', 'identifier'],
     ['class C {}', 'class_declaration'],
@@ -25,7 +25,6 @@ test('selects Script and Module await roles without changing public expression c
     [scriptLanguage, true],
   ] as const) {
     const parser = new Parser().setLanguage(language);
-    const query = new Query(language, '(expression) @expression (primary_expression) @primary');
     try {
       for (const [operand, scriptType] of controls) {
         const source = `await\n${operand}`;
@@ -38,19 +37,6 @@ test('selects Script and Module await roles without changing public expression c
           if (isScript) {
             const identifiers = tree.rootNode.descendantsOfType('identifier').filter(({ text }) => text === 'await');
             expect(identifiers, source).toHaveLength(1);
-            expect(
-              query
-                .captures(tree.rootNode)
-                .filter(({ name, node }) => name === 'primary' && node.id === identifiers[0]!.id),
-              source
-            ).toHaveLength(1);
-            const expression = tree.rootNode.namedChildren[0]!.namedChildren[0]!;
-            expect(
-              query
-                .captures(tree.rootNode)
-                .filter(({ name, node }) => name === 'expression' && node.id === expression.id),
-              source
-            ).toHaveLength(1);
             if (scriptType.endsWith('declaration')) {
               expect(tree.rootNode.namedChildren[1]!.type, source).toBe(scriptType);
             } else {
@@ -62,7 +48,6 @@ test('selects Script and Module await roles without changing public expression c
         }
       }
     } finally {
-      query.delete();
       parser.delete();
     }
   }

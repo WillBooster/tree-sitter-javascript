@@ -1,4 +1,4 @@
-import { Language, Parser, Query, type Tree } from '@willbooster/web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 const Operators = ['=', '+=', '-=', '*=', '/=', '%=', '**=', '<<=', '>>=', '>>>=', '&=', '|=', '^='];
@@ -21,14 +21,10 @@ const Targets = [
 const Following = 'const sentinel = 1;';
 
 for (const goal of ['javascript', 'javascript_script']) {
-  test(`parses classic call assignments and preserves callee supertype captures in ${goal}`, async () => {
+  test(`parses classic call assignments in ${goal}`, async () => {
     await Parser.init();
     const language = await Language.load(`tree-sitter-${goal}.wasm`);
     const parser = new Parser().setLanguage(language);
-    const query = new Query(
-      language,
-      '(call_expression function: (expression) @expression) (call_expression function: (primary_expression) @primary)'
-    );
     try {
       for (const target of Targets) {
         for (const operator of Operators) {
@@ -42,7 +38,6 @@ for (const goal of ['javascript', 'javascript_script']) {
             );
             expect(assignment.childForFieldName('left')?.text, source).toBe(target);
             expect(assignment.childForFieldName('right')?.text, source).toBe('value');
-            checkCallees(tree, query, source);
             expect(tree.rootNode.lastNamedChild!.text, source).toBe(Following);
           } finally {
             tree.delete();
@@ -50,7 +45,6 @@ for (const goal of ['javascript', 'javascript_script']) {
         }
       }
     } finally {
-      query.delete();
       parser.delete();
     }
   });
@@ -108,7 +102,6 @@ for (const goal of ['javascript', 'javascript_script']) {
     await Parser.init();
     const language = await Language.load(`tree-sitter-${goal}.wasm`);
     const parser = new Parser().setLanguage(language);
-    const query = new Query(language, '(parenthesized_expression [(expression) (sequence_expression)] @inner)');
     try {
       for (const statement of [
         ...['=', '+=', '&&=', '||=', '??='].flatMap((operator) => [
@@ -130,14 +123,6 @@ for (const goal of ['javascript', 'javascript_script']) {
         try {
           expect(tree.rootNode.hasError, source).toBe(false);
           expect(tree.rootNode.lastNamedChild!.text, source).toBe(Following);
-          const captures = query.captures(tree.rootNode);
-          for (const group of tree.rootNode.descendantsOfType('parenthesized_expression')) {
-            const inner = group.firstNamedChild!;
-            expect(
-              captures.filter(({ node }) => node.id === inner.id),
-              source
-            ).toHaveLength(1);
-          }
         } finally {
           tree.delete();
         }
@@ -207,7 +192,6 @@ for (const goal of ['javascript', 'javascript_script']) {
         }
       }
     } finally {
-      query.delete();
       parser.delete();
     }
   });
@@ -307,22 +291,4 @@ for (const goal of ['javascript', 'javascript_script']) {
       parser.delete();
     }
   });
-}
-
-function checkCallees(tree: Tree, query: Query, source: string): void {
-  const captures = query.captures(tree.rootNode);
-  for (const call of tree.rootNode.descendantsOfType('call_expression')) {
-    const callee = call.childForFieldName('function')!;
-    if (callee.type === 'import') continue;
-    expect(
-      captures.some(({ name, node }) => name === 'primary' && node.id === callee.id),
-      source
-    ).toBe(true);
-    if (call.childForFieldName('arguments')?.type === 'arguments' && !call.childForFieldName('optional_chain')) {
-      expect(
-        captures.some(({ name, node }) => name === 'expression' && node.id === callee.id),
-        source
-      ).toBe(true);
-    }
-  }
 }

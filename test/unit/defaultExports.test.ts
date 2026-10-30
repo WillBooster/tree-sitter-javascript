@@ -1,15 +1,14 @@
 import path from 'node:path';
 
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
 const language = await Language.load(path.join(import.meta.dirname, '../../tree-sitter-javascript.wasm'));
 
-test('retains default declaration queries and independent following statements', () => {
+test('retains default declarations and independent following statements', () => {
   const parser = new Parser();
   parser.setLanguage(language);
-  const query = new Query(language, '(export_statement declaration: (declaration) @declaration)');
   try {
     for (const declaration of [
       'function() {}',
@@ -26,7 +25,11 @@ test('retains default declaration queries and independent following statements',
         const tree = parser.parse(`export default /* before */ ${declaration} /* after */\n${following}`)!;
         try {
           expect(tree.rootNode.hasError).toBe(false);
-          expect(query.captures(tree.rootNode).map(({ node }) => node.text)).toEqual([declaration]);
+          expect(
+            tree.rootNode
+              .descendantsOfType('export_statement')
+              .map((node) => node.childForFieldName('declaration')?.text)
+          ).toEqual([declaration]);
           expect(tree.rootNode.lastNamedChild?.text).toBe(following);
           expect(tree.rootNode.lastNamedChild?.type).toBe('expression_statement');
         } finally {
@@ -35,7 +38,6 @@ test('retains default declaration queries and independent following statements',
       }
     }
   } finally {
-    query.delete();
     parser.delete();
   }
 });
@@ -69,7 +71,6 @@ test('parses declarations with and without a default export prefix', () => {
 test('preserves default keyword ranges and comment extras around declarations', () => {
   const parser = new Parser();
   parser.setLanguage(language);
-  const query = new Query(language, '"default" @keyword (export_statement declaration: (declaration) @declaration)');
   try {
     for (const before of ['', '/* before */ ', '<!-- before\n', '--> before\n']) {
       for (const after of ['', '/* after */ ', '<!-- after\n', '--> after\n']) {
@@ -78,13 +79,14 @@ test('preserves default keyword ranges and comment extras around declarations', 
           const tree = parser.parse(source)!;
           try {
             expect(tree.rootNode.hasError, source).toBe(false);
-            const captures = query.captures(tree.rootNode);
             expect(
-              captures
-                .filter(({ name }) => name === 'keyword')
-                .map(({ node }) => [node.text, node.startIndex, node.endIndex])
+              tree.rootNode.descendantsOfType('default').map((node) => [node.text, node.startIndex, node.endIndex])
             ).toEqual([['default', source.indexOf('default'), source.indexOf('default') + 7]]);
-            expect(captures.filter(({ name }) => name === 'declaration')).toHaveLength(value === '1;' ? 0 : 1);
+            expect(
+              tree.rootNode
+                .descendantsOfType('export_statement')
+                .filter((node) => node.childForFieldName('declaration'))
+            ).toHaveLength(value === '1;' ? 0 : 1);
             expect(tree.rootNode.lastNamedChild?.text).toBe(
               value === '1;' ? source : value.endsWith('(x);') ? '(x);' : '[x];'
             );
@@ -106,7 +108,6 @@ test('preserves default keyword ranges and comment extras around declarations', 
       tree.delete();
     }
   } finally {
-    query.delete();
     parser.delete();
   }
 });

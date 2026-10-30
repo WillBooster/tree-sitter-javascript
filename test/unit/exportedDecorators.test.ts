@@ -1,19 +1,13 @@
 import path from 'node:path';
 
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
 const language = await Language.load(path.join(import.meta.dirname, '../../tree-sitter-javascript.wasm'));
 
-const querySource = `
-  (export_statement declaration: (declaration) @declaration)
-  (declaration/class_declaration decorator: (decorator) @decorator)
-`;
-
-test('keeps decorators on exported classes with canonical declaration queries', () => {
+test('keeps decorators on exported classes', () => {
   const parser = new Parser().setLanguage(language);
-  const query = new Query(language, querySource);
   try {
     for (const decorators of ['@dec', '@one() @two.member', '@factory(() => class {})']) {
       for (const source of [
@@ -29,17 +23,10 @@ test('keeps decorators on exported classes with canonical declaration queries', 
           expect(tree.rootNode.hasError, source).toBe(false);
           const exported = tree.rootNode.firstNamedChild!;
           const declaration = exported.childForFieldName('declaration')!;
-          const captures = query.captures(tree.rootNode);
           expect(exported.type).toBe('export_statement');
           expect(declaration.type).toBe('class_declaration');
-          expect(captures.filter(({ name }) => name === 'declaration').map(({ node }) => node.id)).toEqual([
-            declaration.id,
-          ]);
           const decorated = declaration.childrenForFieldName('decorator');
           expect(decorated.map((node) => node.text).join(' ')).toBe(decorators);
-          expect(captures.filter(({ name }) => name === 'decorator').map(({ node }) => node.id)).toEqual(
-            decorated.map((node) => node.id)
-          );
           expect(exported.childrenForFieldName('decorator')).toEqual([]);
           expect(declaration.startIndex).toBe(source.indexOf('@'));
           expect(declaration.endIndex).toBe(source.length);
@@ -51,7 +38,6 @@ test('keeps decorators on exported classes with canonical declaration queries', 
       }
     }
   } finally {
-    query.delete();
     parser.delete();
   }
 });

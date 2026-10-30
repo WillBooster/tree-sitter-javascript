@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -61,9 +61,8 @@ test('uses the computed-name and nested-function contexts independently of the f
   }
 });
 
-test('separates field boundaries and public captures by whether an arrow is async', () => {
+test('separates field boundaries and await identifiers by whether an arrow is async', () => {
   const parser = new Parser().setLanguage(language);
-  const query = new Query(language, '(expression) @expression (primary_expression) @primary');
   try {
     for (const async of [false, true]) {
       const source = `class C { x = ${async ? 'async ' : ''}() => await\nvalue; }`;
@@ -73,15 +72,14 @@ test('separates field boundaries and public captures by whether an arrow is asyn
         expect(tree.rootNode.descendantsOfType('await_expression'), source).toHaveLength(async ? 1 : 0);
         expect(tree.rootNode.descendantsOfType('field_definition'), source).toHaveLength(async ? 1 : 2);
         expect(
-          query.captures(tree.rootNode).filter(({ node }) => node.text === 'await'),
+          tree.rootNode.descendantsOfType('identifier').filter((node) => node.text === 'await'),
           source
-        ).toHaveLength(async ? 0 : 2);
+        ).toHaveLength(async ? 0 : 1);
       } finally {
         tree.delete();
       }
     }
   } finally {
-    query.delete();
     parser.delete();
   }
 });

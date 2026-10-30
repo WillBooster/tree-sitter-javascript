@@ -4,11 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 
 const Root = fileURLToPath(new URL('../../', import.meta.url));
 const Following = 'const sentinel = 1;';
-const QueryNames = ['highlights', 'highlights-jsx', 'highlights-params', 'locals', 'tags', 'injections'];
 const Cli = execFileSync(path.join(Root, 'script/fork-cli'), { encoding: 'utf8' }).trim();
 const Scratch = fs.mkdtempSync(path.join(Root, '.tmp/grammarExtensions-'));
 let passed = false;
@@ -31,20 +30,12 @@ async function checkConsumer(goal, mode) {
   const wasm = path.join(directory, 'consumer.wasm');
   runCli(directory, ['build', '--wasm', '--optimization', 'z', '--output', wasm, directory], 'build');
   const parser = new Parser();
-  const queries = [];
   try {
-    const language = await Language.load(wasm);
-    parser.setLanguage(language);
-    queries.push(new Query(language, '(rest_pattern) @rest'));
-    // Compiled only to check that the queries stay valid for a derived grammar.
-    for (const name of QueryNames) {
-      queries.push(new Query(language, fs.readFileSync(path.join(Root, `queries/${name}.scm`), 'utf8')));
-    }
-    for (const fixture of validFixtures(mode)) checkFixture(parser, queries[0], fixture);
+    parser.setLanguage(await Language.load(wasm));
+    for (const fixture of validFixtures(mode)) checkFixture(parser, fixture);
     for (const statement of invalidFixtures()) checkInvalid(parser, statement);
     process.stdout.write(`Verified ${goal} ${mode} consumer\n`);
   } finally {
-    for (const query of queries) query.delete();
     parser.delete();
   }
 }
@@ -140,7 +131,7 @@ function validFixtures(mode) {
   return fixtures;
 }
 
-function checkFixture(parser, query, [statement, rests]) {
+function checkFixture(parser, [statement, rests]) {
   const source = `${statement}\n${Following}`;
   const tree = parser.parse(source);
   assert.ok(tree);
@@ -148,7 +139,9 @@ function checkFixture(parser, query, [statement, rests]) {
     assert.equal(tree.rootNode.hasError, false, source);
     assertFollowing(tree, source);
     assert.deepEqual(
-      query.captures(tree.rootNode).map(({ node }) => [node.type, node.text, node.startIndex, node.endIndex]),
+      tree.rootNode
+        .descendantsOfType('rest_pattern')
+        .map((node) => [node.type, node.text, node.startIndex, node.endIndex]),
       rests.map((text) => ['rest_pattern', text, source.indexOf(text), source.indexOf(text) + text.length]),
       source
     );

@@ -25,7 +25,7 @@ the package. Choose `tree-sitter-javascript.wasm` for the Module goal, or
 `tree-sitter-javascript_script.wasm` for the Script goal. The source goal comes from the host or file type;
 `.mjs` uses Module and `.cjs` uses Script, while `.js` depends on the host. For example, `await\nvalue` is one
 await expression in a Module and two identifier statements in a Script. Both languages preserve the same node
-schema and query names. As with other tree-sitter grammars, parsing does not enforce every ECMAScript early error.
+schema. As with other tree-sitter grammars, parsing does not enforce every ECMAScript early error.
 For the native CLI, select Script with `tree-sitter parse --grammar-path grammars/script`.
 
 ```js
@@ -126,9 +126,7 @@ and the release build regenerate the parsers before compiling them.
   Node.js compatibility (`test/unit/workers.test.ts`). Run `bun run test/ci-setup` once before the first
   run to install Chromium and, on Linux, the system libraries it needs;
 - a check that `package.json` and `Cargo.lock` lock the same WillBooster/tree-sitter runtime version
-  (`test/unit/runtimeVersion.test.ts`);
-- a check that the queries `tree-sitter.json` lists compile against the Wasm build and are in both the npm package and
-  the crate (`test/unit/queries.test.ts`).
+  (`test/unit/runtimeVersion.test.ts`).
 
 The tests and `script/parse-examples` compile the parser into `.tmp/tree-sitter-lib` instead of the CLI's cache shared
 by every checkout, and `mise.toml` sets `TREE_SITTER_LIBDIR` to it for any other command run in the checkout.
