@@ -85,7 +85,7 @@ In Rust, depend on the [crate](https://crates.io/crates/willbooster-tree-sitter-
 ```toml
 [dependencies]
 tree-sitter = { package = "willbooster-tree-sitter", version = "15.5.4" }
-tree-sitter-javascript = { package = "willbooster-tree-sitter-javascript", version = "16" }
+tree-sitter-javascript = { package = "willbooster-tree-sitter-javascript", version = "18" }
 ```
 
 ```rust
