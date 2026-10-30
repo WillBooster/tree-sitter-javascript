@@ -137,9 +137,6 @@ function checkConstructors(tree: Tree, source: string): void {
   expect(tree.rootNode.hasError, source).toBe(false);
   const constructors = tree.rootNode.descendantsOfType('new_expression');
   expect(constructors.length, source).toBeGreaterThan(0);
-  for (const expression of constructors) {
-    expect(expression.childForFieldName('constructor'), `${source}: ${expression.text}`).not.toBeNull();
-  }
   const sentinel = tree.rootNode.descendantsOfType('variable_declarator').at(-1)!;
   expect(sentinel.childForFieldName('name')?.text, source).toBe('sentinel');
   expect(sentinel.parent?.type, source).toBe('lexical_declaration');

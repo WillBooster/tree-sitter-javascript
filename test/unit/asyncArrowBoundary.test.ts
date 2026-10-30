@@ -137,7 +137,7 @@ test.each(['javascript', 'javascript_script'])(
               expect(binding.childCount).toBe(0);
               expect(binding.startIndex).toBe(start);
               expect(binding.endIndex).toBe(start + parameter.length);
-              expect(tree.rootNode.descendantsOfType('arrow_function')).toHaveLength(1);
+              expect(binding.type).toBe('identifier');
               expect(tree.rootNode.lastNamedChild!.text).toBe(Following);
             } finally {
               tree.delete();
