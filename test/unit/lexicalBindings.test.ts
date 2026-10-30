@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -43,9 +43,8 @@ test('rejects reserved direct lexical bindings in declarations and loop headers'
   }
 });
 
-test('preserves contextual identifiers in values, var bindings, and lexical binding queries', () => {
+test('preserves contextual identifiers in values, var bindings, and lexical bindings', () => {
   const parser = new Parser().setLanguage(language);
-  const query = new Query(language, '(variable_declarator name: (identifier) @binding)');
   try {
     for (const source of [
       'var let = 1;',
@@ -78,14 +77,19 @@ test('preserves contextual identifiers in values, var bindings, and lexical bind
           source.startsWith('const value') ||
           source.startsWith('for (let value =')
         ) {
-          expect(query.captures(tree.rootNode).map(({ node }) => node.text)).toEqual(['value']);
+          expect(
+            tree.rootNode
+              .descendantsOfType('variable_declarator')
+              .map((node) => node.childForFieldName('name'))
+              .filter((node) => node?.type === 'identifier')
+              .map((node) => node?.text)
+          ).toEqual(['value']);
         }
       } finally {
         tree.delete();
       }
     }
   } finally {
-    query.delete();
     parser.delete();
   }
 });

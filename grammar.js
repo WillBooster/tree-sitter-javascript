@@ -78,7 +78,8 @@ module.exports = grammar({
     // _arrow_function_block_continuation, since the arrow function may be, e.g., an argument.
     sym('_arrow_function_block_end'),
     sym('_arrow_function_block_continuation'),
-    // Bindings emit a boundary to preserve reuse; the other flags only select a scanner line-break rule.
+    // Bindings emit a boundary where the scanner decides from what follows whether a line break ends the declaration;
+    // the other flags only select a scanner line-break rule.
     // Keep those flags alternatives to what follows: leading optional flags duplicate parse states.
     sym('_line_break_ends_statement'),
     sym('_line_break_after_binding'),
@@ -101,7 +102,8 @@ module.exports = grammar({
     // Emitted zero-width decision preserves direct operands and identifier statements before yield.
     sym('_await_yield_identifier_start'),
     sym('_await_yield_identifier_context'),
-    // Emitted zero-width after a postfix update; carries the pending statement boundary across reuse.
+    // Emitted zero-width after a postfix update; records whether a line break before `(`, `[`, or a template ends the
+    // statement, for the automatic semicolon that follows.
     sym('_postfix_update_end'),
     sym('_await_keyword'),
     sym('_let'),
@@ -482,8 +484,7 @@ module.exports = grammar({
     _for_condition: ($) => field('condition', choice(seq($._expressions, ';'), $.empty_statement)),
 
     // ECMAScript inserts no semicolon inside a for header, so these declarations end only with `;`. Accepting an
-    // automatic semicolon there made `for (let x\n of y)` ambiguous until `of`, and an incremental reparse could
-    // reuse a declaration built when that ambiguity was resolved differently.
+    // automatic semicolon there would make `for (let x\n of y)` ambiguous until `of`.
     for_lexical_declaration: ($) =>
       seq(
         field('kind', choice('let', 'const')),

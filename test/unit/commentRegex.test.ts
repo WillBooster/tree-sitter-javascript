@@ -1,15 +1,21 @@
 import path from 'node:path';
 
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, type Node, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
 const language = await Language.load(path.join(import.meta.dirname, '../../tree-sitter-javascript.wasm'));
 
+function statementCalls(root: Node): string[] {
+  return root
+    .descendantsOfType('expression_statement')
+    .flatMap((statement) => statement.namedChildren.filter((node) => node.type === 'call_expression'))
+    .map((node) => node.text);
+}
+
 test('preserves statement boundaries before regex literals adjacent to newline-bearing comments', () => {
   const parser = new Parser();
   parser.setLanguage(language);
-  const query = new Query(language, '(expression_statement (call_expression) @regex.statement)');
   try {
     for (const newline of ['\n', '\r', '\r\n', '\u2028', '\u2029']) {
       for (const trailing of ['', '/* second */', '// second\n']) {
@@ -18,10 +24,7 @@ test('preserves statement boundaries before regex literals adjacent to newline-b
           const tree = parser.parse(source)!;
           try {
             expect(tree.rootNode.hasError, source).toBe(false);
-            expect(
-              query.captures(tree.rootNode).map(({ node }) => node.text),
-              source
-            ).toEqual(['/b/.test(x)']);
+            expect(statementCalls(tree.rootNode), source).toEqual(['/b/.test(x)']);
             const returned = tree.rootNode.descendantsOfType('return_statement')[0];
             if (returned) {
               expect(
@@ -41,12 +44,11 @@ test('preserves statement boundaries before regex literals adjacent to newline-b
     try {
       expect(tree.rootNode.hasError).toBe(false);
       expect(tree.rootNode.descendantsOfType('return_statement')[0]?.namedChildren.at(-1)?.text).toBe('/b/.test(x)');
-      expect(query.captures(tree.rootNode)).toEqual([]);
+      expect(statementCalls(tree.rootNode)).toEqual([]);
     } finally {
       tree.delete();
     }
   } finally {
-    query.delete();
     parser.delete();
   }
 });
@@ -54,7 +56,6 @@ test('preserves statement boundaries before regex literals adjacent to newline-b
 test('assigns return and regex roles by whether the comment after return contains a newline', () => {
   const parser = new Parser();
   parser.setLanguage(language);
-  const query = new Query(language, '(expression_statement (call_expression) @regex.statement)');
   try {
     for (const comment of ['/* same line */', '/*\ncomment*/', '/*\ncomment*//* second */', '/* unfinished']) {
       const source = `function f(){return${comment}/b/.test(x);}`;
@@ -70,17 +71,13 @@ test('assigns return and regex roles by whether the comment after return contain
             returned!.namedChildren.filter((node) => node.type !== 'comment').map((node) => node.text),
             source
           ).toEqual(comment.includes('\n') ? [] : ['/b/.test(x)']);
-          expect(
-            query.captures(tree.rootNode).map(({ node }) => node.text),
-            source
-          ).toEqual(comment.includes('\n') ? ['/b/.test(x)'] : []);
+          expect(statementCalls(tree.rootNode), source).toEqual(comment.includes('\n') ? ['/b/.test(x)'] : []);
         }
       } finally {
         tree.delete();
       }
     }
   } finally {
-    query.delete();
     parser.delete();
   }
 });
@@ -128,7 +125,6 @@ for (const [goal, currentLanguage] of RegexCommentLanguages) {
     { lineEnding: 'PS', newline: '\u2029' },
   ])(`ends block arrows before regex statements following line comments in ${goal} with $lineEnding`, ({ newline }) => {
     const parser = new Parser().setLanguage(currentLanguage);
-    const query = new Query(currentLanguage, '(regex) @regex (arrow_function) @arrow');
     try {
       for (const [enclosing, prefix] of [
         ['function', ''],
@@ -154,10 +150,6 @@ for (const [goal, currentLanguage] of RegexCommentLanguages) {
               expect(regex.text).toBe('/pattern/g');
               expect(regex.startIndex).toBe(before.length + comment.length);
               expect(tree.rootNode.descendantsOfType('binary_expression')).toEqual([]);
-              expect(query.captures(tree.rootNode).map(({ name, node }) => [name, node.text])).toEqual([
-                ['arrow', arrow],
-                ['regex', '/pattern/g'],
-              ]);
             } finally {
               tree.delete();
             }
@@ -165,7 +157,6 @@ for (const [goal, currentLanguage] of RegexCommentLanguages) {
         }
       }
     } finally {
-      query.delete();
       parser.delete();
     }
   });

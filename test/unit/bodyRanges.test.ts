@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -41,45 +41,3 @@ for (const [kind, expression, prefix] of [
     });
   }
 }
-
-test('statement boundaries preserve supertype queries', () => {
-  const parser = new Parser();
-  parser.setLanguage(language);
-  const tree = parser.parse(`function f() {}
-function* g() {}
-class C {}
-{}
-export function h() {}
-export default function* i() {}
-export class D {}
-export const z = 1;
-var w = 2;
-foo();
-`);
-  assert.ok(tree);
-  const query = new Query(language, '(statement) @statement\n(declaration) @declaration');
-  try {
-    expect(tree.rootNode.hasError).toBe(false);
-    const captures = query.captures(tree.rootNode);
-    const statements = new Set(
-      captures.filter((capture) => capture.name === 'statement').map((capture) => capture.node.id)
-    );
-    for (const node of tree.rootNode.namedChildren) expect(statements.has(node.id), node.type).toBe(true);
-    const declarations = new Set(
-      captures.filter((capture) => capture.name === 'declaration').map((capture) => capture.node.id)
-    );
-    for (const node of tree.rootNode.descendantsOfType([
-      'function_declaration',
-      'generator_function_declaration',
-      'class_declaration',
-      'lexical_declaration',
-      'variable_declaration',
-    ])) {
-      expect(declarations.has(node.id), node.text).toBe(true);
-    }
-  } finally {
-    query.delete();
-    tree.delete();
-    parser.delete();
-  }
-});

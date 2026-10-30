@@ -1,4 +1,4 @@
-import { Language, type Node, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, type Node, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 const prefix = 'class C extends ';
@@ -46,18 +46,13 @@ for (const goal of ['javascript', 'javascript_script']) {
     await Parser.init();
     const language = await Language.load(`tree-sitter-${goal}.wasm`);
     const parser = new Parser().setLanguage(language);
-    const query = new Query(
-      language,
-      '(class_heritage (expression) @expression) (class_heritage (primary_expression) @primary)'
-    );
     try {
       for (const expression of valid) {
         const tree = parser.parse(prefix + expression + suffix)!;
         try {
           expect(tree.rootNode.hasError, expression).toBe(false);
-          expect(captures(query, tree.rootNode), expression).toEqual([
-            ['expression', expression, prefix.length, prefix.length + expression.length],
-            ['primary', expression, prefix.length, prefix.length + expression.length],
+          expect(heritageRanges(tree.rootNode), expression).toEqual([
+            [expression, prefix.length, prefix.length + expression.length],
           ]);
         } finally {
           tree.delete();
@@ -74,14 +69,16 @@ for (const goal of ['javascript', 'javascript_script']) {
         }
       }
     } finally {
-      query.delete();
       parser.delete();
     }
   });
 }
 
-function captures(query: Query, node: Node): unknown[] {
-  return query.captures(node).map(({ name, node }) => [name, node.text, node.startIndex, node.endIndex]);
+function heritageRanges(root: Node): unknown[] {
+  return root
+    .descendantsOfType('class_heritage')
+    .flatMap((heritage) => heritage.namedChildren.filter((node) => node.type !== 'comment'))
+    .map((node) => [node.text, node.startIndex, node.endIndex]);
 }
 
 test('preserves declarations following an unfinished comparison heritage and rejects EOF prefixes', async () => {

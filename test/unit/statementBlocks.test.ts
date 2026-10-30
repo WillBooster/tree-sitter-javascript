@@ -1,5 +1,5 @@
 import { parse } from '@babel/parser';
-import { Language, type Node, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, type Node, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 const Statements = [
@@ -31,9 +31,11 @@ const Statements = [
   'if (a) ({b, c});',
   'export default {a, b};',
 ];
-const BraceQuery =
-  '(statement_block "{" @block_open "}" @block_close) ' +
-  '(object "{" @object_open "}" @object_close) (object_pattern "{" @pattern_open "}" @pattern_close)';
+const BraceOwners = [
+  ['statement_block', 'block'],
+  ['object', 'object'],
+  ['object_pattern', 'pattern'],
+] as const;
 const Following = 'const sentinel = 1;';
 
 test.each(['javascript', 'javascript_script'])(
@@ -42,7 +44,6 @@ test.each(['javascript', 'javascript_script'])(
     await Parser.init();
     const language = await Language.load(`tree-sitter-${goal}.wasm`);
     const parser = new Parser().setLanguage(language);
-    const query = new Query(language, BraceQuery);
     try {
       for (const source of Statements.filter(
         (statement) => goal === 'javascript' || (!statement.includes('import ') && !statement.startsWith('export '))
@@ -50,7 +51,7 @@ test.each(['javascript', 'javascript_script'])(
         const tree = parser.parse(source)!;
         try {
           expect(tree.rootNode.hasError, source).toBe(false);
-          expect(braces(query, tree.rootNode), source).toEqual(referenceBraces(source, goal));
+          expect(braces(tree.rootNode), source).toEqual(referenceBraces(source, goal));
         } finally {
           tree.delete();
         }
@@ -64,7 +65,6 @@ test.each(['javascript', 'javascript_script'])(
         }
       }
     } finally {
-      query.delete();
       parser.delete();
     }
   }
@@ -76,7 +76,6 @@ test.each(['javascript', 'javascript_script'])(
     await Parser.init();
     const language = await Language.load(`tree-sitter-${goal}.wasm`);
     const parser = new Parser().setLanguage(language);
-    const query = new Query(language, BraceQuery);
     try {
       for (const statement of [
         'while (a) {b, c};',
@@ -94,24 +93,25 @@ test.each(['javascript', 'javascript_script'])(
         const tree = parser.parse(source)!;
         try {
           expect(tree.rootNode.hasError, source).toBe(false);
-          expect(braces(query, tree.rootNode), source).toEqual(referenceBraces(source, goal));
+          expect(braces(tree.rootNode), source).toEqual(referenceBraces(source, goal));
           expect(tree.rootNode.lastNamedChild!.text, source).toBe(Following);
         } finally {
           tree.delete();
         }
       }
     } finally {
-      query.delete();
       parser.delete();
     }
   }
 );
 
-function braces(query: Query, node: Node): unknown[] {
-  return query
-    .captures(node)
-    .map(({ name, node: brace }) => [name, brace.startIndex, brace.endIndex])
-    .toSorted((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+function braces(root: Node): unknown[] {
+  return BraceOwners.flatMap(([type, owner]) =>
+    root
+      .descendantsOfType(type)
+      .flatMap((node) => node.children.filter((child) => child.type === '{' || child.type === '}'))
+      .map((brace) => [`${owner}_${brace.type === '{' ? 'open' : 'close'}`, brace.startIndex, brace.endIndex])
+  ).toSorted((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
 }
 
 function referenceBraces(source: string, goal: string): unknown[] {

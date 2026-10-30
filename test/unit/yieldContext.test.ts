@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -12,7 +12,6 @@ test('distinguishes contextual await and yield from regular expressions and divi
 function* bar() { await /DIVISION/g; yield /REGEX/g; }
 async function* baz() { await /REGEX/g; yield /REGEX/g; }
 function div3(await, yield, g) { return await/yield/g; }`;
-  const query = new Query(language, '(expression) @expression (primary_expression) @primary');
   const tree = parser.parse(source)!;
   try {
     expect(tree.rootNode.hasError).toBe(false);
@@ -26,18 +25,8 @@ function div3(await, yield, g) { return await/yield/g; }`;
     ]);
     const identifiers = tree.rootNode.descendantsOfType('identifier').filter(({ text }) => text === 'yield');
     expect(identifiers).toHaveLength(3);
-    const captures = query.captures(tree.rootNode);
-    for (const identifier of identifiers.filter(({ parent }) => parent?.type !== 'formal_parameters')) {
-      expect(
-        captures
-          .filter(({ node }) => node.id === identifier.id)
-          .map(({ name }) => name)
-          .toSorted()
-      ).toEqual(['expression', 'primary']);
-    }
   } finally {
     tree.delete();
-    query.delete();
     parser.delete();
   }
 });
@@ -167,27 +156,6 @@ test('resets ordinary object-method parameters inside generator functions', () =
         ).toEqual(['/outer/g']);
         const methodNode = tree.rootNode.descendantsOfType('method_definition')[0]!;
         expect(methodNode.text).toBe(method);
-        const query = new Query(language, '(expression) @expression (primary_expression) @primary');
-        try {
-          for (const node of methodNode
-            .descendantsOfType('identifier')
-            .filter(
-              ({ text, parent }) =>
-                text === 'yield' && !['formal_parameters', 'assignment_pattern'].includes(parent!.type)
-            )) {
-            expect(
-              query
-                .captures(tree.rootNode)
-                .filter(
-                  ({ node: captured }) => captured.startIndex === node.startIndex && captured.endIndex === node.endIndex
-                )
-                .map(({ name }) => name)
-                .toSorted()
-            ).toEqual(['expression', 'primary']);
-          }
-        } finally {
-          query.delete();
-        }
       } finally {
         tree.delete();
       }

@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -17,9 +17,8 @@ const functionBodies = [
   ['new function(){ BODY };', 'new async function(){ BODY };'],
 ];
 
-test('distinguishes await identifiers from operators in function bodies and public queries', () => {
+test('distinguishes await identifiers from operators in function bodies', () => {
   const parser = new Parser().setLanguage(language);
-  const query = new Query(language, '(expression) @expression (primary_expression) @primary');
   try {
     for (const forms of functionBodies) {
       for (const [async, form] of forms.entries()) {
@@ -28,8 +27,10 @@ test('distinguishes await identifiers from operators in function bodies and publ
         try {
           expect(tree.rootNode.hasError, source).toBe(false);
           expect(tree.rootNode.descendantsOfType('await_expression'), source).toHaveLength(async);
-          const captures = query.captures(tree.rootNode).filter(({ node }) => node.text === 'await');
-          expect(captures.map(({ name }) => name).toSorted(), source).toEqual(async ? [] : ['expression', 'primary']);
+          expect(
+            tree.rootNode.descendantsOfType('identifier').filter((node) => node.text === 'await'),
+            source
+          ).toHaveLength(async ? 0 : 1);
           const body = tree.rootNode.descendantsOfType('statement_block')[0]!;
           expect(
             body.namedChildren.filter(({ type }) => type === 'expression_statement'),
@@ -41,7 +42,6 @@ test('distinguishes await identifiers from operators in function bodies and publ
       }
     }
   } finally {
-    query.delete();
     parser.delete();
   }
 });
@@ -178,10 +178,6 @@ test.each(['javascript', 'javascript_script'])(
   async (goal) => {
     const selectedLanguage = await Language.load(path.join(import.meta.dirname, `../../tree-sitter-${goal}.wasm`));
     const parser = new Parser().setLanguage(selectedLanguage);
-    const query = new Query(
-      selectedLanguage,
-      '(await_expression (identifier) @operand) (expression) @reference (primary_expression) @primary'
-    );
     try {
       for (const newline of ['\n', '\r', '\r\n', '\u2028', '\u2029']) {
         for (const [prefix, suffix, hasOperand] of [
@@ -202,19 +198,16 @@ test.each(['javascript', 'javascript_script'])(
                 expect(tree.rootNode.hasError, source).toBe(false);
                 const awaits = tree.rootNode.descendantsOfType('await_expression');
                 expect(awaits, source).toHaveLength(hasOperand ? 1 : 0);
-                const captures = query.captures(tree.rootNode);
                 if (hasOperand) {
                   expect(awaits[0]!.text).toBe('await' + separator + word);
                   expect(awaits[0]!.endIndex).toBe(before.length + separator.length + word.length);
-                  expect(captures.filter(({ name }) => name === 'operand').map(({ node }) => node.text)).toEqual([
-                    word,
-                  ]);
-                } else {
-                  const names = captures.filter(({ node }) => node.text === 'await');
-                  expect(names.map(({ name }) => name).toSorted()).toEqual(['primary', 'reference']);
                   expect(
-                    names.every(({ node }) => node.childCount === 0 && node.endIndex - node.startIndex === 5)
-                  ).toBe(true);
+                    awaits[0]!.namedChildren.filter((node) => node.type === 'identifier').map((node) => node.text)
+                  ).toEqual([word]);
+                } else {
+                  const names = tree.rootNode.descendantsOfType('identifier').filter((node) => node.text === 'await');
+                  expect(names).toHaveLength(1);
+                  expect(names[0]!.childCount === 0 && names[0]!.endIndex - names[0]!.startIndex === 5).toBe(true);
                 }
                 expect(tree.rootNode.lastNamedChild!.text).toBe('const sentinel = 1;');
               } finally {
@@ -225,7 +218,6 @@ test.each(['javascript', 'javascript_script'])(
         }
       }
     } finally {
-      query.delete();
       parser.delete();
     }
   }

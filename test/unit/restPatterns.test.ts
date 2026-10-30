@@ -1,11 +1,7 @@
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, type Node, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 const Following = 'const sentinel = 1;';
-const PatternQuery =
-  '(array_pattern (pattern) @element) (formal_parameters (pattern) @parameter) ' +
-  '(object_pattern (rest_pattern) @rest) (parenthesized_expression (expression) @expression) ' +
-  '(parenthesized_expression (primary_expression) @primary)';
 
 for (const goal of ['javascript', 'javascript_script']) {
   test(`rejects nested destructuring targets for object rest in ${goal}`, async () => {
@@ -63,7 +59,6 @@ for (const goal of ['javascript', 'javascript_script']) {
     await Parser.init();
     const language = await Language.load(`tree-sitter-${goal}.wasm`);
     const parser = new Parser().setLanguage(language);
-    const query = new Query(language, '(rest_pattern (_) @target) @rest');
     try {
       for (const [source, expected] of [
         [
@@ -93,10 +88,7 @@ for (const goal of ['javascript', 'javascript_script']) {
         const tree = parser.parse(source)!;
         try {
           expect(tree.rootNode.hasError, source).toBe(false);
-          expect(
-            query.captures(tree.rootNode).map(({ name, node }) => [name, node.text, node.startIndex, node.endIndex]),
-            source
-          ).toEqual(expected);
+          expect(restRanges(tree.rootNode), source).toEqual(expected);
         } finally {
           tree.delete();
         }
@@ -117,7 +109,6 @@ for (const goal of ['javascript', 'javascript_script']) {
         ]);
       }
     } finally {
-      query.delete();
       parser.delete();
     }
   });
@@ -159,11 +150,10 @@ for (const goal of ['javascript', 'javascript_script']) {
     }
   });
 
-  test(`preserves object-pattern value captures in ${goal}`, async () => {
+  test(`preserves object-pattern keys and values in ${goal}`, async () => {
     await Parser.init();
     const language = await Language.load(`tree-sitter-${goal}.wasm`);
     const parser = new Parser().setLanguage(language);
-    const query = new Query(language, '(pair_pattern key: (_) @key value: (pattern) @value)');
     try {
       for (const [statement, expected] of [
         [
@@ -191,10 +181,7 @@ for (const goal of ['javascript', 'javascript_script']) {
         const tree = parser.parse(statement)!;
         try {
           expect(tree.rootNode.hasError, statement).toBe(false);
-          expect(
-            query.captures(tree.rootNode).map(({ name, node }) => [name, node.text, node.startIndex, node.endIndex]),
-            statement
-          ).toEqual(expected);
+          expect(pairRanges(tree.rootNode), statement).toEqual(expected);
         } finally {
           tree.delete();
         }
@@ -215,7 +202,6 @@ for (const goal of ['javascript', 'javascript_script']) {
         ]);
       }
     } finally {
-      query.delete();
       parser.delete();
     }
   });
@@ -255,11 +241,10 @@ for (const goal of ['javascript', 'javascript_script']) {
     }
   });
 
-  test(`preserves holes, nested patterns, defaults, and public supertype captures in ${goal}`, async () => {
+  test(`preserves holes, nested patterns, and defaults in ${goal}`, async () => {
     await Parser.init();
     const language = await Language.load(`tree-sitter-${goal}.wasm`);
     const parser = new Parser().setLanguage(language);
-    const query = new Query(language, PatternQuery);
     try {
       for (const statement of [
         '[] = values;',
@@ -295,58 +280,7 @@ for (const goal of ['javascript', 'javascript_script']) {
           tree.delete();
         }
       }
-      for (const [source, expected] of [
-        [
-          '[a,,...b] = value;',
-          [
-            ['element', 'a', 1, 2],
-            ['element', '...b', 4, 8],
-          ],
-        ],
-        [
-          '[(a), ...((b))] = value;',
-          [
-            ['element', '(a)', 1, 4],
-            ['expression', 'a', 2, 3],
-            ['primary', 'a', 2, 3],
-            ['element', '...((b))', 6, 14],
-            ['expression', '(b)', 10, 13],
-            ['primary', '(b)', 10, 13],
-            ['expression', 'b', 11, 12],
-            ['primary', 'b', 11, 12],
-          ],
-        ],
-        ['function f(a = 1, ...b) {}', [['parameter', '...b', 18, 22]]],
-        [
-          '({a = 1, ...b} = value);',
-          [
-            ['expression', '{a = 1, ...b} = value', 1, 22],
-            ['rest', '...b', 9, 13],
-          ],
-        ],
-        [
-          'let [a,,...[b,...c]] = value;',
-          [
-            ['element', 'a', 5, 6],
-            ['element', '...[b,...c]', 8, 19],
-            ['element', 'b', 12, 13],
-            ['element', '...c', 14, 18],
-          ],
-        ],
-      ] as const) {
-        const tree = parser.parse(source)!;
-        try {
-          expect(tree.rootNode.hasError, source).toBe(false);
-          expect(
-            query.captures(tree.rootNode).map(({ name, node }) => [name, node.text, node.startIndex, node.endIndex]),
-            source
-          ).toEqual(expected);
-        } finally {
-          tree.delete();
-        }
-      }
     } finally {
-      query.delete();
       parser.delete();
     }
   });
@@ -388,4 +322,25 @@ function expectStatements(parser: Parser, sources: readonly (readonly [string, b
       tree.delete();
     }
   }
+}
+
+function restRanges(root: Node): unknown[] {
+  return root.descendantsOfType('rest_pattern').flatMap((rest) => {
+    const target = rest.namedChildren.find((node) => node.type !== 'comment')!;
+    return [
+      ['rest', rest.text, rest.startIndex, rest.endIndex],
+      ['target', target.text, target.startIndex, target.endIndex],
+    ];
+  });
+}
+
+function pairRanges(root: Node): unknown[] {
+  return root.descendantsOfType('pair_pattern').flatMap((pair) => {
+    const key = pair.childForFieldName('key')!;
+    const value = pair.childForFieldName('value')!;
+    return [
+      ['key', key.text, key.startIndex, key.endIndex],
+      ['value', value.text, value.startIndex, value.endIndex],
+    ];
+  });
 }

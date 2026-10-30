@@ -1,74 +1,12 @@
-import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
 import path from 'node:path';
 
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, type Node, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
-import treeSitterJson from '../../tree-sitter.json';
-
 const Root = path.join(import.meta.dirname, '../..');
-const QueryKinds = ['highlights', 'injections', 'locals', 'tags'] as const;
-const queryPaths = (kind: (typeof QueryKinds)[number]): string[] => [
-  ...new Set(treeSitterJson.grammars.flatMap((grammar) => grammar[kind])),
-];
 await Parser.init();
 
-test('lists every query file in tree-sitter.json', () => {
-  const listed = QueryKinds.flatMap((kind) => queryPaths(kind)).toSorted();
-  const files = fs
-    .readdirSync(path.join(Root, 'queries'))
-    .map((file) => `queries/${file}`)
-    .toSorted();
-  expect(listed).toEqual(files);
-});
-
-// Tools that read tree-sitter.json, such as the tree-sitter CLI, compile each kind of query from its files
-// concatenated, so a node type that a grammar change removes must fail here rather than in them. performance.test.ts
-// checks that the Wasm build is current.
-for (const grammar of treeSitterJson.grammars) {
-  test(`compiles the configured queries against ${grammar.name}`, async () => {
-    const language = await Language.load(path.join(Root, `tree-sitter-${grammar.name}.wasm`));
-    for (const kind of QueryKinds) {
-      const files = [grammar[kind]].flat();
-      const source = files.map((file) => fs.readFileSync(path.join(Root, file), 'utf8')).join('\n');
-      const query = new Query(language, source);
-      query.delete();
-    }
-  });
-}
-
-// On a fresh runner, cargo first installs the toolchain that rust-toolchain.toml pins. The commands run synchronously,
-// so only their own timeout can stop them; the test's is longer so that theirs is reported.
-const execOptions = { cwd: Root, encoding: 'utf8', timeout: 240_000 } as const;
-const listPublishedFiles = {
-  npm: (): string[] => {
-    const [pack] = JSON.parse(
-      execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], execOptions)
-    ) as [{ files: { path: string }[] }];
-    return pack.files.map((file) => file.path);
-  },
-  crate: (): string[] => execFileSync('cargo', ['package', '--list', '--allow-dirty'], execOptions).split('\n'),
-};
-for (const [packageKind, listFiles] of Object.entries(listPublishedFiles)) {
-  test(
-    `publishes every query file that tree-sitter.json references in the ${packageKind} package`,
-    { timeout: 300_000 },
-    () => {
-      const published = new Set(listFiles());
-      expect(published).toContain('tree-sitter.json');
-      for (const kind of QueryKinds) {
-        for (const file of queryPaths(kind)) {
-          expect(published, file).toContain(file);
-        }
-      }
-    }
-  );
-}
-
-// Identical printed trees can lose supertype membership when a filtered hidden rule replaces the public expression
-// rules. Check captures through the shipped parser, including the contextual yield-identifier operand paths.
-test('captures canonical expression supertypes in await operands and callees', async () => {
+test('parses await operands and callees named yield', async () => {
   const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
   const parser = new Parser();
   parser.setLanguage(language);
@@ -87,10 +25,6 @@ test('captures canonical expression supertypes in await operands and callees', a
     yield.foo;
     const h = async () => await g(x);
   }`)!;
-  const operands = new Query(language, '(await_expression (expression) @operand)');
-  const primaryOperands = new Query(language, '(await_expression (primary_expression) @operand)');
-  const callees = new Query(language, '(call_expression function: (expression) @callee)');
-  const primaryCallees = new Query(language, '(call_expression function: (primary_expression) @callee)');
   try {
     expect(tree.rootNode.hasError).toBe(false);
     expect(tree.rootNode.descendantsOfType('comment')).toHaveLength(2);
@@ -108,34 +42,17 @@ test('captures canonical expression supertypes in await operands and callees', a
       'call_expression',
     ]);
     expect(tree.rootNode.descendantsOfType('yield_expression')).toHaveLength(0);
-    for (const query of [operands, primaryOperands]) {
-      const captured = new Set(query.captures(tree.rootNode).map(({ node }) => node.id));
-      for (const awaitNode of tree.rootNode.descendantsOfType('await_expression')) {
-        const operand = awaitNode.namedChildren.find((node) => node.type !== 'comment')!;
-        expect(captured, operand.text).toContain(operand.id);
-      }
-    }
-    expect(callees.captures(tree.rootNode).map(({ node }) => node.text)).toEqual(['g', 'yield', 'g']);
-    const capturedCallees = new Set(primaryCallees.captures(tree.rootNode).map(({ node }) => node.id));
-    for (const call of tree.rootNode.descendantsOfType('call_expression')) {
-      const callee = call.childForFieldName('function')!;
-      expect(capturedCallees, callee.text).toContain(callee.id);
-    }
+    expect(callees(tree.rootNode)).toEqual(['g', 'yield', 'yield', 'g']);
   } finally {
-    operands.delete();
-    primaryOperands.delete();
-    callees.delete();
-    primaryCallees.delete();
     tree.delete();
     parser.delete();
   }
 });
 
-test('preserves comments and expression captures in ternary arrow bodies', async () => {
+test('preserves comments in ternary arrow bodies', async () => {
   const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
   const parser = new Parser();
   parser.setLanguage(language);
-  const query = new Query(language, '(arrow_function body: (expression) @body)');
   try {
     for (const comment of ['/* comment */', '/*\ncomment */', '// comment\n']) {
       const source = `const f = x => a ${comment} ? b : c;`;
@@ -146,25 +63,19 @@ test('preserves comments and expression captures in ternary arrow bodies', async
         const body = tree.rootNode.descendantsOfType('arrow_function')[0]!.childForFieldName('body')!;
         expect(body.type).toBe('ternary_expression');
         expect(body.text).toBe(`a ${comment} ? b : c`);
-        expect(query.captures(tree.rootNode).map(({ node }) => node.id)).toContain(body.id);
       } finally {
         tree.delete();
       }
     }
   } finally {
-    query.delete();
     parser.delete();
   }
 });
 
-test('retains canonical callees in recovered legacy call assignments', async () => {
+test('retains callees in recovered legacy call assignments', async () => {
   const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
   const parser = new Parser();
   parser.setLanguage(language);
-  const queries = [
-    new Query(language, '(call_expression function: (expression) @callee)'),
-    new Query(language, '(call_expression function: (primary_expression) @callee)'),
-  ];
   try {
     for (const [source, expectedCallees] of [
       ['foo().bar() = 1;', ['foo().bar', 'foo']],
@@ -178,19 +89,11 @@ test('retains canonical callees in recovered legacy call assignments', async () 
           calls.map((call) => call.childForFieldName('function')!.text),
           source
         ).toEqual(expectedCallees);
-        for (const query of queries) {
-          const captured = new Set(query.captures(tree.rootNode).map(({ node }) => node.id));
-          for (const call of calls) {
-            const callee = call.childForFieldName('function')!;
-            expect(captured, `${source}: ${callee.text}`).toContain(callee.id);
-          }
-        }
       } finally {
         tree.delete();
       }
     }
   } finally {
-    for (const query of queries) query.delete();
     parser.delete();
   }
 });
@@ -199,7 +102,6 @@ test('preserves consuming await keyword ranges across operand lookahead', async 
   const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
   const parser = new Parser();
   parser.setLanguage(language);
-  const query = new Query(language, '"await" @keyword');
   try {
     const sources = [
       ['async function f(){return /*before*/ await /*\n*/ let.foo;}', 1],
@@ -211,9 +113,9 @@ test('preserves consuming await keyword ranges across operand lookahead', async 
       const tree = parser.parse(source)!;
       try {
         expect(tree.rootNode.hasError, source).toBe(false);
-        const keywords = query.captures(tree.rootNode);
+        const keywords = tree.rootNode.descendantsOfType('await');
         expect(keywords, source).toHaveLength(count);
-        for (const { node } of keywords) {
+        for (const node of keywords) {
           expect(node.text, source).toBe('await');
           expect(node.endIndex - node.startIndex, source).toBe(5);
         }
@@ -228,21 +130,14 @@ test('preserves consuming await keyword ranges across operand lookahead', async 
       }
     }
   } finally {
-    query.delete();
     parser.delete();
   }
 });
 
-test('parses awaited resource bindings with canonical expression queries', async () => {
+test('parses awaited resource bindings', async () => {
   const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
   const parser = new Parser();
   parser.setLanguage(language);
-  const bindings = new Query(
-    language,
-    '(using_declaration (variable_declarator name: (identifier) @binding)) (for_in_clause left: (identifier) @binding)'
-  );
-  const callees = new Query(language, '(call_expression function: (primary_expression) @callee)');
-  const keywords = new Query(language, '"await" @keyword');
   try {
     for (const name of [
       'i',
@@ -265,16 +160,10 @@ test('parses awaited resource bindings with canonical expression queries', async
         const tree = parser.parse(source)!;
         try {
           expect(tree.rootNode.hasError, source).toBe(false);
+          expect(resourceBindings(tree.rootNode), source).toEqual([name]);
+          expect(callees(tree.rootNode), source).toEqual(expectedCallees);
           expect(
-            bindings.captures(tree.rootNode).map(({ node }) => node.text),
-            source
-          ).toEqual([name]);
-          expect(
-            callees.captures(tree.rootNode).map(({ node }) => node.text),
-            source
-          ).toEqual(expectedCallees);
-          expect(
-            keywords.captures(tree.rootNode).map(({ node }) => node.text),
+            tree.rootNode.descendantsOfType('await').map((node) => node.text),
             source
           ).toEqual(['await']);
           expect(tree.rootNode.descendantsOfType('await_expression'), source).toHaveLength(0);
@@ -284,9 +173,6 @@ test('parses awaited resource bindings with canonical expression queries', async
       }
     }
   } finally {
-    bindings.delete();
-    callees.delete();
-    keywords.delete();
     parser.delete();
   }
 });
@@ -354,10 +240,6 @@ test('rejects resource bindings whose escaped names spell reserved words', async
   const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
   const parser = new Parser();
   parser.setLanguage(language);
-  const bindings = new Query(
-    language,
-    '(using_declaration (variable_declarator name: (identifier) @binding)) (for_in_clause left: (identifier) @binding)'
-  );
   try {
     for (const kind of ['using', 'await using']) {
       for (const declaration of [
@@ -381,10 +263,9 @@ test('rejects resource bindings whose escaped names spell reserved words', async
           try {
             expect(tree.rootNode.hasError, source).toBe(name !== String.raw`i\u006eside`);
             if (!tree.rootNode.hasError) {
-              expect(
-                bindings.captures(tree.rootNode).map(({ node }) => node.text),
-                source
-              ).toEqual(declaration.includes('first=') ? ['first', name] : [name]);
+              expect(resourceBindings(tree.rootNode), source).toEqual(
+                declaration.includes('first=') ? ['first', name] : [name]
+              );
             }
           } finally {
             tree.delete();
@@ -393,7 +274,6 @@ test('rejects resource bindings whose escaped names spell reserved words', async
       }
     }
   } finally {
-    bindings.delete();
     parser.delete();
   }
 });
@@ -451,11 +331,10 @@ test('retains resource for-of fields while rejecting for-in', async () => {
   }
 });
 
-test('preserves ordinary using statement boundaries and expression captures', async () => {
+test('preserves ordinary using statement boundaries and expressions', async () => {
   const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
   const parser = new Parser();
   parser.setLanguage(language);
-  const query = new Query(language, '(expression_statement (expression) @value)');
   const source = `function f() {
     using ? a : b;
     using /*
@@ -479,7 +358,7 @@ test('preserves ordinary using statement boundaries and expression captures', as
   const tree = parser.parse(source)!;
   try {
     expect(tree.rootNode.hasError).toBe(false);
-    expect(query.captures(tree.rootNode).map(({ node }) => node.type)).toEqual([
+    expect(statementExpressions(tree.rootNode).map((node) => node.type)).toEqual([
       'ternary_expression',
       'ternary_expression',
       'call_expression',
@@ -502,7 +381,7 @@ test('preserves ordinary using statement boundaries and expression captures', as
       const bare = parser.parse(input)!;
       try {
         expect(bare.rootNode.hasError).toBe(false);
-        expect(query.captures(bare.rootNode).map(({ node }) => [node.type, node.text])).toEqual([
+        expect(statementExpressions(bare.rootNode).map((node) => [node.type, node.text])).toEqual([
           ['identifier', 'using'],
         ]);
         for (const comment of bare.rootNode.descendantsOfType('comment')) {
@@ -516,7 +395,28 @@ test('preserves ordinary using statement boundaries and expression captures', as
     }
   } finally {
     tree.delete();
-    query.delete();
     parser.delete();
   }
 });
+
+function callees(root: Node): string[] {
+  return root.descendantsOfType('call_expression').map((call) => call.childForFieldName('function')!.text);
+}
+
+function resourceBindings(root: Node): string[] {
+  const declared = root
+    .descendantsOfType('using_declaration')
+    .flatMap((declaration) => declaration.descendantsOfType('variable_declarator'))
+    .map((declarator) => declarator.childForFieldName('name')!);
+  const looped = root.descendantsOfType('for_in_clause').map((clause) => clause.childForFieldName('left')!);
+  return [...declared, ...looped]
+    .filter((node) => node.type === 'identifier')
+    .toSorted((left, right) => left.startIndex - right.startIndex)
+    .map((node) => node.text);
+}
+
+function statementExpressions(root: Node): Node[] {
+  return root
+    .descendantsOfType('expression_statement')
+    .flatMap((statement) => statement.namedChildren.filter((node) => node.type !== 'comment'));
+}

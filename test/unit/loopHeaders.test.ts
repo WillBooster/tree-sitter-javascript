@@ -1,11 +1,10 @@
-import { Language, Parser, Query, type Tree } from '@willbooster/web-tree-sitter';
+import { Language, Parser, type Tree } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 test.each(['javascript', 'javascript_script'])('pairs loop-header delimiters in %s', async (grammar) => {
   await Parser.init();
   const language = await Language.load(`tree-sitter-${grammar}.wasm`);
   const parser = new Parser().setLanguage(language);
-  const brackets = new Query(language, '[(for_clause "(" @open ")" @close) (for_in_clause "(" @open ")" @close)]');
   try {
     for (const [prefix, header, type] of [
       ['for', '(let i = 0; i < limit; i++)', 'for_clause'],
@@ -28,12 +27,15 @@ test.each(['javascript', 'javascript_script'])('pairs loop-header delimiters in 
 
       function checkTree(current: Tree, source: string, expectedHeader: string): void {
         expect(current.rootNode.hasError, source).toBe(false);
-        const matches = brackets.matches(current.rootNode);
-        expect(matches).toHaveLength(1);
-        const [open, close] = matches[0]!.captures.map(({ node }) => node);
-        expect(open!.parent!.id).toBe(close!.parent!.id);
-        const clause = open!.parent!;
+        const clauses = current.rootNode.descendantsOfType(['for_clause', 'for_in_clause']);
+        expect(clauses).toHaveLength(1);
+        const clause = clauses[0]!;
         expect(clause.type).toBe(type);
+        const opens = clause.children.filter((node) => node.type === '(');
+        const closes = clause.children.filter((node) => node.type === ')');
+        expect(opens).toHaveLength(1);
+        expect(closes).toHaveLength(1);
+        const [open, close] = [opens[0], closes[0]];
         expect(clause.text).toBe(expectedHeader);
         expect(clause.startIndex).toBe(open!.startIndex);
         expect(clause.endIndex).toBe(close!.endIndex);
@@ -50,7 +52,6 @@ test.each(['javascript', 'javascript_script'])('pairs loop-header delimiters in 
       }
     }
   } finally {
-    brackets.delete();
     parser.delete();
   }
 });
@@ -61,7 +62,6 @@ test.each(['javascript', 'javascript_script'])(
     await Parser.init();
     const language = await Language.load(`tree-sitter-${goal}.wasm`);
     const parser = new Parser().setLanguage(language);
-    const query = new Query(language, '(for_in_clause left: (identifier) @binding)');
     try {
       for (const kind of ['let', 'const', 'var']) {
         for (const iterable of ['[of]', '(of)', '+ of', 'of(of)', 'of + of', 'of']) {
@@ -76,7 +76,7 @@ test.each(['javascript', 'javascript_script'])(
               expect(header.childForFieldName('left')?.startIndex).toBe(source.indexOf(kind) + kind.length + 1);
               expect(header.childForFieldName('operator')?.text).toBe('of');
               expect(header.childForFieldName('right')?.text).toBe(iterable);
-              expect(query.captures(tree.rootNode).map(({ node }) => node.text)).toEqual([binding]);
+              expect(header.childForFieldName('left')?.type).toBe('identifier');
             } finally {
               tree.delete();
             }
@@ -84,7 +84,6 @@ test.each(['javascript', 'javascript_script'])(
         }
       }
     } finally {
-      query.delete();
       parser.delete();
     }
   }

@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -9,7 +9,6 @@ const language = await Language.load(path.join(import.meta.dirname, '../../tree-
 test.each(['/*c*/', '//c\n'])('ends regex flags before comment %j', (comment) => {
   const parser = new Parser();
   parser.setLanguage(language);
-  const query = new Query(language, '(regex) @regex (regex_flags) @flags');
   try {
     for (const regex of ['/[/]/', '/x/g', '/x/dgimsuy']) {
       const source = `${regex}${comment}instanceof value;`;
@@ -30,10 +29,7 @@ test.each(['/*c*/', '//c\n'])('ends regex flags before comment %j', (comment) =>
           source
         ).toBe('instanceof');
         expect(
-          query
-            .captures(tree.rootNode)
-            .filter(({ name }) => name === 'regex')
-            .map(({ node }) => [node.text, node.startIndex, node.endIndex]),
+          tree.rootNode.descendantsOfType('regex').map((node) => [node.text, node.startIndex, node.endIndex]),
           source
         ).toEqual([[regex, 0, regex.length]]);
       } finally {
@@ -41,7 +37,6 @@ test.each(['/*c*/', '//c\n'])('ends regex flags before comment %j', (comment) =>
       }
     }
   } finally {
-    query.delete();
     parser.delete();
   }
 });

@@ -1,4 +1,4 @@
-import { Language, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 const Following = 'const sentinel = 1;';
@@ -80,10 +80,15 @@ async function *generator() { yield await input; }
 async: while (flag) { break async; }
 `;
     const controlTree = parser.parse(control)!;
-    const calls = new Query(language, '(call_expression function: (identifier) @function)');
     try {
       expect(controlTree.rootNode.hasError).toBe(false);
-      expect(calls.captures(controlTree.rootNode).map(({ node }) => node.text)).toEqual(['async']);
+      expect(
+        controlTree.rootNode
+          .descendantsOfType('call_expression')
+          .map((node) => node.childForFieldName('function'))
+          .filter((node) => node?.type === 'identifier')
+          .map((node) => node?.text)
+      ).toEqual(['async']);
       const identifiers = controlTree.rootNode.descendantsOfType([
         'identifier',
         'property_identifier',
@@ -95,7 +100,6 @@ async: while (flag) { break async; }
         'async',
       ]);
     } finally {
-      calls.delete();
       controlTree.delete();
     }
   } finally {
@@ -109,7 +113,6 @@ test.each(['javascript', 'javascript_script'])(
     await Parser.init();
     const language = await Language.load(`tree-sitter-${goal}.wasm`);
     const parser = new Parser().setLanguage(language);
-    const query = new Query(language, '(arrow_function parameter: (identifier) @parameter)');
     try {
       for (const [before, after] of [
         ['consume(', ');'],
@@ -134,7 +137,7 @@ test.each(['javascript', 'javascript_script'])(
               expect(binding.childCount).toBe(0);
               expect(binding.startIndex).toBe(start);
               expect(binding.endIndex).toBe(start + parameter.length);
-              expect(query.captures(tree.rootNode).map(({ node }) => node.text)).toEqual([parameter]);
+              expect(tree.rootNode.descendantsOfType('arrow_function')).toHaveLength(1);
               expect(tree.rootNode.lastNamedChild!.text).toBe(Following);
             } finally {
               tree.delete();
@@ -143,7 +146,6 @@ test.each(['javascript', 'javascript_script'])(
         }
       }
     } finally {
-      query.delete();
       parser.delete();
     }
   }
