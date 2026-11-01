@@ -134,6 +134,7 @@ module.exports = grammar({
     sym('_class_heritage_end'),
     sym('_class_heritage_yield_identifier'),
     sym('_class_heritage_await_identifier'),
+    sym('_template_escape_sequence'),
   ],
 
   extras: ($) => [$.comment, sym('html_comment'), /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -1873,7 +1874,7 @@ function templateString($, tagged) {
     repeat(
       choice(
         alias(sym('_template_chars'), sym('string_fragment')),
-        $.escape_sequence,
+        tagged ? $.escape_sequence : alias(sym('_template_escape_sequence'), $.escape_sequence),
         ...(tagged ? [alias($._invalid_template_escape, $.escape_sequence)] : []),
         $.template_substitution
       )

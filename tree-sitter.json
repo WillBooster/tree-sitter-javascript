@@ -8,7 +8,7 @@
       "path": ".",
       "file-types": ["js", "mjs", "jsx"],
       "injection-regex": "^(js|javascript)$",
-      "external-files": ["src/function_context.h"]
+      "external-files": ["src/function_context.h", "src/literal.h"]
     },
     {
       "name": "javascript_script",
@@ -17,7 +17,7 @@
       "path": "grammars/script",
       "file-types": ["cjs"],
       "injection-regex": "^javascript-script$",
-      "external-files": ["src/scanner.c", "src/function_context.h"]
+      "external-files": ["src/scanner.c", "src/function_context.h", "src/literal.h"]
     }
   ],
   "metadata": {
