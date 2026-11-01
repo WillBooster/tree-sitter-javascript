@@ -1039,7 +1039,7 @@ module.exports = grammar({
         'template_call',
         seq(
           field('function', alias($._assignment_call_primary, $.primary_expression)),
-          field('arguments', $.template_string)
+          field('arguments', alias($._tagged_template_string, $.template_string))
         )
       ),
 
@@ -1149,7 +1149,7 @@ module.exports = grammar({
         'template_call',
         seq(
           field('function', alias($._constructor_chain_base, $.primary_expression)),
-          field('arguments', $.template_string)
+          field('arguments', alias($._tagged_template_string, $.template_string))
         )
       ),
 
@@ -1373,23 +1373,10 @@ module.exports = grammar({
     // http://stackoverflow.com/questions/13014947/regex-to-match-a-c-style-multiline-comment/36328890#36328890
     comment: () => token(choice(seq('//', /[^\r\n\u2028\u2029]*/), seq('/*', /[^*]*\*+([^/*][^*]*\*+)*/, '/'))),
 
-    template_string: ($) =>
-      seq(
-        '`',
-        repeat(
-          choice(
-            alias(sym('_template_chars'), sym('string_fragment')),
-            $.escape_sequence,
-            alias($._invalid_template_escape, $.escape_sequence),
-            $.template_substitution
-          )
-        ),
-        '`'
-      ),
+    template_string: ($) => templateString($, false),
 
-    // Tagged templates allow `\x` and `\u` without the hex digits an escape_sequence needs (the cooked string is
-    // undefined). The lexer prefers the longer escape_sequence when the digits follow. Untagged templates reject these
-    // escapes, but the lexer cannot tell the two apart.
+    _tagged_template_string: ($) => templateString($, true),
+
     _invalid_template_escape: () => token.immediate(seq('\\', /[xu]/)),
 
     template_substitution: ($) => seq('${', $._expressions, '}'),
@@ -1754,14 +1741,17 @@ function contextualIdentifier($, heritage) {
 }
 
 /**
- * @param {GrammarSymbols<'import' | 'arguments' | 'template_string' | 'optional_chain'>} $
+ * @param {GrammarSymbols<'import' | 'arguments' | '_tagged_template_string' | 'template_string' | 'optional_chain'>} $
  * @param {RuleOrLiteral} callee
  * @param {RuleOrLiteral} primary
  */
 function callExpression($, callee, primary) {
   return choice(
     prec('call', seq(field('function', choice(callee, $.import)), field('arguments', $.arguments))),
-    prec('template_call', seq(field('function', primary), field('arguments', $.template_string))),
+    prec(
+      'template_call',
+      seq(field('function', primary), field('arguments', alias($._tagged_template_string, $.template_string)))
+    ),
     prec(
       'member',
       seq(field('function', primary), field('optional_chain', $.optional_chain), field('arguments', $.arguments))
@@ -1871,4 +1861,23 @@ function functionContext(makeRule) {
 function functionScope(async, content, kind = 'function_signature') {
   const name = kind === 'function' && !async ? 'sync_function' : `${async ? 'async_' : ''}${kind}`;
   return seq(sym(`_${name}_start`), content, sym('_function_context_end'));
+}
+
+/**
+ * @param {GrammarSymbols<'escape_sequence' | '_invalid_template_escape' | 'template_substitution'>} $
+ * @param {boolean} tagged
+ */
+function templateString($, tagged) {
+  return seq(
+    '`',
+    repeat(
+      choice(
+        alias(sym('_template_chars'), sym('string_fragment')),
+        $.escape_sequence,
+        ...(tagged ? [alias($._invalid_template_escape, $.escape_sequence)] : []),
+        $.template_substitution
+      )
+    ),
+    '`'
+  );
 }
