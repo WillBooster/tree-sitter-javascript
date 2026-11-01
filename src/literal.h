@@ -5,10 +5,11 @@
 
 static bool scan_character_reference(TSLexer *lexer);
 static bool scan_template_escape_value(TSLexer *lexer);
-static bool scan_literal_hex_digits(TSLexer *lexer, unsigned length);
+static bool scan_fixed_hex_digits(TSLexer *lexer, unsigned length);
 static bool scan_template_code_point(TSLexer *lexer);
-static int literal_hex_digit(int32_t c);
-static bool literal_is_letter(int32_t c);
+static int hex_digit_value(int32_t c);
+static bool is_ascii_letter(int32_t c);
+static bool is_ascii_digit(int32_t c);
 static bool reference_is_digit(int32_t c, bool hex);
 
 static bool scan_template_chars(TSLexer *lexer, TSSymbol symbol) {
@@ -48,9 +49,9 @@ static bool scan_jsx_text(TSLexer *lexer, TSSymbol symbol) {
             default:
                 break;
         }
-        // JSX trims ASCII whitespace; Unicode spaces remain text on every platform.
+        // Use ASCII classes here because Babel retains Unicode spaces in JSX text.
         bool is_space = (lexer->lookahead >= '\t' && lexer->lookahead <= '\r') || lexer->lookahead == ' ';
-        // JSX line boundaries are CR and LF, including where U+2028/U+2029 are text.
+        // Babel splits JSX text into lines at CR/LF; U+2028 and U+2029 stay text.
         if (lexer->lookahead == '\n' || lexer->lookahead == '\r') {
             at_newline = true;
         } else {
@@ -74,7 +75,7 @@ static bool scan_character_reference(TSLexer *lexer) {
             length++;
         }
     } else {
-        while (length < 30 && literal_is_letter(lexer->lookahead)) {
+        while (length < 30 && is_ascii_letter(lexer->lookahead)) {
             lexer->advance(lexer, false);
             length++;
         }
@@ -95,22 +96,22 @@ static bool scan_template_escape_value(TSLexer *lexer) {
     lexer->advance(lexer, false);
     switch (c) {
         case '0':
-            return lexer->lookahead < '0' || lexer->lookahead > '9';
+            return !is_ascii_digit(lexer->lookahead);
         case 'x':
-            return scan_literal_hex_digits(lexer, 2);
+            return scan_fixed_hex_digits(lexer, 2);
         case 'u':
-            return lexer->lookahead == '{' ? scan_template_code_point(lexer) : scan_literal_hex_digits(lexer, 4);
+            return lexer->lookahead == '{' ? scan_template_code_point(lexer) : scan_fixed_hex_digits(lexer, 4);
         case '\r':
             if (lexer->lookahead == '\n') lexer->advance(lexer, false);
             return true;
         default:
-            return c < '0' || c > '9';
+            return !is_ascii_digit(c);
     }
 }
 
-static bool scan_literal_hex_digits(TSLexer *lexer, unsigned length) {
+static bool scan_fixed_hex_digits(TSLexer *lexer, unsigned length) {
     for (unsigned i = 0; i < length; i++) {
-        if (literal_hex_digit(lexer->lookahead) < 0) return false;
+        if (hex_digit_value(lexer->lookahead) < 0) return false;
         lexer->advance(lexer, false);
     }
     return true;
@@ -121,7 +122,7 @@ static bool scan_template_code_point(TSLexer *lexer) {
     uint32_t value = 0;
     bool has_digit = false;
     int digit;
-    while ((digit = literal_hex_digit(lexer->lookahead)) >= 0) {
+    while ((digit = hex_digit_value(lexer->lookahead)) >= 0) {
         has_digit = true;
         value = value * 16 + (unsigned)digit;
         if (value > 0x10FFFF) return false;
@@ -132,19 +133,23 @@ static bool scan_template_code_point(TSLexer *lexer) {
     return true;
 }
 
-static int literal_hex_digit(int32_t c) {
-    if (c >= '0' && c <= '9') return c - '0';
+static int hex_digit_value(int32_t c) {
+    if (is_ascii_digit(c)) return c - '0';
     if (c >= 'a' && c <= 'f') return c - 'a' + 10;
     if (c >= 'A' && c <= 'F') return c - 'A' + 10;
     return -1;
 }
 
-static bool literal_is_letter(int32_t c) {
+static bool is_ascii_letter(int32_t c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
 static bool reference_is_digit(int32_t c, bool hex) {
-    return hex ? literal_hex_digit(c) >= 0 : c >= '0' && c <= '9';
+    return hex ? hex_digit_value(c) >= 0 : is_ascii_digit(c);
+}
+
+static bool is_ascii_digit(int32_t c) {
+    return c >= '0' && c <= '9';
 }
 
 #endif

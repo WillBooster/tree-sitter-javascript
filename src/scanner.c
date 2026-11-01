@@ -1,4 +1,4 @@
-// code-gauge-allow-file fileNcss 982 -- Scanner context dispatch stays together; splitting unrelated state transitions would only relocate complexity.
+// code-gauge-allow-file fileNcss 976 -- Scanner context dispatch stays together; splitting unrelated state transitions would only relocate complexity.
 #include "function_context.h"
 #include "literal.h"
 #include "tree_sitter/alloc.h"
@@ -135,10 +135,6 @@ static inline bool is_whitespace(int32_t c) {
     }
 }
 
-static inline bool is_ascii_letter(int32_t c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
-
-static inline bool is_ascii_digit(int32_t c) { return c >= '0' && c <= '9'; }
-
 // Counts the characters the grammar's identifiers may continue with (a backslash starts a `\u` escape), with every
 // character from U+007F on other than whitespace, which suffices to tell `in` and `instanceof` from the identifiers they
 // start.
@@ -156,7 +152,6 @@ static bool scan_word(TSLexer *lexer, const char *word) {
     }
     return !is_identifier_part(lexer->lookahead);
 }
-
 
 typedef enum {
     REJECT,     // Semicolon is illegal, ie a syntax error occurred
@@ -688,9 +683,6 @@ static bool scan_html_comment(TSLexer *lexer) {
     return true;
 }
 
-
-static inline bool is_hex_digit(int32_t c) { return is_ascii_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'); }
-
 static bool scan_infix_word(TSLexer *lexer, bool skip_characters) {
     char word[16] = {0};
     return scan_identifier(lexer, word, sizeof(word), skip_characters) &&
@@ -788,10 +780,9 @@ static bool scan_resource_binding(TSLexer *lexer, bool plain_for_of, bool *infix
             if (braced) advance(lexer);
             character = 0;
             unsigned digits = 0;
-            while (is_hex_digit(lexer->lookahead) && (braced || digits < 4)) {
-                unsigned digit = is_ascii_digit(lexer->lookahead) ? lexer->lookahead - '0' :
-                    (lexer->lookahead >= 'a' ? lexer->lookahead - 'a' : lexer->lookahead - 'A') + 10;
-                character = character > 0x7F ? 0x80 : character * 16 + digit;
+            int digit;
+            while ((digit = hex_digit_value(lexer->lookahead)) >= 0 && (braced || digits < 4)) {
+                character = character > 0x7F ? 0x80 : character * 16 + (unsigned)digit;
                 advance(lexer);
                 digits++;
             }
