@@ -9195,8 +9195,13 @@
                 "value": "string_fragment"
               },
               {
-                "type": "SYMBOL",
-                "name": "escape_sequence"
+                "type": "ALIAS",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_template_escape_sequence"
+                },
+                "named": true,
+                "value": "escape_sequence"
               },
               {
                 "type": "SYMBOL",
@@ -12178,6 +12183,10 @@
     {
       "type": "SYMBOL",
       "name": "_class_heritage_await_identifier"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_template_escape_sequence"
     }
   ],
   "inline": [

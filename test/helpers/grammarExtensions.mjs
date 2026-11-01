@@ -45,7 +45,9 @@ function prepareConsumer(directory, goal, mode) {
   fs.mkdirSync(sources, { recursive: true });
   const base = path.join(Root, goal === 'javascript' ? 'grammar.js' : 'grammars/script/grammar.js');
   fs.writeFileSync(path.join(directory, 'grammar.js'), consumerGrammar(base, goal, mode));
-  fs.copyFileSync(path.join(Root, 'src/function_context.h'), path.join(sources, 'function_context.h'));
+  for (const name of ['function_context.h', 'literal.h']) {
+    fs.copyFileSync(path.join(Root, 'src', name), path.join(sources, name));
+  }
   if (goal === 'javascript') fs.copyFileSync(path.join(Root, 'src/scanner.c'), path.join(sources, 'scanner.c'));
   else {
     fs.copyFileSync(path.join(Root, 'src/scanner.c'), path.join(sources, 'scannerBase.c'));

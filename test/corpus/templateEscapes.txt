@@ -1,0 +1,306 @@
+==================================================
+Untagged template rejects \1
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\1`;
+
+---
+
+==================================================
+Untagged template rejects \2
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\2`;
+
+---
+
+==================================================
+Untagged template rejects \3
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\3`;
+
+---
+
+==================================================
+Untagged template rejects \4
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\4`;
+
+---
+
+==================================================
+Untagged template rejects \5
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\5`;
+
+---
+
+==================================================
+Untagged template rejects \6
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\6`;
+
+---
+
+==================================================
+Untagged template rejects \7
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\7`;
+
+---
+
+==================================================
+Untagged template rejects \8
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\8`;
+
+---
+
+==================================================
+Untagged template rejects \9
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\9`;
+
+---
+
+==================================================
+Untagged template rejects \00
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\00`;
+
+---
+
+==================================================
+Untagged template rejects \01
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\01`;
+
+---
+
+==================================================
+Untagged template rejects \02
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\02`;
+
+---
+
+==================================================
+Untagged template rejects \03
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\03`;
+
+---
+
+==================================================
+Untagged template rejects \04
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\04`;
+
+---
+
+==================================================
+Untagged template rejects \05
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\05`;
+
+---
+
+==================================================
+Untagged template rejects \06
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\06`;
+
+---
+
+==================================================
+Untagged template rejects \07
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\07`;
+
+---
+
+==================================================
+Untagged template rejects \08
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\08`;
+
+---
+
+==================================================
+Untagged template rejects \09
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\09`;
+
+---
+
+==================================================
+Untagged template rejects \377
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\377`;
+
+---
+
+==================================================
+Untagged template rejects \u{110000}
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\u{110000}`;
+
+---
+
+==================================================
+Untagged template rejects \u{FFFFFFFF}
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\u{FFFFFFFF}`;
+
+---
+
+==================================================
+Untagged template rejects \u{00000110000}
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\u{00000110000}`;
+
+---
+
+==================================================
+Untagged template rejects \\\1
+:language(javascript)
+:language(javascript_script)
+:error
+==================================================
+
+const value = `\\\1`;
+
+---
+
+==================================================
+Valid template numeric escapes and tagged raw text
+:language(javascript)
+:language(javascript_script)
+==================================================
+
+const controls = `\0a\x00\xFF\u0000\uD800\uDFFF\uFFFF\u{0}\u{D800}\u{10FFFF}\u{000000000010FFFF}\\1\\u{110000}`;
+tag`\1\01\08\9\u{110000}`;
+
+---
+
+(program
+  (lexical_declaration
+    (variable_declarator
+      (identifier)
+      (template_string
+        (escape_sequence)
+        (string_fragment)
+        (escape_sequence)
+        (escape_sequence)
+        (escape_sequence)
+        (escape_sequence)
+        (escape_sequence)
+        (escape_sequence)
+        (escape_sequence)
+        (escape_sequence)
+        (escape_sequence)
+        (escape_sequence)
+        (escape_sequence)
+        (string_fragment)
+        (escape_sequence)
+        (string_fragment))))
+  (expression_statement
+    (call_expression
+      (identifier)
+      (template_string
+        (escape_sequence)
+        (escape_sequence)
+        (escape_sequence)
+        (string_fragment)
+        (escape_sequence)
+        (escape_sequence)))))

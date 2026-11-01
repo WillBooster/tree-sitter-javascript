@@ -35,5 +35,6 @@ fn main() {
     }
 
     println!("cargo:rerun-if-changed=src/function_context.h");
+    println!("cargo:rerun-if-changed=src/literal.h");
     c_config.compile("tree-sitter-javascript");
 }
