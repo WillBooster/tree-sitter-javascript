@@ -4602,8 +4602,13 @@
                 "type": "FIELD",
                 "name": "arguments",
                 "content": {
-                  "type": "SYMBOL",
-                  "name": "template_string"
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_tagged_template_string"
+                  },
+                  "named": true,
+                  "value": "template_string"
                 }
               }
             ]
@@ -5861,8 +5866,13 @@
                 "type": "FIELD",
                 "name": "arguments",
                 "content": {
-                  "type": "SYMBOL",
-                  "name": "template_string"
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_tagged_template_string"
+                  },
+                  "named": true,
+                  "value": "template_string"
                 }
               }
             ]
@@ -6231,8 +6241,13 @@
             "type": "FIELD",
             "name": "arguments",
             "content": {
-              "type": "SYMBOL",
-              "name": "template_string"
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_tagged_template_string"
+              },
+              "named": true,
+              "value": "template_string"
             }
           }
         ]
@@ -6913,8 +6928,13 @@
             "type": "FIELD",
             "name": "arguments",
             "content": {
-              "type": "SYMBOL",
-              "name": "template_string"
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_tagged_template_string"
+              },
+              "named": true,
+              "value": "template_string"
             }
           }
         ]
@@ -9155,6 +9175,44 @@
       }
     },
     "template_string": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "`"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_template_chars"
+                },
+                "named": true,
+                "value": "string_fragment"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "escape_sequence"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "template_substitution"
+              }
+            ]
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "`"
+        }
+      ]
+    },
+    "_tagged_template_string": {
       "type": "SEQ",
       "members": [
         {
