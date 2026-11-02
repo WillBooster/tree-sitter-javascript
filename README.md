@@ -27,7 +27,7 @@ the trees that error recovery produces may change; such changes are released as 
 The npm package ships two languages for
 [@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter), which runs in Node.js, Bun,
 browsers, and Cloudflare Workers. The parser carries the ABI number of WillBooster/tree-sitter (`0x5742000b`), so it
-requires that runtime ABI; the upstream runtime rejects it. This package is tested with runtime 15.5.4, and its optional peer dependency covers major 15. In Node.js and Bun, load it from
+requires that runtime ABI; the upstream runtime rejects it. This package is tested with runtime 16.0.2, and its optional peer dependency covers majors 15 and 16. In Node.js and Bun, load it from
 the package. Choose `tree-sitter-javascript.wasm` for the Module goal, or
 `tree-sitter-javascript_script.wasm` for the Script goal. The source goal comes from the host or file type;
 `.mjs` uses Module and `.cjs` uses Script, while `.js` depends on the host. For example, `await\nvalue` is one
@@ -80,10 +80,10 @@ that extend this one (e.g. `require('@willbooster/tree-sitter-javascript/grammar
 array/formal and object-rest extension hooks. The crate ships `tree-sitter.json` too.
 
 In Rust, depend on the [crate](https://crates.io/crates/willbooster-tree-sitter-javascript) and the
-[willbooster-tree-sitter](https://crates.io/crates/willbooster-tree-sitter) runtime with the matching ABI. The tested version is 15.5.4:
+[willbooster-tree-sitter](https://crates.io/crates/willbooster-tree-sitter) runtime with the matching ABI. The tested version is 16.0.2:
 
 ```sh
-cargo add willbooster-tree-sitter@15.5.4 --rename tree-sitter
+cargo add willbooster-tree-sitter@16.0.2 --rename tree-sitter
 cargo add willbooster-tree-sitter-javascript --rename tree-sitter-javascript
 ```
 
