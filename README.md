@@ -77,7 +77,8 @@ parser.setLanguage(await Language.load(javascript));
 
 The package also ships the node types in `src/node-types.json`, `tree-sitter.json`, and `grammar.js` for grammars
 that extend this one (e.g. `require('@willbooster/tree-sitter-javascript/grammar')`). Its JSDoc describes the
-array/formal and object-rest extension hooks. The crate ships `tree-sitter.json` too.
+array/formal and object-rest extension hooks. Their external scanners can include `src/literal.h`, which scans template
+characters and escapes and JSX text for the tokens they pass it. The crate ships `tree-sitter.json` too.
 
 In Rust, depend on the [crate](https://crates.io/crates/willbooster-tree-sitter-javascript) and the
 [willbooster-tree-sitter](https://crates.io/crates/willbooster-tree-sitter) runtime with the matching ABI. The tested version is 17.0.1:
