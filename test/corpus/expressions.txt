@@ -1354,9 +1354,9 @@ Function calls
 ============================================
 
 x.someMethod(arg1, "arg2");
-function(x, y) {
+(function(x, y) {
 
-}(a, b);
+})(a, b);
 
 ---
 
@@ -1372,11 +1372,12 @@ function(x, y) {
           (string_fragment)))))
   (expression_statement
     (call_expression
-      (function_expression
-        (formal_parameters
-          (identifier)
-          (identifier))
-        (statement_block))
+      (parenthesized_expression
+        (function_expression
+          (formal_parameters
+            (identifier)
+            (identifier))
+          (statement_block)))
       (arguments
         (identifier)
         (identifier)))))

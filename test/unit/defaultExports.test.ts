@@ -42,7 +42,7 @@ test('retains default declarations and independent following statements', () => 
   }
 });
 
-test('parses declarations with and without a default export prefix', () => {
+test('parses declarations with a default export prefix and rejects nameless ones without it', () => {
   const parser = new Parser();
   parser.setLanguage(language);
   try {
@@ -55,9 +55,10 @@ test('parses declarations with and without a default export prefix', () => {
       'class {}',
     ]) {
       for (const prefix of ['', 'export default ']) {
-        const tree = parser.parse(`${prefix}${declaration}\n(x);`)!;
+        const source = `${prefix}${declaration}\n(x);`;
+        const tree = parser.parse(source)!;
         try {
-          expect(tree.rootNode.hasError).toBe(false);
+          expect(tree.rootNode.hasError, source).toBe(!prefix && !/named/i.test(declaration));
         } finally {
           tree.delete();
         }
