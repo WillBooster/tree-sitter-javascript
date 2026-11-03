@@ -135,6 +135,10 @@ module.exports = grammar({
     sym('_class_heritage_yield_identifier'),
     sym('_class_heritage_await_identifier'),
     sym('_template_escape_sequence'),
+    // The `function` and `class` keywords where a declaration may start, so that an expression statement cannot begin
+    // with them there, as ECMAScript's ExpressionStatement lookahead restriction requires.
+    sym('_declaration_function_keyword'),
+    sym('_declaration_class_keyword'),
   ],
 
   extras: ($) => [$.comment, sym('html_comment'), /[\s\p{Zs}\uFEFF\u2028\u2029\u2060\u200B]/u],
@@ -579,8 +583,10 @@ module.exports = grammar({
       seq(
         'try',
         field('body', $.statement_block),
-        optional(field('handler', $.catch_clause)),
-        optional(field('finalizer', $.finally_clause))
+        choice(
+          seq(field('handler', $.catch_clause), optional(field('finalizer', $.finally_clause))),
+          field('finalizer', $.finally_clause)
+        )
       ),
 
     with_statement: ($) => seq('with', field('object', $.parenthesized_expression), field('body', $._single_statement)),
@@ -670,17 +676,12 @@ module.exports = grammar({
         'object',
         seq(
           '{',
-          commaSep(
-            optional(
-              choice(
-                $.pair,
-                $.spread_element,
-                $.method_definition,
-                aliasWithAsyncKeyword(
-                  choice($.identifier, $._reserved_identifier),
-                  sym('shorthand_property_identifier')
-                )
-              )
+          trailingCommaSep(
+            choice(
+              $.pair,
+              $.spread_element,
+              $.method_definition,
+              aliasWithAsyncKeyword(choice($.identifier, $._reserved_identifier), sym('shorthand_property_identifier'))
             )
           ),
           '}'
@@ -696,14 +697,10 @@ module.exports = grammar({
           sym('shorthand_property_identifier_pattern')
         )
       );
+      const rest = alias($._object_rest_pattern, $.rest_pattern);
       return prec(
         'object',
-        seq(
-          '{',
-          repeat(seq(optional(property), ',')),
-          optional(choice(property, alias($._object_rest_pattern, $.rest_pattern))),
-          '}'
-        )
+        seq('{', optional(choice(seq(commaSep1(property), optional(seq(',', optional(rest)))), rest)), '}')
       );
     },
 
@@ -845,7 +842,11 @@ module.exports = grammar({
               'class',
               field('name', optional($.identifier))
             ),
-            seq(repeat(field('decorator', $.decorator)), 'class', field('name', $.identifier))
+            seq(
+              repeat(field('decorator', $.decorator)),
+              choice('class', alias(sym('_declaration_class_keyword'), 'class')),
+              field('name', $.identifier)
+            )
           ),
           optional($.class_heritage),
           field('body', $.class_body)
@@ -903,7 +904,11 @@ module.exports = grammar({
                 'function',
                 field('name', optional($.identifier))
               ),
-              seq(...(async ? [alias(sym('_async_keyword'), 'async')] : []), 'function', field('name', $.identifier))
+              seq(
+                ...(async ? [alias(sym('_async_keyword'), 'async')] : []),
+                choice('function', alias(sym('_declaration_function_keyword'), 'function')),
+                field('name', $.identifier)
+              )
             ),
             functionScope(async, seq($._call_signature, field('body', $.statement_block)))
           )
@@ -939,7 +944,7 @@ module.exports = grammar({
               ),
               seq(
                 ...(async ? [alias(sym('_async_keyword'), 'async')] : []),
-                'function',
+                choice('function', alias(sym('_declaration_function_keyword'), 'function')),
                 '*',
                 field('name', $.identifier)
               )
@@ -1476,7 +1481,7 @@ module.exports = grammar({
     undefined: () => 'undefined',
 
     arguments: ($) =>
-      seq(choice('(', sym('_call_arguments_context')), commaSep(optional(choice($.expression, $.spread_element))), ')'),
+      seq(choice('(', sym('_call_arguments_context')), trailingCommaSep(choice($.expression, $.spread_element)), ')'),
 
     decorator: ($) =>
       seq(
@@ -1848,6 +1853,15 @@ function commaSep1(rule) {
  */
 function commaSep(rule) {
   return optional(commaSep1(rule));
+}
+
+/**
+ * @param {import('@willbooster/web-tree-sitter/dsl').RuleOrLiteral} rule
+ *
+ * @returns {import('@willbooster/web-tree-sitter/dsl').ChoiceRule}
+ */
+function trailingCommaSep(rule) {
+  return optional(seq(commaSep1(rule), optional(',')));
 }
 
 /** @param {(isAsync: boolean) => import('@willbooster/web-tree-sitter/dsl').RuleOrLiteral} makeRule */

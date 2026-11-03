@@ -150,10 +150,9 @@ if ({a: 'b'} {c: 'd'}) {
       (expression_statement
         (assignment_expression
           (identifier)
-          (function_expression (formal_parameters (identifier)) (statement_block (expression_statement (identifier)))))
-        (MISSING ";"))
-      (expression_statement
-        (function_expression (formal_parameters (identifier)) (statement_block (expression_statement (identifier))))))))
+          (ERROR
+            (function_expression (formal_parameters (identifier)) (statement_block (expression_statement (identifier)))))
+          (function_expression (formal_parameters (identifier)) (statement_block (expression_statement (identifier)))))))))
 
 ============================================
 Parenthesized targets in destructuring assignments
