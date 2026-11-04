@@ -3017,38 +3017,34 @@
       "type": "CHOICE",
       "members": [
         {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "SYMBOL",
-              "name": "_primary_atom"
-            },
-            {
-              "type": "SYMBOL",
-              "name": "subscript_expression"
-            },
-            {
-              "type": "SYMBOL",
-              "name": "member_expression"
-            },
-            {
-              "type": "SYMBOL",
-              "name": "call_expression"
-            },
-            {
-              "type": "SYMBOL",
-              "name": "new_expression"
-            },
-            {
-              "type": "ALIAS",
-              "content": {
-                "type": "SYMBOL",
-                "name": "_argumentless_new_expression"
-              },
-              "named": true,
-              "value": "new_expression"
-            }
-          ]
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_assignment_call_primary"
+          },
+          "named": true,
+          "value": "primary_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_non_assignment_call_primary"
+        }
+      ]
+    },
+    "_non_assignment_call_primary": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "member_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "subscript_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "call_expression"
         },
         {
           "type": "SYMBOL",
@@ -5935,22 +5931,8 @@
                 "type": "FIELD",
                 "name": "function",
                 "content": {
-                  "type": "CHOICE",
-                  "members": [
-                    {
-                      "type": "ALIAS",
-                      "content": {
-                        "type": "SYMBOL",
-                        "name": "_call_callee"
-                      },
-                      "named": true,
-                      "value": "expression"
-                    },
-                    {
-                      "type": "SYMBOL",
-                      "name": "import"
-                    }
-                  ]
+                  "type": "SYMBOL",
+                  "name": "_non_assignment_call_primary"
                 }
               },
               {
@@ -5975,7 +5957,7 @@
                 "name": "function",
                 "content": {
                   "type": "SYMBOL",
-                  "name": "primary_expression"
+                  "name": "_non_assignment_call_primary"
                 }
               },
               {
@@ -6004,8 +5986,13 @@
                 "type": "FIELD",
                 "name": "function",
                 "content": {
-                  "type": "SYMBOL",
-                  "name": "primary_expression"
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_call_callee"
+                  },
+                  "named": true,
+                  "value": "expression"
                 }
               },
               {
@@ -7170,41 +7157,68 @@
         "type": "SEQ",
         "members": [
           {
-            "type": "FIELD",
-            "name": "object",
-            "content": {
-              "type": "CHOICE",
-              "members": [
-                {
-                  "type": "ALIAS",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "_call_callee"
-                  },
-                  "named": true,
-                  "value": "expression"
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "import"
-                }
-              ]
-            }
-          },
-          {
             "type": "CHOICE",
             "members": [
               {
-                "type": "STRING",
-                "value": "."
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "FIELD",
+                    "name": "object",
+                    "content": {
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "ALIAS",
+                          "content": {
+                            "type": "SYMBOL",
+                            "name": "_call_callee"
+                          },
+                          "named": true,
+                          "value": "expression"
+                        },
+                        {
+                          "type": "SYMBOL",
+                          "name": "import"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "FIELD",
+                    "name": "optional_chain",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "optional_chain"
+                    }
+                  }
+                ]
               },
               {
-                "type": "FIELD",
-                "name": "optional_chain",
-                "content": {
-                  "type": "SYMBOL",
-                  "name": "optional_chain"
-                }
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "FIELD",
+                    "name": "object",
+                    "content": {
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "SYMBOL",
+                          "name": "_non_assignment_call_primary"
+                        },
+                        {
+                          "type": "SYMBOL",
+                          "name": "import"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "STRING",
+                    "value": "."
+                  }
+                ]
               }
             ]
           },
@@ -7244,31 +7258,41 @@
         "type": "SEQ",
         "members": [
           {
-            "type": "FIELD",
-            "name": "object",
-            "content": {
-              "type": "ALIAS",
-              "content": {
-                "type": "SYMBOL",
-                "name": "_call_callee"
-              },
-              "named": true,
-              "value": "expression"
-            }
-          },
-          {
             "type": "CHOICE",
             "members": [
               {
-                "type": "FIELD",
-                "name": "optional_chain",
-                "content": {
-                  "type": "SYMBOL",
-                  "name": "optional_chain"
-                }
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "FIELD",
+                    "name": "object",
+                    "content": {
+                      "type": "ALIAS",
+                      "content": {
+                        "type": "SYMBOL",
+                        "name": "_call_callee"
+                      },
+                      "named": true,
+                      "value": "expression"
+                    }
+                  },
+                  {
+                    "type": "FIELD",
+                    "name": "optional_chain",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "optional_chain"
+                    }
+                  }
+                ]
               },
               {
-                "type": "BLANK"
+                "type": "FIELD",
+                "name": "object",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_non_assignment_call_primary"
+                }
               }
             ]
           },
@@ -7301,6 +7325,24 @@
         {
           "type": "SYMBOL",
           "name": "subscript_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_assignment_member"
+          },
+          "named": true,
+          "value": "member_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_assignment_subscript"
+          },
+          "named": true,
+          "value": "subscript_expression"
         },
         {
           "type": "SYMBOL",
@@ -7549,6 +7591,24 @@
         {
           "type": "SYMBOL",
           "name": "subscript_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_assignment_member"
+          },
+          "named": true,
+          "value": "member_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_assignment_subscript"
+          },
+          "named": true,
+          "value": "subscript_expression"
         },
         {
           "type": "CHOICE",
@@ -10892,6 +10952,24 @@
           "name": "subscript_expression"
         },
         {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_assignment_member"
+          },
+          "named": true,
+          "value": "member_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_assignment_subscript"
+          },
+          "named": true,
+          "value": "subscript_expression"
+        },
+        {
           "type": "SYMBOL",
           "name": "_identifier"
         },
@@ -11809,10 +11887,6 @@
       "_non_rest_pattern"
     ],
     [
-      "_call_callee",
-      "call_expression"
-    ],
-    [
       "_class_heritage_expression",
       "_class_heritage_call"
     ],
@@ -11841,31 +11915,48 @@
       "await_expression"
     ],
     [
-      "call_expression",
-      "_constructor_import"
+      "_assignment_call_primary",
+      "_classic_call_target"
     ],
     [
-      "primary_expression",
-      "_assignment_call_primary"
+      "_assignment_call_primary",
+      "_simple_target_primary",
+      "_non_rest_pattern"
+    ],
+    [
+      "_non_assignment_call_primary",
+      "_non_rest_pattern"
+    ],
+    [
+      "_non_assignment_call_primary",
+      "_object_rest_pattern"
+    ],
+    [
+      "for_in_clause",
+      "_non_assignment_call_primary"
+    ],
+    [
+      "_non_assignment_call_primary",
+      "rest_pattern"
     ],
     [
       "_local_export_specifier",
       "_module_export_name"
     ],
     [
-      "primary_expression",
+      "_assignment_call_primary",
       "rest_pattern"
     ],
     [
-      "primary_expression",
+      "_assignment_call_primary",
       "_object_rest_pattern"
     ],
     [
-      "primary_expression",
+      "_assignment_call_primary",
       "_non_rest_pattern"
     ],
     [
-      "primary_expression",
+      "_assignment_call_primary",
       "for_in_clause"
     ],
     [
