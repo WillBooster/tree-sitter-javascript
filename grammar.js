@@ -233,7 +233,6 @@ module.exports = grammar({
     [$._primary_atom, $._simple_target_primary],
     [$._simple_target_primary, $._non_rest_pattern],
     [$._primary_atom, $._simple_target_primary, $._non_rest_pattern],
-    [$._call_callee, $.call_expression],
     [$._class_heritage_expression, $._class_heritage_call],
     [$.for_in_clause, $._primary_atom],
     [$._primary_atom, $.rest_pattern],
@@ -241,13 +240,17 @@ module.exports = grammar({
     [$._primary_atom, $._non_rest_pattern],
     [$.arrow_function, $._primary_atom],
     [$._primary_atom, $.await_expression],
-    [$.call_expression, $._constructor_import],
-    [$.primary_expression, $._assignment_call_primary],
+    [$._assignment_call_primary, $._classic_call_target],
+    [$._assignment_call_primary, $._simple_target_primary, $._non_rest_pattern],
+    [$._non_assignment_call_primary, $._non_rest_pattern],
+    [$._non_assignment_call_primary, $._object_rest_pattern],
+    [$.for_in_clause, $._non_assignment_call_primary],
+    [$._non_assignment_call_primary, $.rest_pattern],
     [$._local_export_specifier, $._module_export_name],
-    [$.primary_expression, $.rest_pattern],
-    [$.primary_expression, $._object_rest_pattern],
-    [$.primary_expression, $._non_rest_pattern],
-    [$.primary_expression, $.for_in_clause],
+    [$._assignment_call_primary, $.rest_pattern],
+    [$._assignment_call_primary, $._object_rest_pattern],
+    [$._assignment_call_primary, $._non_rest_pattern],
+    [$._assignment_call_primary, $.for_in_clause],
     [$.array, $.array_pattern],
     [$.object, $.object_pattern],
     [$.assignment_expression, $._non_rest_pattern],
@@ -661,7 +664,14 @@ module.exports = grammar({
 
     _unary_operand: ($) => choice($.primary_expression, $.await_expression, $.unary_expression, $.update_expression),
 
-    primary_expression: ($) => choice(leftHandSideExpression($), $.arrow_function),
+    // Calls in `_assignment_call_primary` chains can be classic call assignment targets; the other chains contain an
+    // optional chain or start with an arrow function. Keeping the two disjoint lets the tokens read so far decide every
+    // chain, where overlapping chains would split the parse at every call until its arguments end.
+    primary_expression: ($) =>
+      choice(alias($._assignment_call_primary, $.primary_expression), $._non_assignment_call_primary),
+
+    _non_assignment_call_primary: ($) =>
+      choice($.member_expression, $.subscript_expression, $.call_expression, $.arrow_function),
 
     yield_expression: ($) =>
       prec.right(
@@ -859,12 +869,14 @@ module.exports = grammar({
     _class_heritage_expression: ($) => alias($._class_heritage_primary, $.primary_expression),
 
     _class_heritage_primary: ($) =>
-      leftHandSideExpression($, {
-        atom: $._class_heritage_atom,
-        call: alias($._class_heritage_call, $.call_expression),
-        member: alias($._class_heritage_member, $.member_expression),
-        subscript: alias($._class_heritage_subscript, $.subscript_expression),
-      }),
+      choice(
+        $._class_heritage_atom,
+        alias($._class_heritage_subscript, $.subscript_expression),
+        alias($._class_heritage_member, $.member_expression),
+        alias($._class_heritage_call, $.call_expression),
+        $.new_expression,
+        alias($._argumentless_new_expression, $.new_expression)
+      ),
 
     _class_heritage_atom: ($) => primaryAtom($, $._expression_identifier),
 
@@ -994,7 +1006,25 @@ module.exports = grammar({
 
     optional_chain: () => '?.',
 
-    call_expression: ($) => callExpression($, alias($._call_callee, $.expression), $.primary_expression),
+    call_expression: ($) =>
+      choice(
+        prec('call', seq(field('function', $._non_assignment_call_primary), field('arguments', $.arguments))),
+        prec(
+          'template_call',
+          seq(
+            field('function', $._non_assignment_call_primary),
+            field('arguments', alias($._tagged_template_string, $.template_string))
+          )
+        ),
+        prec(
+          'member',
+          seq(
+            field('function', alias($._call_callee, $.expression)),
+            field('optional_chain', $.optional_chain),
+            field('arguments', $.arguments)
+          )
+        )
+      ),
 
     _primary_atom: ($) => primaryAtom($, $._reserved_identifier),
 
@@ -1186,14 +1216,47 @@ module.exports = grammar({
         )
       ),
 
-    member_expression: ($) => memberExpression($, alias($._call_callee, $.expression)),
+    member_expression: ($) =>
+      prec(
+        'member',
+        seq(
+          choice(
+            seq(
+              field('object', choice(alias($._call_callee, $.expression), $.import)),
+              field('optional_chain', $.optional_chain)
+            ),
+            seq(field('object', choice($._non_assignment_call_primary, $.import)), '.')
+          ),
+          field(
+            'property',
+            choice(
+              $.private_property_identifier,
+              reserved('properties', alias($.identifier, sym('property_identifier')))
+            )
+          )
+        )
+      ),
 
-    subscript_expression: ($) => subscriptExpression($, alias($._call_callee, $.expression)),
+    subscript_expression: ($) =>
+      prec.right(
+        'member',
+        seq(
+          choice(
+            seq(field('object', alias($._call_callee, $.expression)), field('optional_chain', $.optional_chain)),
+            field('object', $._non_assignment_call_primary)
+          ),
+          '[',
+          field('index', $._expressions),
+          ']'
+        )
+      ),
 
     _lhs_expression: ($) =>
       choice(
         $.member_expression,
         $.subscript_expression,
+        alias($._assignment_member, $.member_expression),
+        alias($._assignment_subscript, $.subscript_expression),
         $._identifier,
         aliasWithAsyncKeyword($._reserved_identifier, $.identifier),
         $._destructuring_pattern
@@ -1246,6 +1309,8 @@ module.exports = grammar({
       choice(
         $.member_expression,
         $.subscript_expression,
+        alias($._assignment_member, $.member_expression),
+        alias($._assignment_subscript, $.subscript_expression),
         aliasWithAsyncKeyword($._reserved_identifier, $.identifier),
         $._identifier,
         alias($._parenthesized_simple_target, $.parenthesized_expression)
@@ -1612,6 +1677,8 @@ module.exports = grammar({
       choice(
         $.member_expression,
         $.subscript_expression,
+        alias($._assignment_member, $.member_expression),
+        alias($._assignment_subscript, $.subscript_expression),
         $._identifier,
         aliasWithAsyncKeyword($._reserved_identifier, $.identifier),
         alias($._parenthesized_simple_target, $.parenthesized_expression)
@@ -1713,21 +1780,6 @@ module.exports = grammar({
       ),
   },
 });
-
-/**
- * @param {GrammarSymbols<'_primary_atom' | 'subscript_expression' | 'member_expression' | 'call_expression' | 'new_expression' | '_argumentless_new_expression'>} $
- * @param {{atom?: RuleOrLiteral, subscript?: RuleOrLiteral, member?: RuleOrLiteral, call?: RuleOrLiteral}} [forms]
- */
-function leftHandSideExpression($, forms = {}) {
-  return choice(
-    forms.atom ?? $._primary_atom,
-    forms.subscript ?? $.subscript_expression,
-    forms.member ?? $.member_expression,
-    forms.call ?? $.call_expression,
-    $.new_expression,
-    alias($._argumentless_new_expression, $.new_expression)
-  );
-}
 
 /**
  * @param {import('@willbooster/web-tree-sitter/dsl').GrammarSymbols<'_escaped_let'>} $
