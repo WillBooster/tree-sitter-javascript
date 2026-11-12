@@ -132,7 +132,7 @@ yield / other / g;`;
     const fields = tree.rootNode.descendantsOfType('field_definition');
     expect(fields).toHaveLength(3);
     expect(fields[1]!.childForFieldName('value')?.text).toBe('await');
-    expect(fields[2]!.childForFieldName('property')?.text).toBe('next');
+    expect(fields[2]!.childForFieldName('name')?.text).toBe('next');
   } finally {
     tree.delete();
     parser.delete();

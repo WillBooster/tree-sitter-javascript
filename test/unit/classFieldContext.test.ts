@@ -9,7 +9,7 @@ const language = await Language.load(path.join(import.meta.dirname, '../../tree-
 test('uses an await identifier in instance-field initializers and restores the surrounding async context', () => {
   const parser = new Parser().setLanguage(language);
   try {
-    for (const name of ['field', '[key]', '#field', 'get', 'set', 'static']) {
+    for (const name of ['field', '[key]', '#field', 'get', 'set', 'static', 'static static']) {
       for (const wrap of [(body: string) => body, (body: string) => `async function outer(){${body} await outside;}`]) {
         const source = wrap(`class C { ${name} = await\nnext; }`);
         const tree = parser.parse(source)!;
@@ -21,9 +21,10 @@ test('uses an await identifier in instance-field initializers and restores the s
             fields.map(({ type }) => type),
             source
           ).toEqual(['field_definition', 'field_definition']);
+          expect(fields[0]!.childForFieldName('name')?.text, source).toBe(name === 'static static' ? 'static' : name);
           expect(fields[0]!.childForFieldName('value')?.type, source).toBe('identifier');
           expect(fields[0]!.childForFieldName('value')?.text, source).toBe('await');
-          expect(fields[1]!.childForFieldName('property')?.text, source).toBe('next');
+          expect(fields[1]!.childForFieldName('name')?.text, source).toBe('next');
           expect(
             tree.rootNode.descendantsOfType('await_expression').map(({ text }) => text),
             source
@@ -54,7 +55,7 @@ test('uses the computed-name and nested-function contexts independently of the f
     expect(fields).toHaveLength(3);
     expect(fields[0]!.childForFieldName('value')?.type).toBe('arrow_function');
     expect(fields[1]!.childForFieldName('value')?.text).toBe('await');
-    expect(fields[2]!.childForFieldName('property')?.text).toBe('last');
+    expect(fields[2]!.childForFieldName('name')?.text).toBe('last');
   } finally {
     tree.delete();
     parser.delete();
