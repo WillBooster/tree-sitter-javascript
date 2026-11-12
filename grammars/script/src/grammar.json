@@ -10567,7 +10567,7 @@
                       "members": [
                         {
                           "type": "FIELD",
-                          "name": "property",
+                          "name": "name",
                           "content": {
                             "type": "SYMBOL",
                             "name": "_field_name"
@@ -10601,7 +10601,7 @@
                       "members": [
                         {
                           "type": "FIELD",
-                          "name": "property",
+                          "name": "name",
                           "content": {
                             "type": "ALIAS",
                             "content": {
@@ -10657,7 +10657,7 @@
               "members": [
                 {
                   "type": "FIELD",
-                  "name": "property",
+                  "name": "name",
                   "content": {
                     "type": "ALIAS",
                     "content": {
@@ -10700,7 +10700,7 @@
                 },
                 {
                   "type": "FIELD",
-                  "name": "property",
+                  "name": "name",
                   "content": {
                     "type": "ALIAS",
                     "content": {
