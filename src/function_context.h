@@ -44,11 +44,14 @@ static void function_context_leave(FunctionContext *context) {
 }
 
 static unsigned function_context_serialize(const FunctionContext *context, char *buffer) {
+    if (!context->depth) return 0;
     buffer[0] = (char)(context->depth & 0xff);
     buffer[1] = (char)(context->depth >> 8);
     unsigned context_bytes = (context->depth + 7) / 8;
     memcpy(buffer + 2, context->async, context_bytes);
-    memcpy(buffer + 2 + context_bytes, context->generator, context->generator_bytes);
+    if (context->generator_bytes) {
+        memcpy(buffer + 2 + context_bytes, context->generator, context->generator_bytes);
+    }
     return 2 + context_bytes + context->generator_bytes;
 }
 
@@ -56,9 +59,13 @@ static void function_context_deserialize(FunctionContext *context, const char *b
     context->depth = length >= 2 ? (unsigned char)buffer[0] | ((unsigned char)buffer[1] << 8) : 0;
     unsigned context_bytes = (context->depth + 7) / 8;
     if (context_bytes) memcpy(context->async, buffer + 2, context_bytes);
-    context->generator_bytes = length > 2 + context_bytes ? length - 2 - context_bytes : 0;
-    memset(context->generator, 0, sizeof(context->generator));
-    if (context->generator_bytes) memcpy(context->generator, buffer + 2 + context_bytes, context->generator_bytes);
+    unsigned previous_generator_bytes = context->generator_bytes;
+    unsigned generator_bytes = length > 2 + context_bytes ? length - 2 - context_bytes : 0;
+    if (generator_bytes) memcpy(context->generator, buffer + 2 + context_bytes, generator_bytes);
+    if (previous_generator_bytes > generator_bytes) {
+        memset(context->generator + generator_bytes, 0, previous_generator_bytes - generator_bytes);
+    }
+    context->generator_bytes = generator_bytes;
 }
 
 #endif

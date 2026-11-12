@@ -7,21 +7,23 @@ static bool scan_character_reference(TSLexer *lexer);
 static bool scan_template_escape_value(TSLexer *lexer);
 static bool scan_fixed_hex_digits(TSLexer *lexer, unsigned length);
 static bool scan_template_code_point(TSLexer *lexer);
-static int hex_digit_value(int32_t c);
-static bool is_ascii_letter(int32_t c);
-static bool is_ascii_digit(int32_t c);
-static bool reference_is_digit(int32_t c, bool hex);
+static inline int hex_digit_value(int32_t c);
+static inline bool is_ascii_letter(int32_t c);
+static inline bool is_ascii_digit(int32_t c);
+static inline bool reference_is_digit(int32_t c, bool hex);
+static inline bool lexer_eof(const TSLexer *lexer);
 
 static bool scan_template_chars(TSLexer *lexer, TSSymbol symbol) {
     lexer->result_symbol = symbol;
     for (bool has_content = false;; has_content = true) {
-        lexer->mark_end(lexer);
-        if (lexer->eof(lexer)) return false;
+        if (lexer_eof(lexer)) return false;
         switch (lexer->lookahead) {
             case '`':
             case '\\':
+                if (has_content) lexer->mark_end(lexer);
                 return has_content;
             case '$':
+                if (has_content) lexer->mark_end(lexer);
                 lexer->advance(lexer, false);
                 if (lexer->lookahead == '{') return has_content;
                 break;
@@ -35,24 +37,20 @@ static bool scan_jsx_text(TSLexer *lexer, TSSymbol symbol) {
     bool saw_text = false;
     bool at_newline = false;
     lexer->result_symbol = symbol;
-    for (;;) {
-        lexer->mark_end(lexer);
-        if (lexer->eof(lexer)) return saw_text;
-        switch (lexer->lookahead) {
-            case '<': case '>': case '{': case '}':
-                return saw_text;
-            case '&':
-                if (scan_character_reference(lexer)) return saw_text;
-                saw_text = true;
-                at_newline = false;
-                continue;
-            default:
-                break;
+    while (!lexer_eof(lexer)) {
+        int32_t c = lexer->lookahead;
+        if (c == '<' || c == '>' || c == '{' || c == '}') break;
+        if (c == '&') {
+            lexer->mark_end(lexer);
+            if (scan_character_reference(lexer)) return saw_text;
+            saw_text = true;
+            at_newline = false;
+            continue;
         }
         // Use ASCII classes here because Babel retains Unicode spaces in JSX text.
-        bool is_space = (lexer->lookahead >= '\t' && lexer->lookahead <= '\r') || lexer->lookahead == ' ';
+        bool is_space = (uint32_t)(c - '\t') <= '\r' - '\t' || c == ' ';
         // Babel splits JSX text into lines at CR/LF; U+2028 and U+2029 stay text.
-        if (lexer->lookahead == '\n' || lexer->lookahead == '\r') {
+        if (c == '\n' || c == '\r') {
             at_newline = true;
         } else {
             at_newline &= is_space;
@@ -60,6 +58,8 @@ static bool scan_jsx_text(TSLexer *lexer, TSSymbol symbol) {
         }
         lexer->advance(lexer, false);
     }
+    if (saw_text) lexer->mark_end(lexer);
+    return saw_text;
 }
 
 static bool scan_character_reference(TSLexer *lexer) {
@@ -85,7 +85,7 @@ static bool scan_character_reference(TSLexer *lexer) {
 
 static bool scan_template_escape(TSLexer *lexer, TSSymbol symbol) {
     lexer->advance(lexer, false);
-    if (lexer->eof(lexer) || !scan_template_escape_value(lexer)) return false;
+    if (lexer_eof(lexer) || !scan_template_escape_value(lexer)) return false;
     lexer->mark_end(lexer);
     lexer->result_symbol = symbol;
     return true;
@@ -133,23 +133,27 @@ static bool scan_template_code_point(TSLexer *lexer) {
     return true;
 }
 
-static int hex_digit_value(int32_t c) {
+static inline int hex_digit_value(int32_t c) {
     if (is_ascii_digit(c)) return c - '0';
     if (c >= 'a' && c <= 'f') return c - 'a' + 10;
     if (c >= 'A' && c <= 'F') return c - 'A' + 10;
     return -1;
 }
 
-static bool is_ascii_letter(int32_t c) {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+static inline bool is_ascii_letter(int32_t c) {
+    return (uint32_t)((c | 0x20) - 'a') <= 'z' - 'a';
 }
 
-static bool reference_is_digit(int32_t c, bool hex) {
+static inline bool reference_is_digit(int32_t c, bool hex) {
     return hex ? hex_digit_value(c) >= 0 : is_ascii_digit(c);
 }
 
-static bool is_ascii_digit(int32_t c) {
-    return c >= '0' && c <= '9';
+static inline bool is_ascii_digit(int32_t c) {
+    return (uint32_t)(c - '0') <= 9;
+}
+
+static inline bool lexer_eof(const TSLexer *lexer) {
+    return lexer->lookahead == 0 && lexer->eof(lexer);
 }
 
 #endif
