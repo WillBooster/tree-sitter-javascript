@@ -4,8 +4,7 @@
 #include "tree_sitter/alloc.h"
 #include "tree_sitter/parser.h"
 
-#include <stdio.h>
-#include <string.h>
+#include <stddef.h>
 
 enum TokenType {
     AUTOMATIC_SEMICOLON,
@@ -69,7 +68,11 @@ enum TokenType {
 static bool scan_let(TSLexer *lexer);
 static bool scan_declaration_keyword(TSLexer *lexer, const bool *valid_symbols);
 static bool scan_class_heritage_end(TSLexer *lexer, bool allow_html_comment);
-static bool is_reserved_word(const char *name);
+static bool is_statement_keyword(const char *word, unsigned length);
+static bool is_reserved_word(const char *name, unsigned length);
+static bool is_reserved_statement_keyword(const char *word, unsigned length);
+static bool is_non_statement_reserved_word(const char *word, unsigned length);
+static bool scan_html_comment_line(TSLexer *lexer);
 static bool scan_expression_trivia(TSLexer *lexer, bool *saw_newline, bool *scanned_comment, bool skip_contents);
 
 typedef struct {
@@ -84,8 +87,9 @@ typedef struct {
 static bool scan_export_default(Scanner *scanner, TSLexer *lexer);
 static bool starts_default_declaration(TSLexer *lexer);
 static bool scan_binding_end(Scanner *scanner, TSLexer *lexer);
-static bool scan_default_trivia(TSLexer *lexer, bool allow_line_breaks);
-static bool scan_async_start(TSLexer *lexer, char *keyword, unsigned capacity, const bool *valid_symbols);
+static bool scan_keyword_trivia(TSLexer *lexer, bool allow_line_breaks, bool at_line_start);
+static bool scan_slash_comment(TSLexer *lexer, bool *saw_newline, bool skip_contents, bool require_closed);
+static bool scan_async_start(TSLexer *lexer, const bool *valid_symbols);
 static bool await_is_identifier(const Scanner *scanner);
 
 void *tree_sitter_javascript_external_scanner_create() { return ts_calloc(1, sizeof(Scanner)); }
@@ -94,9 +98,13 @@ void tree_sitter_javascript_external_scanner_destroy(void *payload) { ts_free(pa
 
 unsigned tree_sitter_javascript_external_scanner_serialize(void *payload, char *buffer) {
     Scanner *scanner = (Scanner *)payload;
+    unsigned function_bytes = function_context_serialize(&scanner->functions, buffer + 2);
+    if (!function_bytes && !scanner->automatic_semicolon_pending && !scanner->default_declaration_pending) {
+        return 0;
+    }
     buffer[0] = (char)scanner->automatic_semicolon_pending;
     buffer[1] = (char)scanner->default_declaration_pending;
-    return 2 + function_context_serialize(&scanner->functions, buffer + 2);
+    return 2 + function_bytes;
 }
 
 void tree_sitter_javascript_external_scanner_deserialize(void *payload, const char *buffer, unsigned length) {
@@ -110,18 +118,16 @@ static inline void advance(TSLexer *lexer) { lexer->advance(lexer, false); }
 
 static inline void skip(TSLexer *lexer) { lexer->advance(lexer, true); }
 
-static inline bool is_line_terminator(int32_t c) { return c == '\n' || c == '\r' || c == 0x2028 || c == 0x2029; }
+static inline bool is_line_terminator(int32_t c) {
+    if ((uint32_t)c < 0x80) return c == '\n' || c == '\r';
+    return c == 0x2028 || c == 0x2029;
+}
 
 // The characters of the whitespace class in the grammar's extras (which includes the line terminators). iswspace
 // depends on the C library and locale and differs from that class.
 static inline bool is_whitespace(int32_t c) {
+    if ((uint32_t)c < 0x80) return c == ' ' || (uint32_t)(c - '\t') <= '\r' - '\t';
     switch (c) {
-        case '\t':
-        case '\n':
-        case '\v':
-        case '\f':
-        case '\r':
-        case ' ':
         case 0xA0:
         case 0x1680:
         case 0x200B:
@@ -142,8 +148,27 @@ static inline bool is_whitespace(int32_t c) {
 // character from U+007F on other than whitespace, which suffices to tell `in` and `instanceof` from the identifiers they
 // start.
 static inline bool is_identifier_part(int32_t c) {
-    return is_ascii_letter(c) || is_ascii_digit(c) || c == '_' || c == '$' || c == '\\' ||
-           (c >= 0x7F && !is_whitespace(c));
+    if ((uint32_t)c < 0x7F) {
+        return is_ascii_letter(c) || is_ascii_digit(c) || c == '_' || c == '$' || c == '\\';
+    }
+    return c >= 0x7F && !is_whitespace(c);
+}
+
+static bool bytes_equal(const char *a, const char *b, unsigned length) {
+    for (unsigned i = 0; i < length; i++) {
+        if (a[i] != b[i]) return false;
+    }
+    return true;
+}
+
+static inline bool word_equals(const char *word, unsigned length, const char *target, unsigned target_length) {
+    return length == target_length && bytes_equal(word, target, target_length);
+}
+
+#define WORD_EQ(word, length, literal) word_equals((word), (length), (literal), sizeof(literal) - 1)
+
+static inline bool is_in_or_instanceof(const char *word, unsigned length) {
+    return WORD_EQ(word, length, "in") || WORD_EQ(word, length, "instanceof");
 }
 
 static bool scan_word(TSLexer *lexer, const char *word) {
@@ -178,7 +203,7 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
         lexer->advance(lexer, skip_contents);
         if (lexer->lookahead == '/') {
             lexer->advance(lexer, skip_contents);
-            while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) {
+            while (!lexer_eof(lexer) && !is_line_terminator(lexer->lookahead)) {
                 lexer->advance(lexer, skip_contents);
             }
             saw_comment_newline |= is_line_terminator(lexer->lookahead);
@@ -198,7 +223,7 @@ static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scann
 }
 
 static bool scan_block_comment(TSLexer *lexer, bool *saw_newline, bool skip_contents) {
-    while (!lexer->eof(lexer)) {
+    while (!lexer_eof(lexer)) {
         if (lexer->lookahead != '*') {
             *saw_newline |= is_line_terminator(lexer->lookahead);
             lexer->advance(lexer, skip_contents);
@@ -247,8 +272,17 @@ typedef enum {
 } LineBreakRule;
 
 static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule, bool *scanned_content, bool before_slash);
-static bool scan_identifier(TSLexer *lexer, char *word, unsigned capacity, bool skip_contents);
+static bool scan_line_break_rule(TSLexer *lexer, LineBreakRule rule, bool before_slash, bool *scanned_content);
+static bool scan_line_break_after_await(TSLexer *lexer, bool before_slash, bool *scanned_content);
+static bool starts_await_operand_punctuation(int32_t c);
+static bool scan_await_line_break_identifier(TSLexer *lexer, bool *scanned_content);
+static bool is_async_arrow_start(TSLexer *lexer, bool *scanned_content);
+static bool ends_statement_at_next_token(TSLexer *lexer);
+static bool is_line_continuation_token(int32_t c);
+static unsigned scan_identifier(TSLexer *lexer, char *word, unsigned capacity, bool skip_contents);
+static void skip_identifier_escape(TSLexer *lexer, bool skip_contents);
 static bool follows_yield_operand(TSLexer *lexer);
+static bool scan_infix_word(TSLexer *lexer, bool skip_characters);
 static bool scan_resource_binding(TSLexer *lexer, bool plain_for_of, bool *infix_operator);
 
 // code-gauge-allow functionNcss 41 -- Semicolon eligibility depends on the same consumed-comment and token-boundary state across these cases.
@@ -323,246 +357,173 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool after_block_arrow,
     return scan_after_line_break(lexer, after_block_arrow, rule, scanned_content, false);
 }
 
-// code-gauge-allow duplicateLines 22 -- Operator cases share syntax across probes but have different consumed-input and statement-boundary decisions.
 static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule,
                                   bool *scanned_content, bool before_slash) {
     if (after_block_arrow) {
         return before_slash || ends_statement_after_block_arrow(lexer, scanned_content);
     }
-
     // REJECT means a `/` that starts no comment.
     before_slash = before_slash || scan_whitespace_and_comments(lexer, scanned_content, true, true) == REJECT;
     // A `;` at the start of the next line ends the statement itself.
-    if (!before_slash && lexer->lookahead == ';') {
-        return false;
-    }
+    if (!before_slash && lexer->lookahead == ';') return false;
+    return rule == LINE_BREAK_BY_NEXT_TOKEN
+        ? !before_slash && ends_statement_at_next_token(lexer)
+        : scan_line_break_rule(lexer, rule, before_slash, scanned_content);
+}
+
+static bool scan_line_break_rule(TSLexer *lexer, LineBreakRule rule, bool before_slash, bool *scanned_content) {
     switch (rule) {
         case LINE_BREAK_AWAIT_OPERAND:
             return false;
         case LINE_BREAK_AFTER_AWAIT_KEYWORD:
-            if (!before_slash && lexer->lookahead == '{') {
-                lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
-                return true;
-            }
-            if (before_slash) {
-                return false;
-            }
-            if (is_identifier_part(lexer->lookahead) && !is_ascii_digit(lexer->lookahead)) {
-                *scanned_content = true;
-                char word[16] = {0};
-                bool ascii_word = scan_identifier(lexer, word, sizeof(word), true);
-                if (ascii_word && strcmp(word, "yield") == 0) {
-                    if (follows_yield_operand(lexer)) {
-                        return true;
-                    }
-                    lexer->result_symbol = AWAIT_YIELD_IDENTIFIER_START;
-                    return true;
-                }
-                if (scan_whitespace_and_comments(lexer, scanned_content, true, true) != REJECT && lexer->lookahead == ':') {
-                    return true;
-                }
-                if (ascii_word && strcmp(word, "async") == 0 && is_identifier_part(lexer->lookahead)) {
-                    char parameter[16] = {0};
-                    scan_identifier(lexer, parameter, sizeof(parameter), true);
-                    scan_whitespace_and_comments(lexer, scanned_content, true, true);
-                }
-                if (ascii_word && strcmp(word, "async") == 0 && lexer->lookahead == '(') {
-                    lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
-                    return true;
-                }
-                if (lexer->lookahead == '=') {
-                    skip(lexer);
-                    return lexer->lookahead != '=';
-                }
-                if (!ascii_word) {
-                    lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
-                    return true;
-                }
-                if (strcmp(word, "import") == 0) {
-                    return lexer->lookahead != '(' && lexer->lookahead != '.';
-                }
-                if ((strcmp(word, "using") == 0 || strcmp(word, "let") == 0) && is_identifier_part(lexer->lookahead) && !is_ascii_digit(lexer->lookahead)) {
-                    char binding[16] = {0};
-                    bool ascii_binding = scan_identifier(lexer, binding, sizeof(binding), true);
-                    return !ascii_binding || (strcmp(binding, "in") != 0 && strcmp(binding, "instanceof") != 0);
-                }
-                static const char *const statements[] = {
-                    "break", "case", "catch", "const", "continue", "debugger", "default", "do", "else", "enum",
-                    "export", "finally", "for", "if", "return", "switch",
-                    "throw", "try", "var", "while", "with",
-                };
-                for (unsigned i = 0; i < sizeof(statements) / sizeof(statements[0]); i++) {
-                    if (strcmp(word, statements[i]) == 0) {
-                        return true;
-                    }
-                }
-                lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
-                return true;
-            }
-            switch (lexer->lookahead) {
-                case '.':
-                case '{':
-                case '[':
-                case '(':
-                case '`':
-                case '\'':
-                case '"':
-                case '/':
-                case '+':
-                case '-':
-                case '!':
-                case '~':
-                case '<':
-                    return false;
-                default:
-                    if (is_ascii_digit(lexer->lookahead)) {
-                        return false;
-                    }
-                    break;
-            }
-            break;
+            return scan_line_break_after_await(lexer, before_slash, scanned_content);
         case LINE_BREAK_ENDS:
             // A token that can start a statement starts the next one; any other token is left to the rules below,
             // which keep a bare `yield` continued by an enclosing `,` or `:`, and `yield` as a script's identifier
             // continued by an operator.
-            switch (lexer->lookahead) {
-                case '`':
-                case '[':
-                case '(':
-                case '+':
-                case '-':
-                case '<':
-                    return true;
-                default:
-                    if (before_slash) {
-                        return true;
-                    }
-                    break;
-            }
-            break;
+            return before_slash || lexer->lookahead == '`' || lexer->lookahead == '[' || lexer->lookahead == '(' ||
+                   lexer->lookahead == '+' || lexer->lookahead == '-' || lexer->lookahead == '<' ||
+                   ends_statement_at_next_token(lexer);
         case LINE_BREAK_AFTER_FIELD_NAME:
             return before_slash || (lexer->lookahead != '=' && lexer->lookahead != '(');
         case LINE_BREAK_AFTER_MODIFIER_WORD:
-            return !before_slash && (lexer->lookahead == '}' || lexer->lookahead == '@' || lexer->eof(lexer));
+            return !before_slash && (lexer->lookahead == '}' || lexer->lookahead == '@' || lexer_eof(lexer));
         case LINE_BREAK_BEFORE_FROM_CLAUSE:
         case LINE_BREAK_BEFORE_IMPORT_ATTRIBUTES:
             return before_slash || !scan_word(lexer, rule == LINE_BREAK_BEFORE_FROM_CLAUSE ? "from" : "with");
         case LINE_BREAK_AFTER_ACCESSOR_WORD:
             return !before_slash && (lexer->lookahead == '}' || lexer->lookahead == '@' || lexer->lookahead == '*' ||
-                                     lexer->eof(lexer));
+                                     lexer_eof(lexer));
         default:
-            break;
+            return !before_slash && ends_statement_at_next_token(lexer);
     }
-    if (before_slash) {
+}
+
+static bool scan_line_break_after_await(TSLexer *lexer, bool before_slash, bool *scanned_content) {
+    if (!before_slash && lexer->lookahead == '{') {
+        lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
+        return true;
+    }
+    if (before_slash) return false;
+    if (is_identifier_part(lexer->lookahead) && !is_ascii_digit(lexer->lookahead)) {
+        return scan_await_line_break_identifier(lexer, scanned_content);
+    }
+    if (starts_await_operand_punctuation(lexer->lookahead) || is_ascii_digit(lexer->lookahead)) {
         return false;
     }
+    return ends_statement_at_next_token(lexer);
+}
 
+static bool starts_await_operand_punctuation(int32_t c) {
+    return c == '.' || c == '[' || c == '(' || c == '`' || c == '\'' || c == '"' ||
+           c == '/' || c == '+' || c == '-' || c == '!' || c == '~' || c == '<';
+}
+
+static bool scan_await_line_break_identifier(TSLexer *lexer, bool *scanned_content) {
+    *scanned_content = true;
+    char word[16];
+    unsigned len = scan_identifier(lexer, word, sizeof(word), true);
+    if (WORD_EQ(word, len, "yield")) {
+        if (!follows_yield_operand(lexer)) lexer->result_symbol = AWAIT_YIELD_IDENTIFIER_START;
+        return true;
+    }
+    if (scan_whitespace_and_comments(lexer, scanned_content, true, true) != REJECT && lexer->lookahead == ':') {
+        return true;
+    }
+    if (WORD_EQ(word, len, "async") && is_async_arrow_start(lexer, scanned_content)) {
+        lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
+        return true;
+    }
+    if (lexer->lookahead == '=') {
+        skip(lexer);
+        return lexer->lookahead != '=';
+    }
+    if (!len) {
+        lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
+        return true;
+    }
+    if (WORD_EQ(word, len, "import")) {
+        return lexer->lookahead != '(' && lexer->lookahead != '.';
+    }
+    if ((WORD_EQ(word, len, "using") || WORD_EQ(word, len, "let")) &&
+        is_identifier_part(lexer->lookahead) && !is_ascii_digit(lexer->lookahead)) {
+        char binding[16];
+        unsigned binding_len = scan_identifier(lexer, binding, sizeof(binding), true);
+        return !is_in_or_instanceof(binding, binding_len);
+    }
+    if (!is_statement_keyword(word, len)) {
+        lexer->result_symbol = AWAIT_IDENTIFIER_LINE_BREAK;
+    }
+    return true;
+}
+
+static bool is_async_arrow_start(TSLexer *lexer, bool *scanned_content) {
+    if (is_identifier_part(lexer->lookahead)) {
+        scan_identifier(lexer, NULL, 0, true);
+        scan_whitespace_and_comments(lexer, scanned_content, true, true);
+    }
+    return lexer->lookahead == '(';
+}
+
+static bool ends_statement_at_next_token(TSLexer *lexer) {
+    if (is_line_continuation_token(lexer->lookahead)) return false;
     switch (lexer->lookahead) {
-        case '`':
-        case ',':
-        case ':':
-        case ';':
-        case '*':
-        case '%':
-        case '>':
-        case '<':
-        case '=':
-        case '[':
-        case '(':
-        case '?':
-        case '^':
-        case '|':
-        case '&':
-        case '/':
-            return false;
-
-        // Insert a semicolon before decimals literals but not otherwise.
+        // Insert a semicolon before decimal literals but not otherwise.
         case '.':
             skip(lexer);
             return is_ascii_digit(lexer->lookahead);
-
         // Insert a semicolon before `--` and `++`, but not before binary `+` or `-`.
         case '+':
+        case '-': {
+            int32_t sign = lexer->lookahead;
             skip(lexer);
-            return lexer->lookahead == '+';
-        case '-':
-            skip(lexer);
-            return lexer->lookahead == '-';
-
+            return lexer->lookahead == sign;
+        }
         // Don't insert a semicolon before `!=`, but do insert one before a unary `!`.
         case '!':
             skip(lexer);
             return lexer->lookahead != '=';
-
-        // Don't insert a semicolon before `in` or `instanceof`, but do insert one
-        // before an identifier.
         case 'i':
-            skip(lexer);
-
-            if (lexer->lookahead != 'n') {
-                return true;
-            }
-            skip(lexer);
-
-            if (!is_identifier_part(lexer->lookahead)) {
-                return false;
-            }
-
-            for (unsigned i = 0; i < 8; i++) {
-                if (lexer->lookahead != "stanceof"[i]) {
-                    return true;
-                }
-                skip(lexer);
-            }
-
-            if (!is_identifier_part(lexer->lookahead)) {
-                return false;
-            }
-            break;
-
+            return !scan_infix_word(lexer, true);
         default:
-            break;
+            return true;
     }
-
-    return true;
 }
 
-// code-gauge-allow functionNcss 39 -- Yield operand lookahead keeps the cursor and newline state together across its cases.
-static bool follows_yield_operand(TSLexer *lexer) {
+static bool is_line_continuation_token(int32_t c) {
+    return c == '`' || c == ',' || c == ':' || c == ';' || c == '*' || c == '%' || c == '>' || c == '<' ||
+           c == '=' || c == '[' || c == '(' || c == '?' || c == '^' || c == '|' || c == '&' || c == '/';
+}
+
+typedef enum {
+    YIELD_TRIVIA_OPERAND,
+    YIELD_TRIVIA_NEWLINE,
+    YIELD_TRIVIA_REGEX,
+} YieldTriviaResult;
+
+static YieldTriviaResult scan_yield_trivia(TSLexer *lexer) {
     for (;;) {
         while (is_whitespace(lexer->lookahead)) {
-            if (is_line_terminator(lexer->lookahead)) {
-                return false;
-            }
+            if (is_line_terminator(lexer->lookahead)) return YIELD_TRIVIA_NEWLINE;
             skip(lexer);
         }
-        if (lexer->lookahead != '/') {
-            break;
-        }
+        if (lexer->lookahead != '/') return YIELD_TRIVIA_OPERAND;
         skip(lexer);
-        if (lexer->lookahead == '/') {
-            return false;
-        }
-        if (lexer->lookahead != '*') {
-            return true;
-        }
+        if (lexer->lookahead == '/') return YIELD_TRIVIA_NEWLINE;
+        if (lexer->lookahead != '*') return YIELD_TRIVIA_REGEX;
         skip(lexer);
-        for (;;) {
-            if (lexer->eof(lexer) || is_line_terminator(lexer->lookahead)) {
-                return false;
-            }
-            bool after_asterisk = lexer->lookahead == '*';
-            skip(lexer);
-            if (after_asterisk && lexer->lookahead == '/') {
-                skip(lexer);
-                break;
-            }
-        }
+        bool saw_newline = false;
+        if (!scan_block_comment(lexer, &saw_newline, true) || saw_newline) return YIELD_TRIVIA_NEWLINE;
     }
+}
+
+static bool follows_yield_operand(TSLexer *lexer) {
+    YieldTriviaResult trivia = scan_yield_trivia(lexer);
+    if (trivia != YIELD_TRIVIA_OPERAND) return trivia == YIELD_TRIVIA_REGEX;
     if (is_identifier_part(lexer->lookahead)) {
-        char word[16] = {0};
-        bool ascii_word = scan_identifier(lexer, word, sizeof(word), true);
-        return !ascii_word || (strcmp(word, "in") != 0 && strcmp(word, "instanceof") != 0);
+        char word[16];
+        unsigned len = scan_identifier(lexer, word, sizeof(word), true);
+        return !is_in_or_instanceof(word, len);
     }
     if (lexer->lookahead == '.') {
         skip(lexer);
@@ -571,13 +532,11 @@ static bool follows_yield_operand(TSLexer *lexer) {
     if (lexer->lookahead == '+' || lexer->lookahead == '-') {
         int32_t sign = lexer->lookahead;
         skip(lexer);
-        if (lexer->lookahead != sign) {
-            return false;
-        }
+        if (lexer->lookahead != sign) return false;
         skip(lexer);
         bool scanned_content = false;
         scan_whitespace_and_comments(lexer, &scanned_content, true, true);
-        return !lexer->eof(lexer) && lexer->lookahead != ';' && lexer->lookahead != '}' && lexer->lookahead != ')' &&
+        return !lexer_eof(lexer) && lexer->lookahead != ';' && lexer->lookahead != '}' && lexer->lookahead != ')' &&
                lexer->lookahead != ']' && lexer->lookahead != ',' && lexer->lookahead != ':';
     }
     return lexer->lookahead == '*' || lexer->lookahead == ':' || lexer->lookahead == '(' ||
@@ -585,38 +544,37 @@ static bool follows_yield_operand(TSLexer *lexer) {
            lexer->lookahead == '\'' || lexer->lookahead == '"' || lexer->lookahead == '!' || lexer->lookahead == '~';
 }
 
-// code-gauge-allow functionCognitiveComplexity 27 -- Unicode escape handling and identifier length classification consume the same lexer cursor.
-static bool scan_identifier(TSLexer *lexer, char *word, unsigned capacity, bool skip_contents) {
+static unsigned scan_identifier(TSLexer *lexer, char *word, unsigned capacity, bool skip_contents) {
     unsigned length = 0;
     bool ascii_word = true;
     while (is_identifier_part(lexer->lookahead)) {
         if (lexer->lookahead == '\\') {
             ascii_word = false;
-            lexer->advance(lexer, skip_contents);
-            if (lexer->lookahead == 'u') {
-                lexer->advance(lexer, skip_contents);
-                if (lexer->lookahead == '{') {
-                    lexer->advance(lexer, skip_contents);
-                    while (is_ascii_digit(lexer->lookahead) ||
-                           (lexer->lookahead >= 'a' && lexer->lookahead <= 'f') ||
-                           (lexer->lookahead >= 'A' && lexer->lookahead <= 'F')) {
-                        lexer->advance(lexer, skip_contents);
-                    }
-                    if (lexer->lookahead == '}') {
-                        lexer->advance(lexer, skip_contents);
-                    }
-                }
-            }
+            skip_identifier_escape(lexer, skip_contents);
             continue;
         }
-        if (lexer->lookahead > 0x7F || length == capacity - 1) {
+        if (lexer->lookahead > 0x7F || length >= capacity) {
             ascii_word = false;
         } else {
             word[length++] = (char)lexer->lookahead;
         }
         lexer->advance(lexer, skip_contents);
     }
-    return ascii_word;
+    return ascii_word ? length : 0;
+}
+
+static void skip_identifier_escape(TSLexer *lexer, bool skip_contents) {
+    lexer->advance(lexer, skip_contents);
+    if (lexer->lookahead != 'u') return;
+    lexer->advance(lexer, skip_contents);
+    if (lexer->lookahead != '{') return;
+    lexer->advance(lexer, skip_contents);
+    while (hex_digit_value(lexer->lookahead) >= 0) {
+        lexer->advance(lexer, skip_contents);
+    }
+    if (lexer->lookahead == '}') {
+        lexer->advance(lexer, skip_contents);
+    }
 }
 
 static bool scan_ternary_qmark(TSLexer *lexer) {
@@ -649,47 +607,34 @@ static bool scan_ternary_qmark(TSLexer *lexer) {
     return false;
 }
 
-// code-gauge-allow functionCognitiveComplexity 16 -- HTML comment start and end markers share one consumed cursor but have different prefix lengths.
 static bool scan_html_comment(TSLexer *lexer) {
     while (is_whitespace(lexer->lookahead)) {
         skip(lexer);
     }
-
-    const char *comment_start = "<!--";
-    const char *comment_end = "-->";
-
-    if (lexer->lookahead == '<') {
-        for (unsigned i = 0; i < 4; i++) {
-            if (lexer->lookahead != comment_start[i]) {
-                return false;
-            }
-            advance(lexer);
-        }
-    } else if (lexer->lookahead == '-') {
-        for (unsigned i = 0; i < 3; i++) {
-            if (lexer->lookahead != comment_end[i]) {
-                return false;
-            }
-            advance(lexer);
-        }
-    } else {
+    if ((lexer->lookahead != '<' && lexer->lookahead != '-') || !scan_html_comment_line(lexer)) {
         return false;
     }
-
-    while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) {
-        advance(lexer);
-    }
-
     lexer->result_symbol = HTML_COMMENT;
     lexer->mark_end(lexer);
+    return true;
+}
 
+static bool scan_html_comment_line(TSLexer *lexer) {
+    const char *opening = lexer->lookahead == '<' ? "<!--" : "-->";
+    for (; *opening; opening++) {
+        if (lexer->lookahead != *opening) return false;
+        advance(lexer);
+    }
+    while (!lexer_eof(lexer) && !is_line_terminator(lexer->lookahead)) {
+        advance(lexer);
+    }
     return true;
 }
 
 static bool scan_infix_word(TSLexer *lexer, bool skip_characters) {
-    char word[16] = {0};
-    return scan_identifier(lexer, word, sizeof(word), skip_characters) &&
-        (strcmp(word, "in") == 0 || strcmp(word, "instanceof") == 0);
+    char word[16];
+    unsigned len = scan_identifier(lexer, word, sizeof(word), skip_characters);
+    return is_in_or_instanceof(word, len);
 }
 
 // code-gauge-allow functionCognitiveComplexity 30 -- Expression-boundary cases share mutable newline and semicolon-pending state.
@@ -766,9 +711,11 @@ static bool scan_expression_end(Scanner *scanner, TSLexer *lexer, bool after_pos
     }
 }
 
-// code-gauge-allow functionNcss 41 -- Resource binding lookahead carries one cursor through contextual-word and for-of disambiguation.
+static bool scan_identifier_unicode_escape(TSLexer *lexer, uint32_t *code_point);
+static bool check_resource_binding_word(TSLexer *lexer, const char *word, unsigned word_len, bool plain_for_of);
+
 static bool scan_resource_binding(TSLexer *lexer, bool plain_for_of, bool *infix_operator) {
-    char word[16] = {0};
+    char word[16];
     unsigned length = 0;
     bool ascii_word = true;
     bool escaped = false;
@@ -776,40 +723,48 @@ static bool scan_resource_binding(TSLexer *lexer, bool plain_for_of, bool *infix
         uint32_t character = (uint32_t)lexer->lookahead;
         if (character == '\\') {
             escaped = true;
-            advance(lexer);
-            if (lexer->lookahead != 'u') return false;
-            advance(lexer);
-            bool braced = lexer->lookahead == '{';
-            if (braced) advance(lexer);
-            character = 0;
-            unsigned digits = 0;
-            int digit;
-            while ((digit = hex_digit_value(lexer->lookahead)) >= 0 && (braced || digits < 4)) {
-                character = character > 0x7F ? 0x80 : character * 16 + (unsigned)digit;
-                advance(lexer);
-                digits++;
-            }
-            if (braced) {
-                if (digits == 0 || lexer->lookahead != '}') return false;
-                advance(lexer);
-            } else if (digits != 4) {
-                return false;
-            }
+            if (!scan_identifier_unicode_escape(lexer, &character)) return false;
         } else {
             advance(lexer);
         }
-        if (character > 0x7F || length == sizeof(word) - 1) {
-            ascii_word = false;
-        } else {
-            word[length++] = (char)character;
-        }
+        if (character > 0x7F || length >= sizeof(word)) ascii_word = false;
+        else word[length++] = (char)character;
     }
-    *infix_operator = !escaped && ascii_word && (strcmp(word, "in") == 0 || strcmp(word, "instanceof") == 0);
-    if (ascii_word && plain_for_of && strcmp(word, "of") == 0) {
+    unsigned word_len = ascii_word ? length : 0;
+    *infix_operator = !escaped && is_in_or_instanceof(word, word_len);
+    return check_resource_binding_word(lexer, word, word_len, plain_for_of);
+}
+
+static bool check_resource_binding_word(TSLexer *lexer, const char *word, unsigned word_len, bool plain_for_of) {
+    if (plain_for_of && WORD_EQ(word, word_len, "of")) {
         bool scanned_content = false;
         return scan_whitespace_and_comments(lexer, &scanned_content, true, false) != REJECT && lexer->lookahead == '=';
     }
-    return !ascii_word || (strcmp(word, "enum") != 0 && !is_reserved_word(word));
+    return !word_len || (!WORD_EQ(word, word_len, "enum") && !is_reserved_word(word, word_len));
+}
+
+static bool scan_identifier_unicode_escape(TSLexer *lexer, uint32_t *code_point) {
+    advance(lexer);
+    if (lexer->lookahead != 'u') return false;
+    advance(lexer);
+    bool braced = lexer->lookahead == '{';
+    if (braced) advance(lexer);
+    uint32_t value = 0;
+    unsigned digits = 0;
+    int digit;
+    while ((digit = hex_digit_value(lexer->lookahead)) >= 0 && (braced || digits < 4)) {
+        value = value > 0x7F ? 0x80 : value * 16 + (unsigned)digit;
+        advance(lexer);
+        digits++;
+    }
+    if (braced) {
+        if (digits == 0 || lexer->lookahead != '}') return false;
+        advance(lexer);
+    } else if (digits != 4) {
+        return false;
+    }
+    *code_point = value;
+    return true;
 }
 
 #ifndef JAVASCRIPT_SCRIPT_GOAL
@@ -836,10 +791,10 @@ static bool scan_yield(Scanner *scanner, TSLexer *lexer, const bool *valid_symbo
 
 static bool scan_await_or_async(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     lexer->mark_end(lexer);
-    char keyword[16] = {0};
-    if (!scan_identifier(lexer, keyword, sizeof(keyword), false)) return false;
-    if (strcmp(keyword, "async") == 0) return scan_async_start(lexer, keyword, sizeof(keyword), valid_symbols);
-    if (strcmp(keyword, "await") != 0) return false;
+    char keyword[16];
+    unsigned len = scan_identifier(lexer, keyword, sizeof(keyword), false);
+    if (WORD_EQ(keyword, len, "async")) return scan_async_start(lexer, valid_symbols);
+    if (!WORD_EQ(keyword, len, "await")) return false;
     bool identifier = await_is_identifier(scanner);
     TSSymbol identifier_symbol = valid_symbols[CLASS_HERITAGE_AWAIT_IDENTIFIER] ? CLASS_HERITAGE_AWAIT_IDENTIFIER : AWAIT_IDENTIFIER;
     TSSymbol symbol = identifier ? identifier_symbol : AWAIT_KEYWORD;
@@ -854,8 +809,7 @@ static bool scan_await_or_async(Scanner *scanner, TSLexer *lexer, const bool *va
             words == 2 || !is_identifier_part(lexer->lookahead)) {
             break;
         }
-        char word[16] = {0};
-        scan_identifier(lexer, word, sizeof(word), false);
+        scan_identifier(lexer, NULL, 0, false);
     }
     lexer->result_symbol = symbol;
     return true;
@@ -865,13 +819,15 @@ static bool await_is_identifier(const Scanner *scanner) {
     return scanner->functions.depth ? !function_context_async(&scanner->functions) : JAVASCRIPT_SCRIPT_GOAL;
 }
 
-static bool scan_async_start(TSLexer *lexer, char *keyword, unsigned capacity, const bool *valid_symbols) {
+static bool scan_async_start(TSLexer *lexer, const bool *valid_symbols) {
     bool constructor = valid_symbols[CONSTRUCTOR_ASYNC_FUNCTION_START];
     if (!constructor) lexer->mark_end(lexer);
     lexer->result_symbol = constructor ? CONSTRUCTOR_ASYNC_FUNCTION_START : ASYNC_KEYWORD;
-    return scan_default_trivia(lexer, false) &&
-        (constructor ? scan_identifier(lexer, keyword, capacity, false) && strcmp(keyword, "function") == 0
-                     : valid_symbols[ASYNC_KEYWORD]);
+    if (!scan_keyword_trivia(lexer, false, true)) return false;
+    if (!constructor) return valid_symbols[ASYNC_KEYWORD];
+    char keyword[16];
+    unsigned len = scan_identifier(lexer, keyword, sizeof(keyword), false);
+    return WORD_EQ(keyword, len, "function");
 }
 
 static bool scan_contextual_keyword(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
@@ -894,17 +850,16 @@ static bool scan_contextual_keyword(Scanner *scanner, TSLexer *lexer, const bool
 }
 
 static bool scan_declaration_keyword(TSLexer *lexer, const bool *valid_symbols) {
-    char word[16] = {0};
-    if (!scan_identifier(lexer, word, sizeof(word), false)) return false;
-    if (strcmp(word, "function") == 0) lexer->result_symbol = DECLARATION_FUNCTION_KEYWORD;
-    else if (strcmp(word, "class") == 0) lexer->result_symbol = DECLARATION_CLASS_KEYWORD;
+    char word[16];
+    unsigned len = scan_identifier(lexer, word, sizeof(word), false);
+    if (WORD_EQ(word, len, "function")) lexer->result_symbol = DECLARATION_FUNCTION_KEYWORD;
+    else if (WORD_EQ(word, len, "class")) lexer->result_symbol = DECLARATION_CLASS_KEYWORD;
     else return false;
     lexer->mark_end(lexer);
     return valid_symbols[lexer->result_symbol];
 }
 
 // code-gauge-allow functionNcss 43 -- Arrow boundaries share newline state and the ternary-permission output from one trivia scan.
-// code-gauge-allow duplicateLines 29 -- Operator cases share syntax across probes but intentionally make different statement-boundary decisions.
 static bool scan_arrow_context_end(TSLexer *lexer, bool *can_scan_ternary) {
     lexer->mark_end(lexer);
     bool saw_newline = false;
@@ -936,18 +891,21 @@ static bool scan_expression_trivia(TSLexer *lexer, bool *saw_newline, bool *scan
         }
         if (lexer->lookahead != '/') return true;
         if (scanned_comment) *scanned_comment = true;
-        lexer->advance(lexer, skip_contents);
-        if (lexer->lookahead == '/') {
-            while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) {
-                lexer->advance(lexer, skip_contents);
-            }
-        } else if (lexer->lookahead == '*') {
-            lexer->advance(lexer, skip_contents);
-            scan_block_comment(lexer, saw_newline, skip_contents);
-        } else {
-            return false;
-        }
+        if (!scan_slash_comment(lexer, saw_newline, skip_contents, false)) return false;
     }
+}
+
+static bool scan_slash_comment(TSLexer *lexer, bool *saw_newline, bool skip_contents, bool require_closed) {
+    lexer->advance(lexer, skip_contents);
+    if (lexer->lookahead == '/') {
+        while (!lexer_eof(lexer) && !is_line_terminator(lexer->lookahead)) {
+            lexer->advance(lexer, skip_contents);
+        }
+        return true;
+    }
+    if (lexer->lookahead != '*') return false;
+    lexer->advance(lexer, skip_contents);
+    return scan_block_comment(lexer, saw_newline, skip_contents) || !require_closed;
 }
 
 static bool scan_function_start(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
@@ -1198,7 +1156,6 @@ static bool scan_binding_end(Scanner *scanner, TSLexer *lexer) {
     return true;
 }
 
-// code-gauge-allow functionNcss 55 -- The let probe distinguishes binding and expression continuations with the same already-consumed cursor.
 static bool scan_let(TSLexer *lexer) {
     for (const char *word = "let"; *word; word++) {
         if (lexer->lookahead != *word) return false;
@@ -1206,62 +1163,56 @@ static bool scan_let(TSLexer *lexer) {
     }
     if (is_identifier_part(lexer->lookahead)) return false;
     lexer->mark_end(lexer);
-    bool line_start = false;
-    for (;;) {
-        while (is_whitespace(lexer->lookahead)) {
-            line_start |= is_line_terminator(lexer->lookahead);
-            advance(lexer);
-        }
-        if (lexer->lookahead == '<' || (line_start && lexer->lookahead == '-')) {
-            const char *prefix = lexer->lookahead == '<' ? "<!--" : "-->";
-            for (; *prefix; prefix++) {
-                if (lexer->lookahead != *prefix) return false;
-                advance(lexer);
-            }
-            while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) advance(lexer);
-            continue;
-        }
-        if (lexer->lookahead != '/') break;
-        advance(lexer);
-        if (lexer->lookahead == '/') {
-            while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) advance(lexer);
-        } else if (lexer->lookahead == '*') {
-            advance(lexer);
-            bool star = false;
-            while (!lexer->eof(lexer)) {
-                if (star && lexer->lookahead == '/') break;
-                star = lexer->lookahead == '*';
-                line_start |= is_line_terminator(lexer->lookahead);
-                advance(lexer);
-            }
-            if (lexer->eof(lexer)) return false;
-            advance(lexer);
-        } else {
-            return false;
-        }
-    }
+    if (!scan_keyword_trivia(lexer, true, false)) return false;
     if (lexer->lookahead == '[' || lexer->lookahead == '{') return true;
     if (!is_identifier_part(lexer->lookahead) || is_ascii_digit(lexer->lookahead)) return false;
-    char name[16] = {0};
+    char name[12];
     unsigned length = 0;
     while (is_identifier_part(lexer->lookahead)) {
-        if (length == sizeof(name) - 1) return true;
+        if (length == sizeof(name)) return true;
         name[length++] = lexer->lookahead < 0x80 ? (char)lexer->lookahead : '?';
         advance(lexer);
     }
-    return !is_reserved_word(name);
+    return !is_reserved_word(name, length);
 }
 
-static bool is_reserved_word(const char *name) {
-    static const char *const reserved[] = {
-        "break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else",
-        "export", "extends", "false", "finally", "for", "function", "if", "import", "in", "instanceof", "new",
-        "null", "return", "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with"
-    };
-    for (unsigned i = 0; i < sizeof(reserved) / sizeof(reserved[0]); i++) {
-        if (strcmp(name, reserved[i]) == 0) return true;
+static bool is_statement_keyword(const char *word, unsigned length) {
+    return is_reserved_statement_keyword(word, length) || WORD_EQ(word, length, "enum");
+}
+
+static bool is_reserved_word(const char *name, unsigned length) {
+    return is_reserved_statement_keyword(name, length) || is_non_statement_reserved_word(name, length);
+}
+
+static bool is_reserved_statement_keyword(const char *word, unsigned length) {
+    switch (length) {
+        case 2: return WORD_EQ(word, length, "do") || WORD_EQ(word, length, "if");
+        case 3: return WORD_EQ(word, length, "for") || WORD_EQ(word, length, "try") || WORD_EQ(word, length, "var");
+        case 4: return WORD_EQ(word, length, "case") || WORD_EQ(word, length, "else") || WORD_EQ(word, length, "with");
+        case 5:
+            return WORD_EQ(word, length, "break") || WORD_EQ(word, length, "catch") || WORD_EQ(word, length, "const") ||
+                   WORD_EQ(word, length, "throw") || WORD_EQ(word, length, "while");
+        case 6: return WORD_EQ(word, length, "export") || WORD_EQ(word, length, "return") || WORD_EQ(word, length, "switch");
+        case 7: return WORD_EQ(word, length, "default") || WORD_EQ(word, length, "finally");
+        case 8: return WORD_EQ(word, length, "continue") || WORD_EQ(word, length, "debugger");
+        default: return false;
     }
-    return false;
+}
+
+static bool is_non_statement_reserved_word(const char *word, unsigned length) {
+    switch (length) {
+        case 2: return WORD_EQ(word, length, "in");
+        case 3: return WORD_EQ(word, length, "new");
+        case 4:
+            return WORD_EQ(word, length, "null") || WORD_EQ(word, length, "this") || WORD_EQ(word, length, "true") ||
+                   WORD_EQ(word, length, "void");
+        case 5: return WORD_EQ(word, length, "class") || WORD_EQ(word, length, "false") || WORD_EQ(word, length, "super");
+        case 6: return WORD_EQ(word, length, "delete") || WORD_EQ(word, length, "import") || WORD_EQ(word, length, "typeof");
+        case 7: return WORD_EQ(word, length, "extends");
+        case 8: return WORD_EQ(word, length, "function");
+        case 10: return WORD_EQ(word, length, "instanceof");
+        default: return false;
+    }
 }
 
 static bool scan_export_default(Scanner *scanner, TSLexer *lexer) {
@@ -1284,56 +1235,42 @@ static bool scan_export_default(Scanner *scanner, TSLexer *lexer) {
 }
 
 static bool starts_default_declaration(TSLexer *lexer) {
-    if (!scan_default_trivia(lexer, true)) return false;
+    if (!scan_keyword_trivia(lexer, true, true)) return false;
     if (lexer->lookahead == '@') return true;
-    char word[16] = {0};
-    if (!scan_identifier(lexer, word, sizeof(word), false)) return false;
-    if (strcmp(word, "function") == 0 || strcmp(word, "class") == 0) return true;
-    if (strcmp(word, "async") != 0 || !scan_default_trivia(lexer, false)) return false;
-    memset(word, 0, sizeof(word));
-    return scan_identifier(lexer, word, sizeof(word), false) && strcmp(word, "function") == 0;
+    char word[16];
+    unsigned len = scan_identifier(lexer, word, sizeof(word), false);
+    if (WORD_EQ(word, len, "function") || WORD_EQ(word, len, "class")) return true;
+    if (!WORD_EQ(word, len, "async") || !scan_keyword_trivia(lexer, false, true)) return false;
+    len = scan_identifier(lexer, word, sizeof(word), false);
+    return WORD_EQ(word, len, "function");
 }
 
-// code-gauge-allow functionNcss 38 -- The trivia probe retains no-line-break and HTML-comment decisions while advancing the same cursor.
-static bool scan_default_trivia(TSLexer *lexer, bool allow_line_breaks) {
-    for (;;) {
-        while (is_whitespace(lexer->lookahead)) {
-            if (!allow_line_breaks && is_line_terminator(lexer->lookahead)) return false;
-            advance(lexer);
+static bool skip_trivia_whitespace(TSLexer *lexer, bool allow_line_breaks, bool *at_line_start);
+
+static bool scan_keyword_trivia(TSLexer *lexer, bool allow_line_breaks, bool at_line_start) {
+    while (skip_trivia_whitespace(lexer, allow_line_breaks, &at_line_start)) {
+        if (lexer->lookahead == '<' || (at_line_start && lexer->lookahead == '-')) {
+            if (!scan_html_comment_line(lexer)) return false;
+            continue;
         }
-        if (lexer->lookahead == '/') {
-            advance(lexer);
-            if (lexer->lookahead == '*') {
-                advance(lexer);
-                bool closed = false;
-                while (!lexer->eof(lexer)) {
-                    if (!allow_line_breaks && is_line_terminator(lexer->lookahead)) return false;
-                    if (lexer->lookahead == '*') {
-                        advance(lexer);
-                        if (lexer->lookahead == '/') {
-                            advance(lexer);
-                            closed = true;
-                            break;
-                        }
-                    } else {
-                        advance(lexer);
-                    }
-                }
-                if (!closed) return false;
-                continue;
-            }
-            if (lexer->lookahead != '/') return false;
-        } else if (lexer->lookahead == '<' || lexer->lookahead == '-') {
-            const char *opening = lexer->lookahead == '<' ? "<!--" : "-->";
-            for (; *opening; opening++) {
-                if (lexer->lookahead != *opening) return false;
-                advance(lexer);
-            }
-        } else {
-            return true;
+        if (lexer->lookahead != '/') return true;
+        bool comment_newline = false;
+        if (!scan_slash_comment(lexer, &comment_newline, false, true) || (!allow_line_breaks && comment_newline)) {
+            return false;
         }
-        while (!lexer->eof(lexer) && !is_line_terminator(lexer->lookahead)) advance(lexer);
+        at_line_start |= comment_newline;
     }
+    return false;
+}
+
+static bool skip_trivia_whitespace(TSLexer *lexer, bool allow_line_breaks, bool *at_line_start) {
+    while (is_whitespace(lexer->lookahead)) {
+        bool newline = is_line_terminator(lexer->lookahead);
+        if (!allow_line_breaks && newline) return false;
+        *at_line_start |= newline;
+        advance(lexer);
+    }
+    return true;
 }
 
 // code-gauge-allow functionNcss 36 -- Class heritage decisions share the cursor and newline state after trivia and optional HTML comments.
