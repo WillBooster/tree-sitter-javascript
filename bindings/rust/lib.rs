@@ -10,11 +10,11 @@
 //! parser
 //!     .set_language(&language.into())
 //!     .expect("Error loading JavaScript parser");
-//! let tree = parser.parse(code, None).unwrap();
+//! let tree = parser.parse(code).unwrap();
 //! assert!(!tree.root_node().has_error());
 //! ```
 //!
-//! [`Parser`]: https://docs.rs/willbooster-tree-sitter/19.1.1/tree_sitter/struct.Parser.html
+//! [`Parser`]: https://docs.rs/willbooster-tree-sitter/20.0.0/tree_sitter/struct.Parser.html
 //! [tree-sitter]: https://tree-sitter.github.io/
 
 use tree_sitter_language::LanguageFn;
@@ -44,7 +44,7 @@ mod tests {
         for (language, expected) in [(super::LANGUAGE, 3), (super::LANGUAGE_SCRIPT, 1)] {
             let mut parser = tree_sitter::Parser::new();
             parser.set_language(&language.into()).unwrap();
-            let tree = parser.parse(source, None).unwrap();
+            let tree = parser.parse(source).unwrap();
             assert!(!tree.root_node().has_error());
             let awaits = tree
                 .root_node()
@@ -60,10 +60,7 @@ mod tests {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(&super::LANGUAGE_SCRIPT.into()).unwrap();
         let tree = parser
-            .parse(
-                "yield / divisor / g; function* f(){ yield /value/g; }",
-                None,
-            )
+            .parse("yield / divisor / g; function* f(){ yield /value/g; }")
             .unwrap();
         assert!(!tree.root_node().has_error());
         let printed = tree.root_node().to_sexp();
