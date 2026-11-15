@@ -271,6 +271,15 @@ typedef enum {
     LINE_BREAK_AWAIT_OPERAND,
 } LineBreakRule;
 
+typedef struct {
+    bool after_block_arrow;
+    LineBreakRule rule;
+    bool line_break_in_comment;
+    bool resource_line_break;
+} AutomaticSemicolonState;
+
+static bool scan_automatic_semicolon_slash(TSLexer *lexer, AutomaticSemicolonState *state, bool *scanned_content, bool *accepted);
+static bool scan_automatic_semicolon_non_whitespace(TSLexer *lexer, const AutomaticSemicolonState *state, bool *scanned_content, const bool *resource_symbols);
 static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule, bool *scanned_content, bool before_slash);
 static bool scan_line_break_rule(TSLexer *lexer, LineBreakRule rule, bool before_slash, bool *scanned_content);
 static bool scan_line_break_after_await(TSLexer *lexer, bool before_slash, bool *scanned_content);
@@ -285,69 +294,23 @@ static bool follows_yield_operand(TSLexer *lexer);
 static bool scan_infix_word(TSLexer *lexer, bool skip_characters);
 static bool scan_resource_binding(TSLexer *lexer, bool plain_for_of, bool *infix_operator);
 
-// code-gauge-allow functionNcss 41 -- Semicolon eligibility depends on the same consumed-comment and token-boundary state across these cases.
 static bool scan_automatic_semicolon(TSLexer *lexer, bool after_block_arrow,
                                      LineBreakRule rule, bool *scanned_content, const bool *resource_symbols) {
     lexer->result_symbol = AUTOMATIC_SEMICOLON;
     lexer->mark_end(lexer);
-    bool line_break_in_comment = false;
-    bool resource_line_break = false;
+    AutomaticSemicolonState state = {.after_block_arrow = after_block_arrow, .rule = rule};
 
     for (;;) {
-        if (lexer->eof(lexer)) {
-            return true;
+        if (lexer_eof(lexer)) return true;
+
+        bool accepted = false;
+        if (lexer->lookahead == '/' && scan_automatic_semicolon_slash(lexer, &state, scanned_content, &accepted)) {
+            return accepted;
         }
-
-        if (lexer->lookahead == '/') {
-            WhitespaceResult result = scan_whitespace_and_comments(lexer, scanned_content, false, true);
-            if (result == REJECT) {
-                return false;
-            }
-            if (result == ACCEPT_AFTER_COMMENT_LINE_BREAK_BEFORE_SLASH) {
-                return scan_after_line_break(lexer, after_block_arrow, rule, scanned_content, true);
-            }
-
-            if (after_block_arrow && lexer->eof(lexer)) {
-                return true;
-            }
-
-            if (result == NO_NEWLINE && rule == LINE_BREAK_AFTER_AWAIT_KEYWORD) {
-                return false;
-            }
-            if (result == ACCEPT || result == ACCEPT_AFTER_COMMENT_LINE_BREAK) {
-                resource_line_break = true;
-                if (after_block_arrow || rule != LINE_BREAK_BY_NEXT_TOKEN) {
-                    return scan_after_line_break(lexer, after_block_arrow, rule, scanned_content, false);
-                }
-                line_break_in_comment = result == ACCEPT_AFTER_COMMENT_LINE_BREAK;
-            }
-        }
-
-        if (lexer->lookahead == '}') {
-            return true;
-        }
-
-        if (lexer->is_at_included_range_start(lexer)) {
-            return true;
-        }
-
-        if (is_line_terminator(lexer->lookahead)) {
-            break;
-        }
-
+        if (lexer->lookahead == '}' || lexer->is_at_included_range_start(lexer)) return true;
+        if (is_line_terminator(lexer->lookahead)) break;
         if (!is_whitespace(lexer->lookahead)) {
-            if (resource_symbols && !resource_line_break && is_identifier_part(lexer->lookahead) &&
-                !is_ascii_digit(lexer->lookahead)) {
-                bool infix_operator = false;
-                *scanned_content = true;
-                if (scan_resource_binding(lexer, resource_symbols[PLAIN_RESOURCE_FOR_OF_CONTEXT], &infix_operator)) {
-                    lexer->result_symbol = RESOURCE_BINDING_START;
-                    return true;
-                }
-                return false;
-            }
-            // Otherwise tree-sitter consumes the comments and calls the scanner again after them.
-            return line_break_in_comment && scan_after_line_break(lexer, false, rule, scanned_content, false);
+            return scan_automatic_semicolon_non_whitespace(lexer, &state, scanned_content, resource_symbols);
         }
 
         skip(lexer);
@@ -355,6 +318,46 @@ static bool scan_automatic_semicolon(TSLexer *lexer, bool after_block_arrow,
 
     skip(lexer);
     return scan_after_line_break(lexer, after_block_arrow, rule, scanned_content, false);
+}
+
+static bool scan_automatic_semicolon_slash(TSLexer *lexer, AutomaticSemicolonState *state,
+                                           bool *scanned_content, bool *accepted) {
+    WhitespaceResult result = scan_whitespace_and_comments(lexer, scanned_content, false, true);
+    if (result == REJECT) return true;
+    if (result == ACCEPT_AFTER_COMMENT_LINE_BREAK_BEFORE_SLASH) {
+        *accepted = scan_after_line_break(lexer, state->after_block_arrow, state->rule, scanned_content, true);
+        return true;
+    }
+    if (state->after_block_arrow && lexer_eof(lexer)) {
+        *accepted = true;
+        return true;
+    }
+    if (result == NO_NEWLINE && state->rule == LINE_BREAK_AFTER_AWAIT_KEYWORD) return true;
+    if (result == ACCEPT || result == ACCEPT_AFTER_COMMENT_LINE_BREAK) {
+        state->resource_line_break = true;
+        if (state->after_block_arrow || state->rule != LINE_BREAK_BY_NEXT_TOKEN) {
+            *accepted = scan_after_line_break(lexer, state->after_block_arrow, state->rule, scanned_content, false);
+            return true;
+        }
+        state->line_break_in_comment = result == ACCEPT_AFTER_COMMENT_LINE_BREAK;
+    }
+    return false;
+}
+
+static bool scan_automatic_semicolon_non_whitespace(TSLexer *lexer, const AutomaticSemicolonState *state,
+                                                    bool *scanned_content, const bool *resource_symbols) {
+    if (resource_symbols && !state->resource_line_break && is_identifier_part(lexer->lookahead) &&
+        !is_ascii_digit(lexer->lookahead)) {
+        bool infix_operator = false;
+        *scanned_content = true;
+        if (scan_resource_binding(lexer, resource_symbols[PLAIN_RESOURCE_FOR_OF_CONTEXT], &infix_operator)) {
+            lexer->result_symbol = RESOURCE_BINDING_START;
+            return true;
+        }
+        return false;
+    }
+    // Otherwise tree-sitter consumes the comments and calls the scanner again after them.
+    return state->line_break_in_comment && scan_after_line_break(lexer, false, state->rule, scanned_content, false);
 }
 
 static bool scan_after_line_break(TSLexer *lexer, bool after_block_arrow, LineBreakRule rule,
@@ -707,7 +710,7 @@ static bool scan_expression_end(Scanner *scanner, TSLexer *lexer, bool after_pos
         case '}':
             return true;
         default:
-            return lexer->eof(lexer) || saw_newline;
+            return saw_newline || lexer_eof(lexer);
     }
 }
 
@@ -869,7 +872,7 @@ static bool scan_arrow_context_end(TSLexer *lexer, bool *can_scan_ternary) {
         case 'i':
             return !scan_infix_word(lexer, false);
         case ';': case ',': case ':': case ')': case ']': case '}': return true;
-        default: return lexer->eof(lexer) || saw_newline;
+        default: return saw_newline || lexer_eof(lexer);
     }
 }
 
@@ -1141,7 +1144,7 @@ static bool scan_binding_end(Scanner *scanner, TSLexer *lexer) {
     if (trivia && lexer->lookahead == '=') return false;
     bool separator = trivia && (lexer->lookahead == ',' || lexer->lookahead == ';');
     scanner->automatic_semicolon_pending |= !separator &&
-        (saw_newline || lexer->eof(lexer) || lexer->lookahead == '}' || lexer->is_at_included_range_start(lexer));
+        (saw_newline || lexer->lookahead == '}' || lexer_eof(lexer) || lexer->is_at_included_range_start(lexer));
     lexer->result_symbol = LINE_BREAK_AFTER_BINDING;
     return true;
 }
