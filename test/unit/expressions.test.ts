@@ -6,6 +6,33 @@ import { expect, test } from 'vitest';
 const Root = path.join(import.meta.dirname, '../..');
 await Parser.init();
 
+test('rejects raw line breaks before a closing string quote', async () => {
+  const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
+  const parser = new Parser();
+  parser.setLanguage(language);
+  try {
+    for (const quote of ['"', "'"]) {
+      for (const lineBreak of ['\n', '\r', '\r\n']) {
+        for (const [body, valid] of [
+          [lineBreak, false],
+          [`text${lineBreak}`, false],
+          [`text\\${lineBreak}continued`, true],
+        ] as const) {
+          const source = `f(${quote}${body}${quote});`;
+          const tree = parser.parse(source)!;
+          try {
+            expect(tree.rootNode.hasError, JSON.stringify(source)).toBe(!valid);
+          } finally {
+            tree.delete();
+          }
+        }
+      }
+    }
+  } finally {
+    parser.delete();
+  }
+});
+
 test('parses await operands and callees named yield', async () => {
   const language = await Language.load(path.join(Root, 'tree-sitter-javascript.wasm'));
   const parser = new Parser();

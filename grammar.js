@@ -1423,12 +1423,12 @@ module.exports = grammar({
         seq(
           '"',
           repeat(choice(alias($.unescaped_double_string_fragment, sym('string_fragment')), $.escape_sequence)),
-          '"'
+          token.immediate('"')
         ),
         seq(
           "'",
           repeat(choice(alias($.unescaped_single_string_fragment, sym('string_fragment')), $.escape_sequence)),
-          "'"
+          token.immediate("'")
         )
       ),
 
