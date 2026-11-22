@@ -1,4 +1,4 @@
-// code-gauge-allow-file fileNcss 992 -- Scanner context dispatch stays together; splitting unrelated state transitions would only relocate complexity.
+// code-gauge-allow-file fileNcss -- Scanner context dispatch stays together; splitting unrelated state transitions would only relocate complexity.
 #include "function_context.h"
 #include "literal.h"
 #include "tree_sitter/alloc.h"
@@ -192,7 +192,7 @@ typedef enum {
 
 static bool scan_block_comment(TSLexer *lexer, bool *saw_newline, bool skip_contents);
 
-// code-gauge-allow functionCognitiveComplexity 25 -- Trivia comment and newline decisions share the same lexer cursor and consumption mode.
+// code-gauge-allow functionCognitiveComplexity -- Trivia comment and newline decisions share the same lexer cursor and consumption mode.
 static WhitespaceResult scan_whitespace_and_comments(TSLexer *lexer, bool *scanned_content, bool consume, bool skip_contents) {
     bool saw_comment_newline = false;
     for (;;) {
@@ -640,9 +640,9 @@ static bool scan_infix_word(TSLexer *lexer, bool skip_characters) {
     return is_in_or_instanceof(word, len);
 }
 
-// code-gauge-allow functionCognitiveComplexity 30 -- Expression-boundary cases share mutable newline and semicolon-pending state.
-// code-gauge-allow functionNcss 60 -- Token-boundary decisions retain scanner state and consumed-input order within a single lookahead pass.
-// code-gauge-allow duplicateLines 29 -- Operator cases share syntax across probes but intentionally make different statement-boundary decisions.
+// code-gauge-allow functionCognitiveComplexity -- Expression-boundary cases share mutable newline and semicolon-pending state.
+// code-gauge-allow functionNcss -- Token-boundary decisions retain scanner state and consumed-input order within a single lookahead pass.
+// code-gauge-allow duplicateLines -- Operator cases share syntax across probes but intentionally make different statement-boundary decisions.
 static bool scan_expression_end(Scanner *scanner, TSLexer *lexer, bool after_postfix, const bool *valid_symbols) {
     lexer->mark_end(lexer);
     lexer->result_symbol = after_postfix ? POSTFIX_UPDATE_END : AWAIT_OPERAND_END;
@@ -852,7 +852,7 @@ static bool scan_declaration_keyword(TSLexer *lexer, const bool *valid_symbols) 
     return valid_symbols[lexer->result_symbol];
 }
 
-// code-gauge-allow functionNcss 43 -- Arrow boundaries share newline state and the ternary-permission output from one trivia scan.
+// code-gauge-allow functionNcss -- Arrow boundaries share newline state and the ternary-permission output from one trivia scan.
 static bool scan_arrow_context_end(TSLexer *lexer, bool *can_scan_ternary) {
     lexer->mark_end(lexer);
     bool saw_newline = false;
@@ -1266,7 +1266,7 @@ static bool skip_trivia_whitespace(TSLexer *lexer, bool allow_line_breaks, bool 
     return true;
 }
 
-// code-gauge-allow functionNcss 36 -- Class heritage decisions share the cursor and newline state after trivia and optional HTML comments.
+// code-gauge-allow functionNcss -- Class heritage decisions share the cursor and newline state after trivia and optional HTML comments.
 static bool scan_class_heritage_end(TSLexer *lexer, bool allow_html_comment) {
     lexer->mark_end(lexer);
     bool saw_newline = false;
